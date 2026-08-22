@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_forest_doll_head": {
+      "conditions": {
+        "items": [
+          {
+            "items": "doll-mod:forest_doll_head"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "doll-mod:forest_doll_egg"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_the_recipe",
+      "has_forest_doll_head"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "doll-mod:forest_doll_egg"
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+pluginManagement {
+	repositories {
+		maven {
+			name = 'Aliyun'
+			url = 'https://maven.aliyun.com/repository/public/'
+		}
+		// 原有的保持不变
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		maven { url 'https://maven.aliyun.com/repository/public/' }
+		mavenCentral()
+		// 如果 Fabric 有特殊仓库，也保留
+		maven { url 'https://maven.fabricmc.net/' }
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+// Should match your modid
+rootProject.name = 'doll-mod'

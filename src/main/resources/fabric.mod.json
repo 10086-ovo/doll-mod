@@ -1,0 +1,47 @@
+{
+	"schemaVersion": 1,
+	"id": "doll-mod",
+	"version": "${version}",
+	"name": "人偶模组",
+	"description": "一个普普通通的 Minecraft 模组：召唤可命名的人偶，配武器盔甲，用 8 种行为模式指挥它们干活，死了不心疼。",
+	"authors": [
+		"人没事就好"
+	],
+	"contact": {
+		"homepage": "https://github.com/10086-ovo/doll-mod",
+		"issues": "https://github.com/10086-ovo/doll-mod/issues",
+		"sources": "https://github.com/10086-ovo/doll-mod"
+	},
+	"license": "CC0-1.0",
+	"icon": "assets/doll-mod/icon.png",
+	"custom": {
+		"modrinth": "todo-after-publish",
+		"curseforge": "todo-after-publish"
+	},
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.example.doll.DollMod"
+		],
+		"client": [
+			"com.example.doll.DollModClient"
+		],
+		"fabric-datagen": [
+			"com.example.doll.data.DollDataGenerator"
+		]
+	},
+	"accessWidener": "doll-mod.accesswidener",
+	"mixins": [
+		"doll-mod.mixins.json",
+		{
+			"config": "doll-mod.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

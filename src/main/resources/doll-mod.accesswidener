@@ -1,0 +1,9 @@
+accessWidener v1 official
+
+accessible class net/minecraft/world/inventory/MenuType$MenuSupplier
+accessible method net/minecraft/world/inventory/MenuType <init> (Lnet/minecraft/world/inventory/MenuType$MenuSupplier;Lnet/minecraft/world/flag/FeatureFlagSet;)V
+
+# 人偶背包屏幕注册：26.2 中 MenuScreens.register 为 private，ScreenConstructor 为包级接口。
+# 通过 AW 提权后，由同包普通类 DollScreenRegistration 完成注册（避免 mixin 包污染崩溃）。
+accessible class net/minecraft/client/gui/screens/MenuScreens$ScreenConstructor
+accessible method net/minecraft/client/gui/screens/MenuScreens register (Lnet/minecraft/world/inventory/MenuType;Lnet/minecraft/client/gui/screens/MenuScreens$ScreenConstructor;)V

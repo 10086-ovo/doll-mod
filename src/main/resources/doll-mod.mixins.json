@@ -1,0 +1,17 @@
+{
+	"required": true,
+	"package": "com.example.doll.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"AnvilBlockMixin",
+		"AreaEffectCloudAccessor",
+		"AreaEffectCloudMixin",
+		"EnchantmentHelperMixin",
+		"LivingEntityFearAuraMixin",
+		"MobMixin",
+		"WitherSkullMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
+}

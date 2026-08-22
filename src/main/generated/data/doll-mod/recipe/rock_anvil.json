@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "key": {
+    "C": "minecraft:cobblestone",
+    "S": "minecraft:cobblestone_slab"
+  },
+  "pattern": [
+    "CCC",
+    " S ",
+    "SSS"
+  ],
+  "result": {
+    "id": "doll-mod:rock_anvil"
+  }
+}

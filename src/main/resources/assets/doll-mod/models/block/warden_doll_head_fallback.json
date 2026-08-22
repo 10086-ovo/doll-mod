@@ -1,0 +1,21 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "particle": "doll-mod:block/warden_doll_head",
+    "all": "doll-mod:block/warden_doll_head"
+  },
+  "elements": [
+    {
+      "from": [3, 0, 3],
+      "to": [13, 10, 13],
+      "faces": {
+        "north": {"uv": [0, 0, 8, 8], "texture": "#all"},
+        "east":  {"uv": [8, 8, 16, 16], "texture": "#all"},
+        "south": {"uv": [8, 0, 16, 8], "texture": "#all"},
+        "west":  {"uv": [0, 8, 8, 16], "texture": "#all"},
+        "up":    {"uv": [0, 16, 8, 24], "texture": "#all"},
+        "down":  {"uv": [8, 16, 16, 24], "texture": "#all"}
+      }
+    }
+  ]
+}

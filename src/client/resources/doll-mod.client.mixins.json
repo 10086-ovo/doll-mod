@@ -1,0 +1,21 @@
+{
+	"required": true,
+	"package": "com.example.client.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"AvatarRendererDollMixin",
+		"ClientPacketListenerMixin",
+		"DollEntityClientMixin",
+		"MinecraftStopUseItemMixin",
+		"MinecraftUseItemOnDollMixin",
+		"SkullBlockRendererMixin",
+		"WitherSkullRenderStateMixin",
+		"WitherSkullRendererMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}

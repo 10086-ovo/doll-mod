@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "conditions": [
+        {
+          "condition": "minecraft:survives_explosion"
+        }
+      ],
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "doll-mod:ender_doll_head"
+        }
+      ],
+      "rolls": 1.0
+    }
+  ],
+  "random_sequence": "doll-mod:blocks/ender_doll_head"
+}

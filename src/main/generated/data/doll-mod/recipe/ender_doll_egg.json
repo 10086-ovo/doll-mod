@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "key": {
+    "E": "minecraft:end_stone",
+    "H": "doll-mod:ender_doll_head"
+  },
+  "pattern": [
+    "EEE",
+    "EHE",
+    "EEE"
+  ],
+  "result": {
+    "id": "doll-mod:ender_doll_egg"
+  }
+}
