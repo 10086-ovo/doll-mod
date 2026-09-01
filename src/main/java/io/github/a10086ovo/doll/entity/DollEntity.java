@@ -1595,6 +1595,17 @@ public class DollEntity extends Avatar {
 	/** 海洋人偶专属：仅 isInWater 时按目标 Y 做竖直跟随，陆地与其他人偶不触发。 */
 	private void applySeaSwimIfNeeded(double goalY) {
 		if (isSeaDoll() && this.isInWater()) {
+			// 穿着海洋靴跟随、且主人不在水里的海人偶：抵消下沉，使其贴合主人深度浮在水表，
+			// 避免靴子浮力与跟随竖直控制互相拉扯。主人潜水时(在水中)则刻意不干预，交给 applySeaSwim 下潜。
+			if (this.getItemBySlot(EquipmentSlot.FEET).getItem() instanceof SeaArmorItem) {
+				Player owner = getOwnerPlayer();
+				if (owner != null && !owner.isInWater()) {
+					Vec3 d = this.getDeltaMovement();
+					if (d.y < 0.0) {
+						this.setDeltaMovement(d.x, 0.0, d.z);
+					}
+				}
+			}
 			applySeaSwim(goalY);
 		}
 	}
