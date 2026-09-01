@@ -1,14 +1,16 @@
 {
 	"required": true,
-	"package": "com.example.client.mixin",
+	"package": "io.github.a10086ovo.client.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
 		"AvatarRendererDollMixin",
+		"SeaWaterFogMixin",
 		"ClientPacketListenerMixin",
 		"DollEntityClientMixin",
 		"MinecraftStopUseItemMixin",
 		"MinecraftUseItemOnDollMixin",
 		"SkullBlockRendererMixin",
+		"SpecialModelRenderersMixin",
 		"WitherSkullRenderStateMixin",
 		"WitherSkullRendererMixin"
 	],
