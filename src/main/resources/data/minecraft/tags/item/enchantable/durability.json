@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    "doll-mod:ender_axe",
+    "doll-mod:nether_sword",
+    "doll-mod:sea_helmet",
+    "doll-mod:sea_chestplate",
+    "doll-mod:sea_leggings",
+    "doll-mod:sea_boots"
+  ]
+}

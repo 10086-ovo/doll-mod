@@ -21,13 +21,13 @@
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-			"com.example.doll.DollMod"
+			"io.github.a10086ovo.doll.DollMod"
 		],
 		"client": [
-			"com.example.doll.DollModClient"
+			"io.github.a10086ovo.doll.DollModClient"
 		],
 		"fabric-datagen": [
-			"com.example.doll.data.DollDataGenerator"
+			"io.github.a10086ovo.doll.data.DollDataGenerator"
 		]
 	},
 	"accessWidener": "doll-mod.accesswidener",

@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "I": "minecraft:iron_block",
+    "L": "#minecraft:logs"
+  },
+  "pattern": [
+    "LIL",
+    "LLL",
+    " L "
+  ],
+  "result": {
+    "id": "doll-mod:thorns_shield"
+  }
+}

@@ -1,0 +1,51 @@
+{
+	"name": "末影人偶",
+	"icon": "doll-mod:ender_doll_egg",
+	"category": "special",
+	"sortnum": 5,
+	"pages": [
+		{
+			"type": "text",
+			"title": "基础属性",
+			"text": "末影人偶擅长闪避与瞬移斩杀，在末地战斗中尤其强力。\n\n• 生命值：120\n• 恢复 IV + 抗性 II（无抗火）"
+		},
+		{
+			"type": "text",
+			"title": "光环与能力",
+			"text": "战斗能力\n• 闪避：近战受击 67%、投射物 100% 概率完全免伤并瞬移躲避\n• 近战 / 射手模式下自动发射龙息（命中生成龙息云造成范围持续伤害，冷却 3 秒）\n• 瞬移处决：目标血量低于 25% 时瞬移斩杀，冷却 60 秒\n• 持末影斧时斩杀线提升至 55%\n\n龙息攻击不会误伤主人、主人的宠物和其他人偶。"
+		},
+		{
+			"type": "text",
+			"title": "获取方式",
+			"text": "末影人偶在末地战斗时尤其强力，投射物 100% 闪避使它几乎免疫弓箭和恶魂火球，近战 67% 闪避也足以应对绝大多数近身敌人。\n\n获取方式：先合成末影人偶头颅，再用它合成末影人偶蛋，最后在铁砧上赐名即可召唤。配方见下两页。"
+		},
+		{
+			"type": "crafting",
+			"title": "合成配方",
+			"pattern": [
+				"PP",
+				"PP"
+			],
+			"keys": {
+				"P": "minecraft:purpur_block"
+			},
+			"result": "doll-mod:ender_doll_head",
+			"text": "4 紫珀块摆 2×2 合成末影人偶头颅。"
+		},
+		{
+			"type": "crafting",
+			"title": "合成配方",
+			"pattern": [
+				"EEE",
+				"EHE",
+				"EEE"
+			],
+			"keys": {
+				"E": "minecraft:end_stone",
+				"H": "doll-mod:ender_doll_head"
+			},
+			"result": "doll-mod:ender_doll_egg",
+			"text": "8 末影石围一圈，中间放末影人偶头颅，合成末影人偶蛋。"
+		}
+	]
+}

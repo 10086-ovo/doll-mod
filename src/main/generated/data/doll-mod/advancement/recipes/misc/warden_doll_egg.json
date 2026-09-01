@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "doll-mod:warden_doll_egg"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    },
+    "has_warden_doll_head": {
+      "conditions": {
+        "items": [
+          {
+            "items": "doll-mod:warden_doll_head"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    }
+  },
+  "requirements": [
+    [
+      "has_the_recipe",
+      "has_warden_doll_head"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "doll-mod:warden_doll_egg"
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+{
+	"name": "末影斧",
+	"icon": "doll-mod:ender_axe",
+	"category": "items",
+	"sortnum": 6,
+	"pages": [
+		{
+			"type": "text",
+			"title": "基本属性",
+			"text": "末影斧是近战与远程投掷的混合武器，使用下界合金材质。\n\n• 近战造成 10 点伤害（对标下界合金斧），可剥皮原木\n• 远程投掷：长按右键蓄力后扔出，可回收\n• 主人持有时有 80% 闪避（主手或副手均生效）\n• 斩杀 30% 血以下怪物\n\n与末影人偶的协同\n末影人偶持有时斩杀线从 25% 提升至 55%，配合龙息攻击可实现高效的斩杀循环。"
+		},
+		{
+			"type": "crafting",
+			"title": "合成配方",
+			"pattern": [
+				"GE",
+				"GS",
+				" S"
+			],
+			"keys": {
+				"G": "minecraft:gold_ingot",
+				"E": "minecraft:ender_pearl",
+				"S": "minecraft:stick"
+			},
+			"result": "doll-mod:ender_axe",
+			"text": "投掷后末影斧像三叉戟一样飞行，附魔忠诚后可自动回归。"
+		}
+	]
+}
