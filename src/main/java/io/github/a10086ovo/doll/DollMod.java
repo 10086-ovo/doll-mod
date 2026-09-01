@@ -218,9 +218,9 @@ public class DollMod implements ModInitializer {
 	public static ArmorMaterial SEA_ARMOR_MATERIAL;
 	public static TagKey<Item> SEA_ARMOR_REPAIR_TAG;
 	public static SeaArmorItem SEA_HELMET;
-		public static SeaArmorItem SEA_CHESTPLATE;
-		public static SeaArmorItem SEA_LEGGINGS;
-		public static SeaArmorItem SEA_BOOTS;
+	public static SeaArmorItem SEA_CHESTPLATE;
+	public static SeaArmorItem SEA_LEGGINGS;
+	public static SeaArmorItem SEA_BOOTS;
 	public static Item DOLL_TIER1_EGG;
 	public static Item DOLL_TIER2_EGG;
 	public static Item DOLL_TIER3_EGG;

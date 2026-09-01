@@ -1597,6 +1597,8 @@ public class DollEntity extends Avatar {
 		if (isSeaDoll() && this.isInWater()) {
 			// 穿着海洋靴跟随、且主人不在水里的海人偶：抵消下沉，使其贴合主人深度浮在水表，
 			// 避免靴子浮力与跟随竖直控制互相拉扯。主人潜水时(在水中)则刻意不干预，交给 applySeaSwim 下潜。
+			// 与 SeaArmorItem.tickBoots 的浮力语义交叉引用：此处关闭靴子通用上浮、改由竖直驱动接管，
+			// 改一处需留意另一处。已知潜水边界：主人入水后 tickBoots 的通用浮力可能仍抵消下沉，需在游戏中验证下潜跟随不被卡住。
 			if (this.getItemBySlot(EquipmentSlot.FEET).getItem() instanceof SeaArmorItem) {
 				Player owner = getOwnerPlayer();
 				if (owner != null && !owner.isInWater()) {
