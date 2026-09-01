@@ -35,6 +35,9 @@ public class SeaArmorItem extends Item {
 		// All effects are server-side only (level is already ServerLevel, no client check needed)
 		// Only LivingEntity can wear armor and have effects
 		if (!(entity instanceof LivingEntity living)) return;
+		// 26.2 中 inventoryTick 亦会以 null 槽被调（物品在背包/光标等非装备位）——此时无特效可施，
+		// 且 switch 于 null 即 NPE，故早返。全套抗性只由着辈（非 null）之各件 tick 自足承担。
+		if (slot == null) return;
 
 		// Per-piece effects dispatched by equipment slot
 		switch (slot) {
