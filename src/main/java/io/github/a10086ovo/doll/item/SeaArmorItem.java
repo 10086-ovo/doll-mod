@@ -23,6 +23,7 @@ public class SeaArmorItem extends Item {
 
 	private static final float DAMAGE_FALL_CLEAR_THRESHOLD = 3.0f;
 	private static final int EFFECT_RENEW_THRESHOLD = 20;
+	private static final int NIGHT_VISION_RENEW_THRESHOLD = 240;
 
 	public SeaArmorItem(Properties properties) {
 		super(properties);
@@ -66,7 +67,7 @@ public class SeaArmorItem extends Item {
 		if (!entity.isInWater()) return;
 
 		if (!entity.hasEffect(MobEffects.NIGHT_VISION)
-			|| entity.getEffect(MobEffects.NIGHT_VISION).getDuration() <= EFFECT_RENEW_THRESHOLD) {
+			|| entity.getEffect(MobEffects.NIGHT_VISION).getDuration() <= NIGHT_VISION_RENEW_THRESHOLD) {
 			entity.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, 300, 0, false, false));
 		}
 	}
