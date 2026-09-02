@@ -19,3 +19,6 @@ logs/
 .project
 .settings/
 .workbuddy/
+
+# 内部 AI 开发计划/规格文档（不随仓库公开）
+docs/
