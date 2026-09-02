@@ -6361,10 +6361,11 @@ public class DollEntity extends Avatar {
 			return 120.0;
 		}
 		return switch (level) {
-			case 5, 4 -> 100.0;
-			case 3 -> 80.0;
-			case 2 -> 60.0;
-			case 1 -> 40.0;
+			case 5 -> 100.0;
+			case 4 -> 80.0;
+			case 3 -> 60.0;
+			case 2 -> 40.0;
+			case 1 -> 20.0;
 			default -> 20.0;
 		};
 	}

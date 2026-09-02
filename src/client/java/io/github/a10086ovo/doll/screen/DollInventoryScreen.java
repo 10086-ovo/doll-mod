@@ -103,6 +103,10 @@ public class DollInventoryScreen extends AbstractContainerScreen<DollScreenHandl
 		if (event.button() == 0) {
 			// 向导人偶统一搜索按钮（打开搜索二级菜单屏）
 			DollEntity owner = this.menu.getDollInventory().getOwner();
+			if (owner == null) {
+				// 空壳菜单：无人偶专属交互，槽位点击交超类处理即可
+				return super.mouseClicked(event, bl);
+			}
 			if (owner.getDollVariant() == DollVariant.GUIDE) {
 				int searchX = leftPos - 24;
 				int searchY = topPos + 80;
@@ -184,6 +188,11 @@ public class DollInventoryScreen extends AbstractContainerScreen<DollScreenHandl
 
 		// 左侧渲染血条（模仿玩家 HUD 心形图标，每行 10 心 = 20HP，超出换行）
 		DollEntity owner = this.menu.getDollInventory().getOwner();
+		if (owner == null) {
+			// 空壳菜单（客户端重建时偶发未找到实体）：槽位已由 super.extractContents 绘制，
+			// 此处跳过依赖 owner 的人偶专属层（血条/搜索/模式区），避免 NPE，待下帧同步修复。
+			return;
+		}
 		float health = owner.getHealth();
 		float maxHealth = owner.getMaxHealth();
 		int hearts = Math.max(1, (int) Math.ceil(maxHealth / 2.0f));

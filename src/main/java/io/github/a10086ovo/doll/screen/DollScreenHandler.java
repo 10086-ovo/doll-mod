@@ -69,7 +69,12 @@ public class DollScreenHandler extends AbstractContainerMenu {
 		if (entity instanceof DollEntity doll) {
 			return new DollScreenHandler(syncId, inv, doll.getInventoryBag());
 		}
-		return null;
+		// 实体查询失败（偶发竞态，如右键瞬间实体尚未在客户端确认）：绝不返回 null。
+		// Fabric 对 null 会 fallback 到原版 46 槽玩家背包，而服务端按 81 槽同步槽位，
+		// 导致 container_set_slot 越界断开。此处返回一个空 owner 的同构菜单保持槽位一致，
+		// 槽位渲染/交互已在 owner 为 null 时做空值防护。
+		DollMod.LOGGER.warn("[DollScreen] 客户端重建人偶背包菜单时未能找到实体 id={}，使用空壳菜单", dollEntityId);
+		return new DollScreenHandler(syncId, inv, new DollInventory(null));
 	}
 
 	private void addDollSlots() {
@@ -276,7 +281,9 @@ public class DollScreenHandler extends AbstractContainerMenu {
 		 */
 		@Override
 		public void setByPlayer(ItemStack newItem, ItemStack oldItem) {
-			owner.onEquipItem(equipmentSlot, oldItem, newItem);
+			if (owner != null) {
+				owner.onEquipItem(equipmentSlot, oldItem, newItem);
+			}
 			super.setByPlayer(newItem, oldItem);
 		}
 	}

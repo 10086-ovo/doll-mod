@@ -408,7 +408,8 @@ public class GuideBookScreen extends Screen {
 	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
 		super.extractRenderState(g, mouseX, mouseY, partialTick);
 		if (book == null) {
-			g.centeredText(this.font, "[指南书加载失败]", leftPos + PANEL_W / 2, topPos + PANEL_H / 2, 0xFFFF5555);
+			String err = (TIPS == TIPS_CN) ? "[指南书加载失败]" : "[Guide book failed to load]";
+			g.centeredText(this.font, err, leftPos + PANEL_W / 2, topPos + PANEL_H / 2, 0xFFFF5555);
 			return;
 		}
 
@@ -549,7 +550,7 @@ public class GuideBookScreen extends Screen {
 			// 页数指示
 			int pageCount = entry.pages.size();
 			if (pageCount > 1) {
-				String pages = pageCount + " 页";
+				String pages = (TIPS == TIPS_CN) ? pageCount + " 页" : pageCount + " pages";
 				int pagesW = this.font.width(pages);
 				g.text(this.font, pages, contentX + rowWidth - 8 - pagesW, rowY + 7, C_HINT, true);
 			}
@@ -600,7 +601,7 @@ public class GuideBookScreen extends Screen {
 			case "text" -> renderTextPage(g, page, bodyY);
 			case "item" -> renderItemPage(g, page, bodyY);
 			case "crafting" -> renderCraftingPage(g, entry, page, bodyY);
-			default -> g.text(this.font, "[未知页面类型: " + page.type + "]", contentX + 8, bodyY, 0xFFFF5555, true);
+			default -> g.text(this.font, (TIPS == TIPS_CN) ? "[未知页面类型: " + page.type + "]" : "[Unknown page type: " + page.type + "]", contentX + 8, bodyY, 0xFFFF5555, true);
 		}
 
 		// 页码

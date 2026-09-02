@@ -89,6 +89,9 @@ public class DollInventory implements Container {
 
 	@Override
 	public boolean stillValid(Player player) {
+		if (owner == null) {
+			return true;
+		}
 		if (owner.isRemoved()) {
 			return false;
 		}
