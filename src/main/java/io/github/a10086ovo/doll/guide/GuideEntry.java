@@ -3,8 +3,7 @@ package io.github.a10086ovo.doll.guide;
 import java.util.List;
 
 /**
- * 指南书条目（一个可阅读的章节页组）。参考 Patchouli 的 entry 概念。
- * 字段由 Gson 直接映射 JSON。
+ * 指南书条目（一个可阅读的章节页组）。字段由 Gson 直接映射 JSON。
  */
 public class GuideEntry {
 	/** 显示名（翻译键或纯文本） */

@@ -4,8 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 指南书章节（一组相关条目）。参考 Patchouli 的 category 概念。
- * 字段由 Gson 直接映射 JSON。
+ * 指南书章节（一组相关条目）。字段由 Gson 直接映射 JSON。
  */
 public class GuideCategory {
 	/** 章节 ID（如 "getting_started"） */

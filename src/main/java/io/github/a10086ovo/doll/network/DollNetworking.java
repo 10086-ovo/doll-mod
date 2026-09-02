@@ -15,6 +15,8 @@ import io.github.a10086ovo.doll.network.payload.SelectDollModePayload;
 import io.github.a10086ovo.doll.network.payload.ToggleMarkPayload;
 import io.github.a10086ovo.doll.network.payload.UpdateDollSnapshotPayload;
 import io.github.a10086ovo.doll.util.SearchMarkStore;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -37,6 +39,7 @@ import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.level.levelgen.structure.Structure;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -46,20 +49,26 @@ import java.util.concurrent.Executors;
 public final class DollNetworking {
 
 	/** 搜索冷却记录（玩家 UUID → 上次搜索时间戳 ms，三类搜索共用；按玩家限流，防多只人偶绕过冷却）。 */
-	private static final java.util.Map<java.util.UUID, Long> searchCooldown = new java.util.concurrent.ConcurrentHashMap<>();
+	private static final Map<UUID, Long> searchCooldown = new java.util.concurrent.ConcurrentHashMap<>();
 
-	/** 群系搜索工作线程：单线程串行执行纯噪声采样，避免主线程承担 ~500 次采样。 */
+	/**
+	 * 群系搜索工作线程池：纯噪声采样（{@code getNoiseBiome}）只读、线程安全，
+	 * 交工作线程执行以卸去主线程 ~500 次采样负担。小规模固定池便于多人并发时并行吞吐。
+	 */
 	private static final ExecutorService BIOME_SEARCH_EXECUTOR =
-		Executors.newSingleThreadExecutor(r -> {
+		Executors.newFixedThreadPool(3, r -> {
 			Thread t = new Thread(r, "doll-biome-search");
 			t.setDaemon(true);
 			return t;
 		});
 
-	/** 服务端每 tick 真实搜索配额：多人同时点刷新时把重搜索摊到后续 tick，防主线程瞬时过载。 */
-	private static final int MAX_SEARCHES_PER_TICK = 2;
-	private static long lastSearchTick = -1;
-	private static int searchesThisTick = 0;
+	/**
+	 * 结构/村庄搜索为服务端 tick 专属路径（{@code StructureManager} 非线程安全，不可逕移工作线程）。
+	 * 为避免单 tick 瞬时过载，将一次搜索的多次 {@code findNearestMapStructure} 拆为若干分片，
+	 * 每 tick 最多执行 {@link #STRUCTURE_SLICES_PER_TICK} 片，消除单 tick 峰值、结果迟至界面仍呈"搜索中"。
+	 */
+	private static final int STRUCTURE_SLICES_PER_TICK = 3;
+	private static final int PENDING_SEARCH_MAX = 64;
 
 	/** 搜索结果缓存 LRU 上限（玩家数）。超过后淘汰最久未访问的玩家条目。 */
 	private static final int CACHE_MAX_PLAYERS = 256;
@@ -67,6 +76,11 @@ public final class DollNetworking {
 	/** 搜索半径：100 区块（1600 格），以玩家发起搜索时所在位置为中心。 */
 	private static final int SEARCH_RADIUS_CHUNKS = 100;
 	private static final int SEARCH_RADIUS_BLOCKS = SEARCH_RADIUS_CHUNKS * 16;
+
+	/** 共享缓存复用判定：玩家与已缓存搜索中心点水平距离不超过此值即可直接复用其候选（零主线程搜索）。 */
+	private static final int SHARED_REUSE_BLOCKS = SEARCH_RADIUS_BLOCKS - 100;
+	/** 同一「维度:目标」的共享条目上限，防长时运行内存增长。 */
+	private static final int SHARED_ENTRIES_PER_TARGET = 8;
 
 	/**
 	 * 搜索结果缓存：玩家 UUID → (分类:目标索引:维度 → 上次搜索的候选坐标)。
@@ -80,6 +94,59 @@ public final class DollNetworking {
 				return size() > CACHE_MAX_PLAYERS;
 			}
 		});
+
+	/** 一条可共享的结构/村庄搜索结果（中心点 + 绝对候选坐标）。 */
+	private static final class SharedSearchEntry {
+		final int cx;
+		final int cz;
+		final List<int[]> candidates;
+
+		SharedSearchEntry(int cx, int cz, List<int[]> candidates) {
+			this.cx = cx;
+			this.cz = cz;
+			this.candidates = candidates;
+		}
+	}
+
+	/**
+	 * 世界级共享缓存（多人核心收益）：维度:目标 → 若干中心点各异的结果条目。
+	 * 甲在某处搜过，乙在附近搜索同一目标时直接复用甲的候选坐标（过滤+排序），不再各查一遍。
+	 * 结构/村庄位置由世界种子固定，永不陈腐；维度切换或换世界时于服务器启动清空。
+	 */
+	private static final Map<String, List<SharedSearchEntry>> sharedSearchCache = new java.util.HashMap<>();
+
+	/** 等待分片执行的结构/村庄搜索任务（服务端 tick 处理）。 */
+	private static final java.util.ArrayDeque<StructureSearchJob> pendingSearches = new java.util.ArrayDeque<>();
+
+	/** 一次分片式结构/村庄搜索任务的状态。 */
+	private static final class StructureSearchJob {
+		final ServerPlayer player;
+		final int category;
+		final int targetIndex;
+		final String cacheKey;
+		final ServerLevel level;
+		final HolderSet<Structure> set;
+		final int centerX;
+		final int centerY;
+		final int centerZ;
+		final int totalSlices;
+		int nextSlice;
+		final List<int[]> candidates = new ArrayList<>();
+
+		StructureSearchJob(ServerPlayer player, int category, int targetIndex, String cacheKey,
+				ServerLevel level, HolderSet<Structure> set, int centerX, int centerY, int centerZ, int totalSlices) {
+			this.player = player;
+			this.category = category;
+			this.targetIndex = targetIndex;
+			this.cacheKey = cacheKey;
+			this.level = level;
+			this.set = set;
+			this.centerX = centerX;
+			this.centerY = centerY;
+			this.centerZ = centerZ;
+			this.totalSlices = totalSlices;
+		}
+	}
 
 	private DollNetworking() {
 	}
@@ -153,52 +220,67 @@ public final class DollNetworking {
 				String cacheKey = payload.category() + ":" + payload.targetIndex() + ":" + serverLevel.dimension().identifier();
 				List<int[]> cached = peekCache(player.getUUID(), cacheKey);
 
-				// 非刷新请求且已有缓存：直接回放上次结果（零开销，不触发冷却）
+				// 非刷新请求且已有本玩家缓存：直接回放上次结果（零开销，不触发冷却）
 				if (!payload.refresh() && cached != null) {
 					ServerPlayNetworking.send(player,
 						buildResults(player, payload.category(), payload.targetIndex(), cached));
 					return;
 				}
 
-				// 需要真实搜索：冷却检查（2 秒，按玩家，三类搜索共用）。冷却中回放缓存，避免界面被清空
-				long now = System.currentTimeMillis();
-				Long last = searchCooldown.get(player.getUUID());
-				if (last != null && now - last < 2_000L) {
-					if (cached != null) {
-						ServerPlayNetworking.send(player,
-							buildResults(player, payload.category(), payload.targetIndex(), cached));
-					} else {
-						player.sendSystemMessage(Component.translatable(
-							"message." + DollModConstants.MOD_ID + ".search_cooldown",
-							String.format("%.1f", (2_000L - (now - last)) / 1000.0)));
-						ServerPlayNetworking.send(player,
-							new SearchResultsPayload(payload.category(), payload.targetIndex(), List.of()));
-					}
-					return;
-				}
-
-				// 服务端每 tick 真实搜索配额：超限时回放缓存或提示稍后再试（不占用冷却，可下 tick 重试）
-				if (!tryAcquireSearchSlot(context.server())) {
-					if (cached != null) {
-						ServerPlayNetworking.send(player,
-							buildResults(player, payload.category(), payload.targetIndex(), cached));
-					} else {
-						player.sendSystemMessage(Component.translatable(
-							"message." + DollModConstants.MOD_ID + ".search_busy"));
-					}
-					return;
-				}
-				searchCooldown.put(player.getUUID(), now);
-
-				// 群系走工作线程异步采样（纯噪声、线程安全）；结构/村庄仍主线程同步执行
+				// 群系：工作线程异步采样（纯噪声、线程安全），与共享缓存无涉
 				if (payload.category() == SearchCategory.BIOME) {
+					// 冷却检查（2 秒，按玩家，三类搜索共用）
+					if (!acceptCooldown(player)) {
+						replayOrCooldown(player, payload, cached);
+						return;
+					}
 					startBiomeSearchAsync(context.server(), player, serverLevel, payload, cacheKey);
-				} else {
-					List<int[]> found = runSearch(player, serverLevel, payload.category(), payload.targetIndex());
-					storeCache(player.getUUID(), cacheKey, found);
-					ServerPlayNetworking.send(player,
-						buildResults(player, payload.category(), payload.targetIndex(), found));
+					return;
 				}
+
+				// ---- 结构/村庄：先试共享缓存复用（多人免重复搜索，零主线程开销）----
+				if (!payload.refresh()) {
+					List<SharedSearchEntry> shared = sharedSearchCache.get(sharedTargetKey(serverLevel, payload.category(), payload.targetIndex()));
+					if (shared != null) {
+						BlockPos p = player.blockPosition();
+						SharedSearchEntry best = null;
+						long bestDist = Long.MAX_VALUE;
+						for (SharedSearchEntry e : shared) {
+							long d = horizDistSq(p, e.cx, e.cz);
+							if (d < bestDist) {
+								bestDist = d;
+								best = e;
+							}
+						}
+						if (best != null && horizDistSq(p, best.cx, best.cz) <= (long) SHARED_REUSE_BLOCKS * SHARED_REUSE_BLOCKS) {
+							// 复用：以玩家坐标过滤+排序后回放，并回填本玩家缓存
+							List<int[]> filtered = new ArrayList<>();
+							for (int[] c : best.candidates) {
+								if (horizDistSq(p, c[0], c[1]) <= (long) SEARCH_RADIUS_BLOCKS * SEARCH_RADIUS_BLOCKS) {
+									filtered.add(c);
+								}
+							}
+							storeCache(player.getUUID(), cacheKey, filtered);
+							ServerPlayNetworking.send(player,
+								buildResults(player, payload.category(), payload.targetIndex(), filtered));
+							return;
+						}
+					}
+				}
+
+				// 需要真实搜索：冷却检查
+				if (!acceptCooldown(player)) {
+					replayOrCooldown(player, payload, cached);
+					return;
+				}
+
+				// 分片式搜索入队（每 tick 有界执行，消除单 tick 峰值）
+				if (pendingSearches.size() >= PENDING_SEARCH_MAX) {
+					player.sendSystemMessage(Component.translatable(
+						"message." + DollModConstants.MOD_ID + ".search_busy"));
+					return;
+				}
+				enqueueStructureSearch(serverLevel, player, payload, cacheKey);
 			});
 		});
 
@@ -216,32 +298,165 @@ public final class DollNetworking {
 			searchResultCache.remove(id);
 			searchCooldown.remove(id);
 		});
+
+		// 服务器启动：清空世界级共享缓存与排队任务（结构位置随世界种子而定，跨世界不应复用）
+		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+			sharedSearchCache.clear();
+			pendingSearches.clear();
+		});
+
+		// 每 tick 递进结构/村庄分片：主线程有界执行，避免单 tick 瞬时过载
+		ServerTickEvents.END_SERVER_TICK.register(server -> {
+			int budget = STRUCTURE_SLICES_PER_TICK;
+			Iterator<StructureSearchJob> it = pendingSearches.iterator();
+			while (it.hasNext() && budget > 0) {
+				StructureSearchJob job = it.next();
+				int remaining = job.totalSlices - job.nextSlice;
+				int take = Math.min(budget, remaining);
+				for (int k = 0; k < take; k++) {
+					runSlice(job, job.nextSlice++);
+				}
+				budget -= take;
+				if (job.nextSlice >= job.totalSlices) {
+					it.remove();
+					finalizeSearch(job);
+				}
+			}
+		});
+	}
+
+	/** 冷却通过则记录本次搜索并返回 true；否则返回 false。 */
+	private static boolean acceptCooldown(ServerPlayer player) {
+		long now = System.currentTimeMillis();
+		Long last = searchCooldown.get(player.getUUID());
+		if (last != null && now - last < 2_000L) {
+			return false;
+		}
+		searchCooldown.put(player.getUUID(), now);
+		return true;
+	}
+
+	/** 冷却中：有缓存回放缓存，否则提示剩余冷却并回空。 */
+	private static void replayOrCooldown(ServerPlayer player, RequestSearchPayload payload, List<int[]> cached) {
+		Long last = searchCooldown.get(player.getUUID());
+		long now = System.currentTimeMillis();
+		if (cached != null) {
+			ServerPlayNetworking.send(player,
+				buildResults(player, payload.category(), payload.targetIndex(), cached));
+		} else {
+			if (last != null) {
+				player.sendSystemMessage(Component.translatable(
+					"message." + DollModConstants.MOD_ID + ".search_cooldown",
+					String.format("%.1f", (2_000L - (now - last)) / 1000.0)));
+			}
+			ServerPlayNetworking.send(player,
+				new SearchResultsPayload(payload.category(), payload.targetIndex(), List.of()));
+		}
 	}
 
 	/**
-	 * 按分类分派搜索，返回以玩家为中心、{@link #SEARCH_RADIUS_CHUNKS} 区块半径内的候选坐标。
-	 * 群系已走 {@link #startBiomeSearchAsync} 异步路径，此处只处理结构/村庄
-	 * （原版 {@code findNearestMapStructure}，不生成区块）。返回原始候选供缓存，
-	 * 构造返回包时再排序与填充打卡状态。
+	 * 结构/村庄分片式搜索入队。任务在服务端 tick 上逐片执行（{@code StructureManager} 线程安全，
+	 * 但每 tick 量有界），完成后回写缓存并发包。
 	 */
-	private static List<int[]> runSearch(ServerPlayer player, ServerLevel level, int category, int targetIndex) {
-		BlockPos playerPos = player.blockPosition();
-		List<int[]> candidates = new ArrayList<>();
+	private static void enqueueStructureSearch(ServerLevel level, ServerPlayer player,
+			RequestSearchPayload payload, String cacheKey) {
+		int category = payload.category();
+		int targetIndex = payload.targetIndex();
+		ResourceKey<Level> dim = level.dimension();
+		ResourceKey<Structure> structureKey;
+		int slices;
 
-		switch (category) {
-			case SearchCategory.VILLAGE -> {
-				VillageSearchType type = VillageSearchType.byIndex(targetIndex);
-				// 村庄仅生成于主世界
-				if (level.dimension().equals(Level.OVERWORLD)) {
-					collectStructure(candidates, level, playerPos, type.structureResourceKey(), Level.OVERWORLD);
+		if (category == SearchCategory.VILLAGE) {
+			// 村庄仅生成于主世界
+			if (!dim.equals(Level.OVERWORLD)) {
+				storeCache(player.getUUID(), cacheKey, List.of());
+				ServerPlayNetworking.send(player,
+					buildResults(player, category, targetIndex, List.of()));
+				return;
+			}
+			structureKey = VillageSearchType.byIndex(targetIndex).structureResourceKey();
+			slices = 1;
+		} else {
+			StructureSearchType type = StructureSearchType.byIndex(targetIndex);
+			if (!type.dimension().equals(dim)) {
+				storeCache(player.getUUID(), cacheKey, List.of());
+				ServerPlayNetworking.send(player,
+					buildResults(player, category, targetIndex, List.of()));
+				return;
+			}
+			structureKey = type.structureResourceKey();
+			slices = 9; // 中心 + 8 方向
+		}
+
+		Registry<Structure> registry = level.registryAccess().lookupOrThrow(Registries.STRUCTURE);
+		Holder.Reference<Structure> holder = registry.get(structureKey).orElse(null);
+		if (holder == null) {
+			storeCache(player.getUUID(), cacheKey, List.of());
+			ServerPlayNetworking.send(player,
+				buildResults(player, category, targetIndex, List.of()));
+			return;
+		}
+		HolderSet<Structure> set = HolderSet.direct(holder);
+		BlockPos p = player.blockPosition();
+		pendingSearches.addLast(new StructureSearchJob(player, category, targetIndex, cacheKey,
+			level, set, p.getX(), p.getY(), p.getZ(), slices));
+	}
+
+	/**
+	 * 执行任务的一片：分片 0 为中心 100 区块内最近结构，分片 1..8 为距中心 70 区块处、
+	 * 各 30 区块半径的八个方向（合起来覆盖 40~100 区块环带），收集更多实例。
+	 */
+	private static void runSlice(StructureSearchJob job, int slice) {
+		if (job.player.connection == null || job.player.isRemoved()) {
+			return;
+		}
+		if (slice == 0) {
+			addStructureHit(job.candidates, job.level, job.set,
+				new BlockPos(job.centerX, job.centerY, job.centerZ), SEARCH_RADIUS_CHUNKS);
+		} else {
+			int i = slice - 1;
+			double angle = 2 * Math.PI * (i + 0.5) / 8;
+			int cx = job.centerX + (int) (Math.cos(angle) * 70 * 16);
+			int cz = job.centerZ + (int) (Math.sin(angle) * 70 * 16);
+			addStructureHit(job.candidates, job.level, job.set, new BlockPos(cx, job.centerY, cz), 30);
+		}
+	}
+
+	/** 任务全部分片执行完毕：写本玩家缓存、写共享缓存、发结果。 */
+	private static void finalizeSearch(StructureSearchJob job) {
+		if (job.player.connection == null || job.player.isRemoved()) {
+			return;
+		}
+		storeCache(job.player.getUUID(), job.cacheKey, job.candidates);
+		storeShared(job.level, job.player, job.category, job.targetIndex, job.candidates);
+		ServerPlayNetworking.send(job.player,
+			buildResults(job.player, job.category, job.targetIndex, job.candidates));
+	}
+
+	/** 将结果并入世界级共享缓存（按中心点归入条目，超上限抛最远旧条目）。 */
+	private static void storeShared(ServerLevel level, ServerPlayer player,
+			int category, int targetIndex, List<int[]> candidates) {
+		String key = sharedTargetKey(level, category, targetIndex);
+		int cx = player.blockPosition().getX();
+		int cz = player.blockPosition().getZ();
+		List<SharedSearchEntry> list = sharedSearchCache.computeIfAbsent(key, k -> new ArrayList<>());
+		list.add(new SharedSearchEntry(cx, cz, new ArrayList<>(candidates)));
+		if (list.size() > SHARED_ENTRIES_PER_TARGET) {
+			int farthestIndex = 0;
+			long farthest = -1;
+			for (int i = 0; i < list.size(); i++) {
+				long d = horizDistSq(player.blockPosition(), list.get(i).cx, list.get(i).cz);
+				if (d > farthest) {
+					farthest = d;
+					farthestIndex = i;
 				}
 			}
-			default -> {
-				StructureSearchType type = StructureSearchType.byIndex(targetIndex);
-				collectStructure(candidates, level, playerPos, type.structureResourceKey(), type.dimension());
-			}
+			list.remove(farthestIndex);
 		}
-		return candidates;
+	}
+
+	private static String sharedTargetKey(ServerLevel level, int category, int targetIndex) {
+		return level.dimension().identifier() + "|" + category + "|" + targetIndex;
 	}
 
 	/**
@@ -278,23 +493,6 @@ public final class DollNetworking {
 					buildResults(player, category, targetIndex, found));
 			});
 		});
-	}
-
-	/**
-	 * 服务端每 tick 真实搜索配额（主线程调用）。多人同时点刷新时限制同 tick 内的
-	 * 真实搜索数量，把重搜索摊到后续 tick，避免主线程瞬时过载。
-	 */
-	private static boolean tryAcquireSearchSlot(MinecraftServer server) {
-		long tick = server.getTickCount();
-		if (tick != lastSearchTick) {
-			lastSearchTick = tick;
-			searchesThisTick = 0;
-		}
-		if (searchesThisTick >= MAX_SEARCHES_PER_TICK) {
-			return false;
-		}
-		searchesThisTick++;
-		return true;
 	}
 
 	/**
@@ -338,38 +536,10 @@ public final class DollNetworking {
 	}
 
 	/**
-	 * 结构/村庄：不生成区块，用原版 {@code findNearestMapStructure}（半径单位为区块）多次采样。
-	 * <p>
-	 * 性能关键：以玩家为中心 100 区块半径 1 次 + 外围 8 方向（距玩家 70 区块、各 30 区块半径）1 次，
-	 * 共 9 次调用、全部收敛在 100 区块半径内。旧实现约 50 次调用、最远搜索到 12600 格，
-	 * 是多人卡顿的另一主因。结构起点确定性生成，同一结构多次命中会返回同一坐标，由去重过滤。
+	 * 单次最近结构查询，命中且不与已有候选重复时记录。不生成区块，
+	 * 直接用原版 {@code findNearestMapStructure}（以区块为半径，起点确定性生成，
+	 * 同一结构多次命中会返回同一坐标，由去重过滤）。仅应在服务端 tick 线程调用。
 	 */
-	private static void collectStructure(List<int[]> into, ServerLevel level, BlockPos playerPos,
-			ResourceKey<Structure> structureKey, ResourceKey<Level> dim) {
-		if (!dim.equals(level.dimension())) {
-			return;
-		}
-		Registry<Structure> registry = level.registryAccess().lookupOrThrow(Registries.STRUCTURE);
-		Holder.Reference<Structure> holder = registry.get(structureKey).orElse(null);
-		if (holder == null) {
-			return;
-		}
-		HolderSet<Structure> set = HolderSet.direct(holder);
-
-		List<int[]> candidates = new ArrayList<>();
-		// 中心：100 区块半径内最近一个
-		addStructureHit(candidates, level, set, playerPos, SEARCH_RADIUS_CHUNKS);
-		// 外围 8 方向：距玩家 70 区块处各查 30 区块半径（合起来覆盖 40~100 区块环带），收集更多实例
-		for (int i = 0; i < 8; i++) {
-			double angle = 2 * Math.PI * (i + 0.5) / 8;
-			int cx = playerPos.getX() + (int) (Math.cos(angle) * 70 * 16);
-			int cz = playerPos.getZ() + (int) (Math.sin(angle) * 70 * 16);
-			addStructureHit(candidates, level, set, new BlockPos(cx, playerPos.getY(), cz), 30);
-		}
-		into.addAll(candidates);
-	}
-
-	/** 单次最近结构查询，命中且不与已有候选重复时记录。 */
 	private static void addStructureHit(List<int[]> candidates, ServerLevel level, HolderSet<Structure> set,
 			BlockPos center, int radiusChunks) {
 		com.mojang.datafixers.util.Pair<BlockPos, Holder<Structure>> hit =

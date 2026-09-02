@@ -36,7 +36,8 @@ import java.util.List;
  *   <li>搜索结果（RESULTS）：列表从上到下按与玩家水平距离由近及远排列，每行显示目标图标、
  *       名称、水平距离、坐标，右侧一个「√」打卡按钮（点击翻转前端 + 通知服务端持久化）。
  *       右上角「刷新」按钮以玩家当前位置为中心强制重新搜索（半径 100 区块），
- *       其余时候服务端直接回放上次搜索结果，避免多人服务器反复搜索造成卡顿。
+ *       其余时候服务端优先回放本玩家缓存，其次复用世界级共享缓存，避免多人反复搜索；确实重新搜索时，
+ *       群系在工作线程异步采样，结构/村庄在服务端跨 tick 分片执行（每 tick 有界），结果迟至期间本屏持续呈「搜索中」。
  * </ul>
  *
  * <p>26.2 坐标系：本屏是纯 Screen（无容器平移），事件坐标与绘图均为窗口绝对坐标。
@@ -94,6 +95,8 @@ public class GuideSearchScreen extends Screen {
 	private int category = SearchCategory.STRUCTURE;
 	private int pickScroll;
 	private int resScroll;
+	private int lastPickHoverRow = 1;   // 类型列表末次所指行号（鼠标离列表时依此示之）
+	private int lastResHoverRow = 1;    // 结果列表末次所指行号（鼠标离列表时依此示之）
 	private List<Pickable> pickByCat = List.of();   // 当前维度该页面下的全部目标
 	private Pickable current;                       // 正在展示结果的目标
 	private boolean pending;                        // 等待服务端返回搜索结果
@@ -240,10 +243,11 @@ public class GuideSearchScreen extends Screen {
 			if (isHovering(tabX(i), topPos + 22, tabW(), TAB_H, mx, my)) {
 				playClick();
 				if (category != TAB_CATS[i]) {
-					category = TAB_CATS[i];
-					pickByCat = buildPickablesFor(category);
-					pickScroll = 0;
-				}
+						category = TAB_CATS[i];
+						pickByCat = buildPickablesFor(category);
+						pickScroll = 0;
+						lastPickHoverRow = 1;
+					}
 				return true;
 			}
 		}
@@ -266,21 +270,23 @@ public class GuideSearchScreen extends Screen {
 	private boolean handleResultsClick(int mx, int my) {
 		// 返回按钮
 		if (isHovering(leftPos + 6, topPos + 6, 24, 16, mx, my)) {
-			playClick();
-			resultsView = false;
-			pending = false;
-			rows.clear();
-			return true;
-		}
+				playClick();
+				resultsView = false;
+				pending = false;
+				rows.clear();
+				lastPickHoverRow = 1;
+				return true;
+			}
 		// 刷新按钮：以玩家当前位置为中心强制重新搜索（服务端覆盖缓存）
 		if (isHovering(refreshBtnX(), topPos + 6, REFRESH_BTN_W, REFRESH_BTN_H, mx, my)) {
 			playClick();
 			if (current != null) {
-				this.pending = true;
-				this.rows.clear();
-				this.resScroll = 0;
-				DollClientNetworking.sendSearch(dollEntityId, current.category, current.targetIndex, true);
-			}
+					this.pending = true;
+					this.rows.clear();
+					this.resScroll = 0;
+					this.lastResHoverRow = 1;
+					DollClientNetworking.sendSearch(dollEntityId, current.category, current.targetIndex, true);
+				}
 			return true;
 		}
 		int visible = Math.min(RES_ROWS, rows.size());
@@ -305,6 +311,7 @@ public class GuideSearchScreen extends Screen {
 		this.pending = true;
 		this.rows.clear();
 		this.resScroll = 0;
+		this.lastResHoverRow = 1;
 		this.resultsView = true;
 		// refresh=false：服务端有缓存时直接回放上次结果，不重复搜索
 		DollClientNetworking.sendSearch(dollEntityId, p.category, p.targetIndex, false);
@@ -323,6 +330,7 @@ public class GuideSearchScreen extends Screen {
 		}
 		this.pending = false;
 		this.resScroll = 0;
+		this.lastResHoverRow = 1;
 	}
 
 	// ---- 渲染 ----
@@ -389,7 +397,15 @@ public class GuideSearchScreen extends Screen {
 			}
 		}
 		if (pickByCat.size() > PICK_ROWS) {
-			String info = (pickScroll + 1) + "/" + pickByCat.size();
+			int curRow = pickScroll + 1;
+			for (int i = 0; i < visible; i++) {
+				int ry = topPos + PICK_TOP + i * PICK_ROW;
+				if (isHovering(leftPos + 4, ry, PANEL_W - 8, PICK_ROW - 1, lastMouseX, lastMouseY)) {
+					curRow = pickScroll + i + 1;
+					break;
+				}
+			}
+			String info = curRow + "/" + pickByCat.size();
 			g.text(this.font, info, leftPos + PANEL_W - 8 - this.font.width(info), topPos + PICK_TOP + PICK_ROWS * PICK_ROW + 8,
 				COLOR_HINT, true);
 		}
@@ -439,7 +455,10 @@ public class GuideSearchScreen extends Screen {
 			ResultRow r = rows.get(resScroll + i);
 			int ry = topPos + RES_TOP + i * RES_ROW;
 			boolean hover = isHovering(leftPos + 4, ry, PANEL_W - 8, RES_ROW - 1, lastMouseX, lastMouseY);
-			g.fill(leftPos + 2, ry, leftPos + PANEL_W - 2, ry + RES_ROW - 1, hover ? COLOR_ROW_HOVER : COLOR_ROW_BG);
+			if (hover) {
+					lastResHoverRow = resScroll + i + 1;
+				}
+				g.fill(leftPos + 2, ry, leftPos + PANEL_W - 2, ry + RES_ROW - 1, hover ? COLOR_ROW_HOVER : COLOR_ROW_BG);
 			// 名称
 			g.item(current.icon, leftPos + 8, ry + 5);
 			String name = current.localizedName();
@@ -472,7 +491,8 @@ public class GuideSearchScreen extends Screen {
 			}
 		}
 		if (rows.size() > RES_ROWS) {
-			String info = (resScroll + 1) + "/" + rows.size();
+			int curRow = Math.min(lastResHoverRow, rows.size());
+			String info = curRow + "/" + rows.size();
 			g.text(this.font, info, leftPos + PANEL_W - 8 - this.font.width(info), topPos + RES_TOP + RES_ROWS * RES_ROW + 8,
 				COLOR_HINT, true);
 		}

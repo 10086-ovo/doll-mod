@@ -8,7 +8,6 @@ import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.Vec3;
 
 /**
  * 海洋人偶甲 — 自定义盔甲物品子类。
@@ -21,7 +20,6 @@ import net.minecraft.world.phys.Vec3;
  */
 public class SeaArmorItem extends Item {
 
-	private static final float DAMAGE_FALL_CLEAR_THRESHOLD = 3.0f;
 	private static final int EFFECT_RENEW_THRESHOLD = 20;
 	private static final int NIGHT_VISION_RENEW_THRESHOLD = 240;
 
@@ -43,7 +41,6 @@ public class SeaArmorItem extends Item {
 		switch (slot) {
 			case HEAD -> tickHelmet(entity);
 			case CHEST -> tickChestplate(living);
-			case LEGS -> tickLeggings(living);
 			case FEET -> tickBoots(living);
 			default -> { /* no-op for other slots */ }
 		}
@@ -75,39 +72,11 @@ public class SeaArmorItem extends Item {
 		}
 	}
 
-	/** 护腿：水中速度 III —— 仅快过期时续期，不重复添加。 */
-	private void tickLeggings(LivingEntity entity) {
-		if (!entity.isInWater()) return;
-
-		if (!entity.hasEffect(MobEffects.SPEED)
-			|| entity.getEffect(MobEffects.SPEED).getDuration() <= EFFECT_RENEW_THRESHOLD) {
-			entity.addEffect(new MobEffectInstance(MobEffects.SPEED, 300, 2, false, false));
-		}
-	}
-
-	/** 靴子：水面行走 / 漂浮 —— 潜行不生效，不潜行抵消下沉并清摔落伤害。 */
+	/** 靴子：行水如履 —— 水面承载（真行走/跑/跳）由
+	 * {@link io.github.a10086ovo.doll.mixin.LiquidBlockWaterWalkMixin} 于水块碰撞处落实；
+	 * 此处仅清摔落兜底。 */
 	private void tickBoots(LivingEntity entity) {
-		if (!entity.isInWater()) {
-			return;
-		}
-
-		if (entity.isShiftKeyDown()) {
-			// Let it sink normally when sneaking
-			return;
-		}
-
-		Vec3 movement = entity.getDeltaMovement();
-		// Clear falling damage if not falling fast (fast fall still takes fall damage but clears fall distance after hit)
-		if (entity.fallDistance > DAMAGE_FALL_CLEAR_THRESHOLD) {
-			// Fast fall hitting water: let it go straight down but clear fall distance after impact
-			entity.fallDistance = 0.0f;
-		} else {
-			// Counteract sinking: zero out negative Y delta to float
-			if (movement.y < 0.0) {
-				entity.setDeltaMovement(movement.x, 0.0, movement.z);
-			}
-			entity.fallDistance = 0.0f;
-		}
+		entity.fallDistance = 0.0f;
 	}
 
 	/** 统计 {@code entity} 四个盔甲槽中 {@code SeaArmorItem} 的数量 —— 用于全套四件触发抗性。 */

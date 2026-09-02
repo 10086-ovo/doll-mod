@@ -27,6 +27,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 
+import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -91,6 +92,17 @@ public class WildWardenDollEntity extends Monster {
 	@Override
 	public boolean fireImmune() {
 		return true; // 免疫火焰和岩浆伤害，仿监守者
+	}
+
+	/**
+	 * 投射物免疫（类似凋零二阶段）：完全免疫所有投射物伤害。
+	 */
+	@Override
+	public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+		if (source.getDirectEntity() instanceof Projectile) {
+			return false;
+		}
+		return super.hurtServer(level, source, amount);
 	}
 
 	/**

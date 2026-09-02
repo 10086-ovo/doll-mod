@@ -4,8 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 指南书整体定义。参考 Patchouli 的 book.json 概念。
- * 字段由 Gson 直接映射 JSON。
+ * 指南书整体定义。字段由 Gson 直接映射 JSON。
  */
 public class GuideBook {
 	/** 书名（翻译键或纯文本） */

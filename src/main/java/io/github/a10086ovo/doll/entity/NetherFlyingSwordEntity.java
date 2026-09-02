@@ -82,7 +82,7 @@ public class NetherFlyingSwordEntity extends ItemEntity {
 	/** 索敌半径：以玩家为中心 */
 	public static final double SEARCH_RADIUS = 16.0;
 	/** 撞击伤害 */
-	public static final float HIT_DAMAGE = 4.0f;
+	public static final float HIT_DAMAGE = 8.0f;
 	/** 撞击点燃时长（秒） */
 	public static final int HIT_IGNITE_SECONDS = 8;
 	/** 攻击间隔（tick） */

@@ -3,6 +3,8 @@ package io.github.a10086ovo.doll.item;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
@@ -95,6 +97,9 @@ public class ThornsShieldItem extends ShieldItem {
 				attacker.getX(), attacker.getY() + attacker.getBbHeight() * 0.5, attacker.getZ(),
 				3, 0.3, 0.3, 0.3, 0.1);
 		}
+
+		// 玩家荆棘反伤：给攻击者施加无限中毒效果（-1 持续 = 永不消退）
+		livingAttacker.addEffect(new MobEffectInstance(MobEffects.POISON, -1, 0, false, false, false));
 
 		// 不额外消耗耐久：反伤是被动能力，盾牌格挡本身的耐久消耗由原版逻辑处理
 	}

@@ -172,7 +172,9 @@ public class DollMod implements ModInitializer {
 	private static final Identifier SEA_BOOTS_KEY =
 		id(DollModConstants.SEA_BOOTS_ID);
 	private static final Identifier PALE_BOW_KEY =
-		id(DollModConstants.PALE_BOW_ID);
+			id(DollModConstants.PALE_BOW_ID);
+		private static final Identifier PRISMARINE_GRAVEL_KEY =
+		id(DollModConstants.PRISMARINE_GRAVEL_ID);
 
 	public static final EntityType<DollEntity> DOLL_ENTITY = Registry.register(
 		BuiltInRegistries.ENTITY_TYPE,
@@ -216,7 +218,11 @@ public class DollMod implements ModInitializer {
 	public static Item GUIDE_BOOK_ITEM;
 	public static PaleBowItem PALE_BOW_ITEM;
 	public static ArmorMaterial SEA_ARMOR_MATERIAL;
-	public static TagKey<Item> SEA_ARMOR_REPAIR_TAG;
+		public static TagKey<Item> SEA_ARMOR_REPAIR_TAG;
+			public static TagKey<Item> ENDER_AXE_REPAIR_TAG;
+			public static TagKey<Item> NETHER_SWORD_REPAIR_TAG;
+			public static TagKey<Item> PALE_BOW_REPAIR_TAG;
+			public static TagKey<Item> THORNS_SHIELD_REPAIR_TAG;
 	public static SeaArmorItem SEA_HELMET;
 	public static SeaArmorItem SEA_CHESTPLATE;
 	public static SeaArmorItem SEA_LEGGINGS;
@@ -246,6 +252,7 @@ public class DollMod implements ModInitializer {
 	public static Item ROCK_ANVIL_ITEM;
 	public static Item CHIPPED_ROCK_ANVIL_ITEM;
 	public static Item DAMAGED_ROCK_ANVIL_ITEM;
+		public static Item PRISMARINE_GRAVEL_ITEM;
 
 	// ---- 升级配方（在 onInitialize 中创建，依赖已注册的物品字段）----
 	public static DollUpgradeRecipe DOLL_UPGRADE_TIER2;
@@ -481,28 +488,37 @@ public class DollMod implements ModInitializer {
 		}
 
 		// ========== 1. 注册所有物品 ==========
-		ENDER_AXE_ITEM = Registry.register(
-			BuiltInRegistries.ITEM,
-			ENDER_AXE_KEY,
-			new EnderAxeItem(ToolMaterial.NETHERITE, 5.0f, -2.9f,
-				new Item.Properties().durability(2031)
-					.setId(ResourceKey.create(Registries.ITEM, ENDER_AXE_KEY)))
-		);
+
+			ENDER_AXE_REPAIR_TAG = TagKey.create(Registries.ITEM, id("ender_axe_repair"));
+				NETHER_SWORD_REPAIR_TAG = TagKey.create(Registries.ITEM, id("nether_sword_repair"));
+				PALE_BOW_REPAIR_TAG = TagKey.create(Registries.ITEM, id("pale_bow_repair"));
+				THORNS_SHIELD_REPAIR_TAG = TagKey.create(Registries.ITEM, id("thorns_shield_repair"));
+
+			ENDER_AXE_ITEM = Registry.register(
+				BuiltInRegistries.ITEM,
+				ENDER_AXE_KEY,
+				new EnderAxeItem(ToolMaterial.NETHERITE, 5.0f, -2.4f,
+					new Item.Properties().durability(2031)
+						.repairable(ENDER_AXE_REPAIR_TAG)
+						.setId(ResourceKey.create(Registries.ITEM, ENDER_AXE_KEY)))
+			);
 
 		THORNS_SHIELD_ITEM = Registry.register(
 			BuiltInRegistries.ITEM,
 			THORNS_SHIELD_KEY,
 			new ThornsShieldItem(new Item.Properties().durability(672)
-				.setId(ResourceKey.create(Registries.ITEM, THORNS_SHIELD_KEY)))
+						.repairable(THORNS_SHIELD_REPAIR_TAG)
+						.setId(ResourceKey.create(Registries.ITEM, THORNS_SHIELD_KEY)))
 		);
 
 		NETHER_SWORD_ITEM = Registry.register(
-			BuiltInRegistries.ITEM,
-			NETHER_SWORD_KEY,
-			new NetherSwordItem(ToolMaterial.NETHERITE, 3.0f, -2.4f,
-				new Item.Properties()
-					.setId(ResourceKey.create(Registries.ITEM, NETHER_SWORD_KEY)))
-		);
+				BuiltInRegistries.ITEM,
+				NETHER_SWORD_KEY,
+				new NetherSwordItem(ToolMaterial.NETHERITE, 3.0f, -2.0f,
+					new Item.Properties()
+						.repairable(NETHER_SWORD_REPAIR_TAG)
+						.setId(ResourceKey.create(Registries.ITEM, NETHER_SWORD_KEY)))
+			);
 
 		GUIDE_BOOK_ITEM = Registry.register(
 			BuiltInRegistries.ITEM,
@@ -512,13 +528,22 @@ public class DollMod implements ModInitializer {
 		);
 
 		PALE_BOW_ITEM = Registry.register(
-			BuiltInRegistries.ITEM,
-			PALE_BOW_KEY,
-			new PaleBowItem(new Item.Properties().durability(1536)
-				.setId(ResourceKey.create(Registries.ITEM, PALE_BOW_KEY)))
-		);
+						BuiltInRegistries.ITEM,
+						PALE_BOW_KEY,
+						new PaleBowItem(new Item.Properties().durability(1536)
+								.enchantable(1)
+								.repairable(PALE_BOW_REPAIR_TAG)
+								.setId(ResourceKey.create(Registries.ITEM, PALE_BOW_KEY)))
+				);
 
-		DOLL_BATON = Registry.register(
+			PRISMARINE_GRAVEL_ITEM = Registry.register(
+				BuiltInRegistries.ITEM,
+				PRISMARINE_GRAVEL_KEY,
+				new Item(new Item.Properties()
+					.setId(ResourceKey.create(Registries.ITEM, PRISMARINE_GRAVEL_KEY)))
+			);
+
+			DOLL_BATON = Registry.register(
 			BuiltInRegistries.ITEM,
 			DOLL_BATON_KEY,
 			new DollBatonItem(new Item.Properties().stacksTo(1)
@@ -696,7 +721,7 @@ public class DollMod implements ModInitializer {
 		);
 
 		// 海洋套装盔甲
-		SEA_ARMOR_REPAIR_TAG = TagKey.create(Registries.ITEM, id("sea_armor_repair"));
+			SEA_ARMOR_REPAIR_TAG = TagKey.create(Registries.ITEM, id("sea_armor_repair"));
 		// 数值对标钻石套：durability 基准 33、防御 helmet3/胸8/腿6/靴3、附魔值 10、韧性 2.0、击退 0.0
 		SEA_ARMOR_MATERIAL = new ArmorMaterial(
 			33,
@@ -811,6 +836,7 @@ public class DollMod implements ModInitializer {
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
 			DollRecallRegistry.clear();
 			DollEntity.clearPaleAuraCenters();
+			DollEntity.clearNetherAuraCenters();
 			DollRecallService.clearInFlight();
 		});
 

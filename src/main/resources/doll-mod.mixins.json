@@ -13,12 +13,17 @@
 		"LivingEntityDodgeMixin",
 		"LivingEntityFearAuraMixin",
 		"LivingEntityVulnerabilityMixin",
+		"LiquidBlockWaterWalkMixin",
 		"MobMixin",
 		"NetherSwordHealthMixin",
 		"PlayerGuideBookMixin",
-		"ThornsShieldMixin",
-		"WitherSkullMixin"
-	],
+			"ThornsShieldMixin",
+			"WitherSkullMixin",
+			"EntityLavaSpeedMixin",
+				"EntityOnGroundAccessor",
+				"EnderAxeCriticalMixin",
+					"PlayerEnderAxeMixin"
+		],
 	"injectors": {
 		"defaultRequire": 1
 	}

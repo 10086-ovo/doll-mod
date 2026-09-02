@@ -6,6 +6,7 @@ import io.github.a10086ovo.doll.guide.GuideCategory;
 import io.github.a10086ovo.doll.guide.GuideEntry;
 import io.github.a10086ovo.doll.guide.GuidePage;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -57,12 +58,12 @@ public class GuideBookScreen extends Screen {
 	private static final int PANEL_H = 240;
 	private static final int SIDEBAR_W = 100;
 	private static final int HEADER_H = 0;
-	private static final int FOOTER_H = 24;
+	private static final int FOOTER_H = 36;
 	private static final int CAT_ITEM_H = 30;
 	private static final int ENTRY_ROW_H = 22;
 	private static final int SCROLLBAR_W = 6;
 
-	// ---- 颜色 ----
+		// ---- 颜色 ----
 	private static final int C_BG = 0xE6101016;
 	private static final int C_EDGE = 0xFF4A4555;
 	private static final int C_SIDEBAR = 0xFF1A1722;
@@ -96,42 +97,31 @@ public class GuideBookScreen extends Screen {
 	private double lastMouseX, lastMouseY;
 
 	// ---- Tips 轮换 ----
-	private static final String[] TIPS = {
-		"右键人偶打开背包界面",
-		"手持遥控器右键可打开全局管理面板",
-		"人偶死亡后蛋会失效，请妥善保护",
-		"在铁砧上给蛋命名后才能召唤人偶",
-		"作业区仅对砍树/耕种/挖矿模式生效",
-		"钓鱼模式与跟随模式互斥",
-		"幽匿人偶是最强高难度变体，需击败野生体获取",
-		"苍白人偶可当作不死图腾携带在背包中",
-		"末影人偶拥有67%闪避（投射全免）与瞬移处决能力",
-		"升级配方可继承蛋的命名与携带数据",
-		"指挥棒选中人偶后，右键生物可强制锁定攻击目标",
-		"指挥棒潜行右键人偶可清除作业区",
-		"石砧是铁砧的廉价替代品，配方仅需圆石",
-		"森林人偶副手持荆棘盾可100%反弹伤害",
-		"海洋人偶的激光可绕过护甲攻击",
-		"苍白弓与苍白人偶的易伤效果可叠加",
-		"向导人偶可搜索结构、群系与村庄坐标",
-		"海洋套装只能从埋藏宝藏中获取",
-		"人偶的坐标搜索在工作线程中执行，多人同服也不卡",
-		"野生幽匿人偶的出场动画是纯代码手写的缓动曲线",
-		"本模组代码 100% 由 AI 完成"
-	};
-	private static final long TIP_INTERVAL_MS = 5000;
-	private String currentTip = TIPS[0];
-	private long lastTipChangeTime = 0;
-	private int lastTipIndex = -1;
+		private static final String[] TIPS_CN = {
+			"人偶的坐标搜索在工作线程中执行，多人同服也不卡",
+			"野生幽匿人偶的出场动画是纯代码手写的缓动曲线",
+			"本模组代码 100% 由 AI 完成"
+		};
+		private static final String[] TIPS_EN = {
+			"Coordinate search runs in a worker thread — no lag on multiplayer servers.",
+			"The Wild Warden Doll's emergence animation uses hand-coded easing curves.",
+			"100% of this mod's code was written by AI."
+		};
+		private String[] TIPS = TIPS_CN;
+		private String currentTip = TIPS_CN[0];
+		private int lastTipIndex = -1;
 
 	// ---- 渲染缓存（避免每帧分配对象，init 时清空）----
 	private final Map<String, ItemStack> iconCache = new HashMap<>();
 	private final Map<String, List<String>> wrapCache = new HashMap<>();
 
 	public GuideBookScreen() {
-		super(Component.literal("人偶模组指南书"));
-		pickRandomTip();
-	}
+			super(Component.literal("Doll Guide Book"));
+			String lang = net.minecraft.client.Minecraft.getInstance().getLanguageManager().getSelected();
+			boolean isZh = "zh_cn".equals(lang) || "zh_tw".equals(lang) || "zh_hk".equals(lang);
+			TIPS = isZh ? TIPS_CN : TIPS_EN;
+			pickRandomTip();
+		}
 
 	private void pickRandomTip() {
 		int idx;
@@ -139,9 +129,8 @@ public class GuideBookScreen extends Screen {
 			idx = (int) (Math.random() * TIPS.length);
 		} while (idx == lastTipIndex && TIPS.length > 1);
 		lastTipIndex = idx;
-		currentTip = TIPS[idx];
-		lastTipChangeTime = System.currentTimeMillis();
-	}
+			currentTip = TIPS[idx];
+		}
 
 	@Override
 	protected void init() {
@@ -172,7 +161,7 @@ public class GuideBookScreen extends Screen {
 			int maxOffset = Math.max(0, cat.entries.size() - visibleRows);
 			if (maxOffset > 0) {
 				int delta = vDelta > 0 ? -1 : 1;
-				entryScrollOffset = Math.max(0, Math.min(maxOffset, entryScrollOffset + delta));
+				entryScrollOffset = Math.clamp(entryScrollOffset + delta, 0, maxOffset);
 				return true;
 			}
 		}
@@ -191,19 +180,18 @@ public class GuideBookScreen extends Screen {
 	public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
 		if (book == null) return super.mouseDragged(event, dragX, dragY);
 		if (event.button() == 0 && this.scrollbarDragging && selectedEntry < 0 && selectedCategory >= 0) {
-			GuideCategory cat = book.categories.get(selectedCategory);
-			int visibleRows = getVisibleEntryRows();
-			int maxOffset = Math.max(0, cat.entries.size() - visibleRows);
-			if (maxOffset <= 0) return true;
+				GuideCategory cat = book.categories.get(selectedCategory);
+				int visibleRows = getVisibleEntryRows();
+				int maxOffset = Math.max(0, cat.entries.size() - visibleRows);
+				if (maxOffset <= 0) return true;
 
-			int trackTop = getScrollbarTrackTop();
-			int trackHeight = getScrollbarTrackHeight();
-			double deltaY = lastMouseY - scrollbarDragStartY;
-			float ratio = (float) deltaY / trackHeight;
-			int deltaOffset = Math.round(ratio * maxOffset);
-			entryScrollOffset = Math.max(0, Math.min(maxOffset, scrollbarDragStartOffset + deltaOffset));
-			return true;
-		}
+				int trackHeight = getScrollbarTrackHeight();
+				double deltaY = lastMouseY - scrollbarDragStartY;
+				float ratio = (float) deltaY / trackHeight;
+				int deltaOffset = Math.round(ratio * maxOffset);
+				entryScrollOffset = Math.clamp(scrollbarDragStartOffset + deltaOffset, 0, maxOffset);
+				return true;
+			}
 		return super.mouseDragged(event, dragX, dragY);
 	}
 
@@ -212,14 +200,20 @@ public class GuideBookScreen extends Screen {
 		return Math.max(1, (contentH - 30) / ENTRY_ROW_H);
 	}
 
-	/** 滚动条轨道顶部 */
-	private int getScrollbarTrackTop() {
-		return contentY + 30;
+	/** 条目列表起始 Y（标题与描述多行后之实际起首；渲染与判定共用同一计算，防阴阳错位） */
+	private int getEntryListStartY() {
+		GuideCategory cat = book.categories.get(selectedCategory);
+		int ty = contentY + 6 + wrapText(cat.name, contentW - 16).size() * this.font.lineHeight;
+		if (!cat.description.isEmpty()) {
+			ty += 4 + wrapText(cat.description, contentW - 16).size() * this.font.lineHeight;
+			return ty + 8;
+		}
+		return ty + 6;
 	}
 
 	/** 滚动条轨道高度 */
 	private int getScrollbarTrackHeight() {
-		return contentH - 32;
+		return getVisibleEntryRows() * ENTRY_ROW_H;
 	}
 
 	/** 滚动条X坐标 */
@@ -305,7 +299,7 @@ public class GuideBookScreen extends Screen {
 		if (maxOffset <= 0) return false;
 
 		int sbX = getScrollbarX();
-		int trackTop = getScrollbarTrackTop();
+		int trackTop = getEntryListStartY();
 		int trackHeight = getScrollbarTrackHeight();
 
 		if (mx < sbX || mx >= sbX + SCROLLBAR_W || my < trackTop || my >= trackTop + trackHeight) {
@@ -315,7 +309,7 @@ public class GuideBookScreen extends Screen {
 		// 点击滚动条轨道 → 跳到对应位置
 		float clickRatio = (float) (my - trackTop) / trackHeight;
 		int targetOffset = Math.round(clickRatio * maxOffset);
-		entryScrollOffset = Math.max(0, Math.min(maxOffset, targetOffset));
+		entryScrollOffset = Math.clamp(targetOffset, 0, maxOffset);
 
 		// 如果点在 thumb 上，启动拖动
 		int thumbHeight = Math.max(16, trackHeight * visibleRows / cat.entries.size());
@@ -342,7 +336,7 @@ public class GuideBookScreen extends Screen {
 		// 重置滚动偏移到合法范围
 		if (entryScrollOffset > maxOffset) entryScrollOffset = maxOffset;
 
-		int listY = contentY + 30; // 标题+描述之后的起始
+		int listY = getEntryListStartY(); // 标题与描述多行后之实际起首
 		for (int i = entryScrollOffset; i < cat.entries.size(); i++) {
 			int rowIdx = i - entryScrollOffset;
 			if (rowIdx >= visibleRows) break;
@@ -454,9 +448,15 @@ public class GuideBookScreen extends Screen {
 			ItemStack icon = resolveItemIcon(cat.icon);
 			g.item(icon, sbX + 6, itemY + 7);
 
-			// 名称
+			// 名称（图标左侧 26px 起，自动换行完整显示，最多两行垂直居中，不截断）
 			int textColor = active ? C_TITLE : (hover ? 0xFFFFFFFF : 0xFFC0C0C0);
-			g.text(this.font, cat.name, sbX + 26, itemY + 11, textColor, true);
+			List<String> catLines = wrapText(cat.name, SIDEBAR_W - 26 - 6);
+			if (catLines.size() > 2) catLines = catLines.subList(0, 2);
+			int catNameY = itemY + Math.max(1, (CAT_ITEM_H - catLines.size() * this.font.lineHeight) / 2);
+			for (String line : catLines) {
+				g.text(this.font, line, sbX + 26, catNameY, textColor, true);
+				catNameY += this.font.lineHeight;
+			}
 		}
 	}
 
@@ -473,82 +473,56 @@ public class GuideBookScreen extends Screen {
 	}
 
 	private void renderLanding(GuiGraphicsExtractor g) {
-		String title = book.name.isEmpty() ? "人偶模组指南书" : book.name;
-		g.centeredText(this.font, title, contentX + contentW / 2, contentY + 8, C_TITLE);
+				String title = book.name.isEmpty() ? "Doll Guide Book" : book.name;
+				g.centeredText(this.font, title, contentX + contentW / 2, contentY + 8, C_TITLE);
 
-		// 欢迎文字（自动换行）
-		String landing = book.landingText.isEmpty()
-			? "右键任意人偶开始你的旅程。" : book.landingText;
-		List<String> lines = wrapText(landing, contentW - 16);
-		int textY = contentY + 24;
-		for (String line : lines) {
-			g.text(this.font, line, contentX + 8, textY, C_BODY, true);
-			textY += this.font.lineHeight + 1;
+			// 欢迎文字（一句话概括 + 提示）
+			String landing = book.landingText.isEmpty()
+				? (TIPS == TIPS_CN ? "右键任意人偶开始你的旅程。" : "Right-click any doll to begin your journey.") : book.landingText;
+			String[] parts = landing.split("\n", 2);
+			String summary = parts[0];
+			String hint = parts.length > 1 ? parts[1] : "";
+
+			int cx = contentX + 8;
+		int cy = contentY + 24;
+		int maxTextWidth = contentW - 16;
+		for (String line : wrapText(summary, maxTextWidth)) {
+			g.text(this.font, line, cx, cy, C_BODY, true);
+			cy += this.font.lineHeight + 1;
 		}
+		cy += 8;
 
-		// 分类预览
-		textY += 10;
-		g.text(this.font, "—— 分类预览 ——", contentX + 8, textY, C_HINT, true);
-		textY += this.font.lineHeight + 4;
-
-		int col = 0;
-		int previewX = contentX + 8;
-		int previewY = textY;
-		for (int i = 0; i < book.categories.size(); i++) {
-			GuideCategory cat = book.categories.get(i);
-			int cellX = previewX + col * 80;
-			g.fill(cellX, previewY, cellX + 72, previewY + 28, C_SIDEBAR);
-			g.fill(cellX, previewY, cellX + 72, previewY + 1, C_BTN_EDGE);
-			g.fill(cellX, previewY, cellX + 1, previewY + 28, C_BTN_EDGE);
-			g.fill(cellX + 71, previewY, cellX + 72, previewY + 28, C_BTN_EDGE_DARK);
-			g.fill(cellX, previewY + 27, cellX + 72, previewY + 28, C_BTN_EDGE_DARK);
-
-			ItemStack icon = resolveItemIcon(cat.icon);
-			g.item(icon, cellX + 4, previewY + 6);
-
-			// 名称可能太长，截断
-			String name = cat.name;
-			if (this.font.width(name) > 48) {
-				while (this.font.width(name + "..") > 48 && name.length() > 1) {
-					name = name.substring(0, name.length() - 1);
+		// 提示文字（分句显示）
+		if (!hint.isEmpty()) {
+			for (String paragraph : hint.split("\n")) {
+				for (String line : wrapText(paragraph, maxTextWidth)) {
+					g.text(this.font, line, cx, cy, C_HINT, true);
+					cy += this.font.lineHeight + 1;
 				}
-				name = name + "..";
-			}
-			g.text(this.font, name, cellX + 24, previewY + 10, 0xFFC0C0C0, true);
-
-			col++;
-			if (col >= 3) {
-				col = 0;
-				previewY += 32;
+				cy += 2;
 			}
 		}
-
-		// 底部提示
-		int hintY = contentY + contentH - 14;
-		g.centeredText(this.font, "点击左侧分类开始阅读", contentX + contentW / 2, hintY, C_HINT);
-	}
+		}
 
 	private void renderEntryList(GuiGraphicsExtractor g) {
 		GuideCategory cat = book.categories.get(selectedCategory);
 
-		// 分类标题
-		g.text(this.font, cat.name, contentX + 8, contentY + 6, C_TITLE, true);
-
-		// 描述（单行截断，防止换行遮挡条目列表）
-		int listY;
-		if (!cat.description.isEmpty()) {
-			String desc = cat.description;
-			if (this.font.width(desc) > contentW - 16) {
-				while (this.font.width(desc + "..") > contentW - 16 && desc.length() > 1) {
-					desc = desc.substring(0, desc.length() - 1);
-				}
-				desc = desc + "..";
-			}
-			g.text(this.font, desc, contentX + 8, contentY + 18, C_DESC, true);
-			listY = contentY + 30;
-		} else {
-			listY = contentY + 24;
+		// 分类标题（自动换行完整显示，目录名不截断）
+		int titleY = contentY + 6;
+		for (String line : wrapText(cat.name, contentW - 16)) {
+			g.text(this.font, line, contentX + 8, titleY, C_TITLE, true);
+			titleY += this.font.lineHeight;
 		}
+
+		// 描述（自动换行完整显示，随栏而扩，不复截断）
+		if (!cat.description.isEmpty()) {
+			int descY = titleY + 4;
+			for (String line : wrapText(cat.description, contentW - 16)) {
+				g.text(this.font, line, contentX + 8, descY, C_DESC, true);
+				descY += this.font.lineHeight;
+			}
+		}
+		int listY = getEntryListStartY();
 
 		// 计算可见行和滚动
 		int visibleRows = getVisibleEntryRows();
@@ -572,9 +546,6 @@ public class GuideBookScreen extends Screen {
 			ItemStack icon = resolveItemIcon(entry.icon);
 			g.item(icon, contentX + 8, rowY + 3);
 
-			// 名称 + 条目数
-			g.text(this.font, entry.name, contentX + 30, rowY + 7, 0xFFFFFFFF, true);
-
 			// 页数指示
 			int pageCount = entry.pages.size();
 			if (pageCount > 1) {
@@ -582,6 +553,9 @@ public class GuideBookScreen extends Screen {
 				int pagesW = this.font.width(pages);
 				g.text(this.font, pages, contentX + rowWidth - 8 - pagesW, rowY + 7, C_HINT, true);
 			}
+
+			// 名称（完整显示，条目名正常皆短，不截断）
+			g.text(this.font, entry.name, contentX + 30, rowY + 7, 0xFFFFFFFF, true);
 		}
 
 		// 滚动条
@@ -620,15 +594,8 @@ public class GuideBookScreen extends Screen {
 		}
 		GuidePage page = entry.pages.get(currentPage);
 
-		// 页面标题
-		String pageTitle = !page.title.isEmpty() ? page.title : entry.name;
-		g.text(this.font, pageTitle, contentX + 8, contentY + 6, C_TITLE, true);
-
-		// 分隔线
-		g.fill(contentX + 8, contentY + 18, contentX + contentW - 8, contentY + 19, C_BTN_EDGE);
-
-		// 按类型渲染页面内容
-		int bodyY = contentY + 24;
+		// 页面副标题已删，正文自内容区顶部偏下起
+		int bodyY = contentY + 10;
 		switch (page.type.toLowerCase(java.util.Locale.ROOT)) {
 			case "text" -> renderTextPage(g, page, bodyY);
 			case "item" -> renderItemPage(g, page, bodyY);
@@ -657,20 +624,16 @@ public class GuideBookScreen extends Screen {
 		int iconX = contentX + contentW / 2 - 8;
 		g.item(icon, iconX, startY);
 
-		// 物品名称
-		String itemName = page.item != null ? page.item : "";
-		g.centeredText(this.font, "[" + itemName + "]", contentX + contentW / 2, startY + 20, C_DESC);
-
-		// 描述
+		// 描述（副标题栏已尽去，正文自图标下方直接起）
 		List<String> lines = wrapText(page.text, contentW - 16);
-		int y = startY + 36;
+		int y = startY + 22;
 		for (String line : lines) {
 			g.text(this.font, line, contentX + 8, y, C_BODY, true);
 			y += this.font.lineHeight + 1;
 		}
 	}
 
-	private void renderCraftingPage(GuiGraphicsExtractor g, GuideEntry entry, GuidePage page, int startY) {
+		private void renderCraftingPage(GuiGraphicsExtractor g, GuideEntry entry, GuidePage page, int startY) {
 		// 3x3 合成网格
 		int gridW = 3 * 18;
 		int gridX = contentX + 8;
@@ -711,48 +674,51 @@ public class GuideBookScreen extends Screen {
 
 		// 描述
 		if (page.text != null && !page.text.isEmpty()) {
-			List<String> lines = wrapText(page.text, contentW - 16);
-			int y = gridY + 3 * 18 + 8;
-			for (String line : lines) {
-				g.text(this.font, line, contentX + 8, y, C_BODY, true);
-				y += this.font.lineHeight + 1;
+				List<String> lines = wrapText(page.text, contentW - 16);
+				int y = gridY + 3 * 18 + 8;
+				for (String line : lines) {
+					g.text(this.font, line, contentX + 8, y, C_BODY, true);
+					y += this.font.lineHeight + 1;
+				}
 			}
-		}
 	}
 
 	// ---- 底栏 ----
 
 	private void renderFooter(GuiGraphicsExtractor g) {
 		if (selectedEntry < 0) {
-			// 首页/条目列表状态：只显示 tips，不显示分类名
-			String tip = currentTip;
-			int tipW = this.font.width(tip);
+			// 底部温馨提示：自动换行完整显示，全文毕显无遗，不复截断
 			int maxW = PANEL_W - 16;
-			if (tipW > maxW) {
-				while (this.font.width(tip + "..") > maxW && tip.length() > 1) {
-					tip = tip.substring(0, tip.length() - 1);
-				}
-				tip = tip + "..";
+			String prefix = (TIPS == TIPS_CN) ? "你知道吗？ " : "Do U know? ";
+			List<String> tipLines = wrapText(prefix + currentTip, maxW);
+			if (tipLines.size() > 3) tipLines = tipLines.subList(0, 3); // 兜底
+			int tipH = tipLines.size() * this.font.lineHeight;
+			int tipY = footerY + Math.max(2, (FOOTER_H - tipH) / 2);
+			for (String line : tipLines) {
+				g.centeredText(this.font, line, leftPos + PANEL_W / 2, tipY, C_HINT);
+				tipY += this.font.lineHeight;
 			}
-			g.centeredText(this.font, tip, leftPos + PANEL_W / 2, footerY + 8, C_HINT);
 			return;
 		}
 
 		GuideEntry entry = book.categories.get(selectedCategory).entries.get(selectedEntry);
 
 		// 上一页按钮
-		boolean prevEnabled = currentPage > 0;
-		drawButton(g, leftPos + 8, footerY + 4, 60, 16, "< 上一页", prevEnabled);
+			boolean prevEnabled = currentPage > 0;
+			String prevLabel = (TIPS == TIPS_CN) ? "< 上一页" : "< Prev";
+			drawButton(g, leftPos + 8, footerY + 4, 60, 16, prevLabel, prevEnabled);
 
 		// 返回按钮
-		drawButton(g, leftPos + PANEL_W / 2 - 24, footerY + 4, 48, 16, "返回", true);
+			String backLabel = (TIPS == TIPS_CN) ? "返回" : "Back";
+			drawButton(g, leftPos + PANEL_W / 2 - 24, footerY + 4, 48, 16, backLabel, true);
 
-		// 下一页按钮
-		boolean nextEnabled = currentPage < entry.pages.size() - 1;
-		drawButton(g, leftPos + PANEL_W - 68, footerY + 4, 60, 16, "下一页 >", nextEnabled);
-	}
+			// 下一页按钮
+			boolean nextEnabled = currentPage < entry.pages.size() - 1;
+			String nextLabel = (TIPS == TIPS_CN) ? "下一页 >" : "Next >";
+			drawButton(g, leftPos + PANEL_W - 68, footerY + 4, 60, 16, nextLabel, nextEnabled);
+		}
 
-	private void drawButton(GuiGraphicsExtractor g, int x, int y, int w, int h, String label, boolean enabled) {
+		private void drawButton(GuiGraphicsExtractor g, int x, int y, int w, int h, String label, boolean enabled) {
 		boolean hover = isMouseIn(x, y, w, h) && enabled;
 		int bg = enabled ? (hover ? C_SIDEBAR_HOVER : C_SIDEBAR) : 0xFF0A090D;
 		g.fill(x, y, x + w, y + h, bg);
@@ -794,10 +760,10 @@ public class GuideBookScreen extends Screen {
 				char c = paragraph.charAt(i);
 				String candidate = line.toString() + c;
 				if (this.font.width(candidate) > maxWidth) {
-					if (line.length() > 0) {
-						result.add(line.toString());
-						line = new StringBuilder(String.valueOf(c));
-					} else {
+					if (!line.isEmpty()) {
+							result.add(line.toString());
+							line = new StringBuilder(String.valueOf(c));
+						} else {
 						// 单个字符即超宽，强制放入避免死循环
 						line.append(c);
 					}
@@ -810,11 +776,11 @@ public class GuideBookScreen extends Screen {
 			}
 		}
 		wrapCache.put(cacheKey, result);
-		return result;
-	}
+			return result;
+		}
 
-	/**
-	 * 把字符串形式的物品 ID（如 "doll-mod:doll_egg_s1"）解析为 ItemStack。
+		/**
+		 * 把字符串形式的物品 ID（如 "doll-mod:doll_egg_s1"）解析为 ItemStack。
 	 * 找不到时返回屏障图标作为占位。
 	 */
 	private ItemStack resolveItemIcon(String itemId) {
@@ -837,7 +803,7 @@ public class GuideBookScreen extends Screen {
 				result = new ItemStack(Items.BARRIER);
 			} else {
 				Item item = holder.get().value();
-				result = (item == null) ? new ItemStack(Items.BARRIER) : new ItemStack(item);
+					result = new ItemStack(item);
 			}
 		} catch (Exception e) {
 			result = new ItemStack(Items.BARRIER);

@@ -14,48 +14,68 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 指南书 JSON 加载器。数据格式参考 Patchouli：
+ * 指南书 JSON 加载器。目录布局：
  * <pre>
- * data/doll-mod/patchouli_books/guide_book/
- *   book.json                        — 书籍定义
+ * data/doll-mod/guide_book/
+ *   book.json                            — 书籍定义
  *   en_us/categories/&lt;id&gt;.json      — 章节（id 取自文件名）
  *   en_us/entries/&lt;id&gt;.json          — 条目（category 字段归入章节）
  * </pre>
  * 加载在客户端进行（传入 {@code Minecraft.getInstance().getResourceManager()}）。
+ * 根据游戏语言选择对应目录（如 zh_cn、en_us），不存在时回退到 en_us。
  */
 public final class GuideBookLoader {
 
 	private static final Gson GSON = new Gson();
-	private static final String BOOK_DIR = "patchouli_books/guide_book";
-	private static final String CATEGORY_DIR = BOOK_DIR + "/en_us/categories";
-	private static final String ENTRY_DIR = BOOK_DIR + "/en_us/entries";
+	private static final String BOOK_DIR = "guide_book";
+	private static final String FALLBACK_LANG = "en_us";
 
 	private GuideBookLoader() {
 	}
 
 	/** 从资源管理器加载整本指南书；任何文件缺失时回退到空定义而非崩溃。 */
 	public static GuideBook load(ResourceManager manager) {
-		GuideBook book = loadJson(manager, BOOK_DIR + "/book.json", GuideBook.class);
-		if (book == null) {
-			book = new GuideBook();
+		return load(manager, FALLBACK_LANG);
+	}
+
+	/** 指定语言加载指南书（如 en_us、zh_cn），语言目录不存在时回退到 en_us。 */
+	public static GuideBook load(ResourceManager manager, String lang) {
+		// 检查语言目录是否存在，不存在则回退
+		String langDir = lang;
+		Identifier testId = Identifier.fromNamespaceAndPath("doll-mod",
+			BOOK_DIR + "/" + langDir + "/categories");
+		boolean langExists = manager.getResource(testId).isPresent()
+			|| manager.listResources(BOOK_DIR + "/" + langDir + "/categories",
+				p -> p.getPath().endsWith(".json")).isEmpty() == false;
+		if (!langExists) {
+			langDir = FALLBACK_LANG;
 		}
+
+		GuideBook book = loadJson(manager, BOOK_DIR + "/" + langDir + "/book.json", GuideBook.class);
+			if (book == null) {
+				// 回退到根目录 book.json
+				book = loadJson(manager, BOOK_DIR + "/book.json", GuideBook.class);
+			}
+			if (book == null) {
+				book = new GuideBook();
+			}
 
 		// 章节：文件名即 id
-		Map<String, GuideCategory> categories = new HashMap<>();
-		for (Map.Entry<Identifier, Resource> e : manager.listResources(CATEGORY_DIR,
-			p -> p.getPath().endsWith(".json")).entrySet()) {
-			GuideCategory cat = loadResource(e.getKey(), e.getValue(), GuideCategory.class);
-			if (cat == null) {
-				continue;
+			Map<String, GuideCategory> categories = new HashMap<>();
+			for (Map.Entry<Identifier, Resource> e : manager.listResources(BOOK_DIR + "/" + langDir + "/categories",
+				p -> p.getPath().endsWith(".json")).entrySet()) {
+				GuideCategory cat = loadResource(e.getKey(), e.getValue(), GuideCategory.class);
+				if (cat == null) {
+					continue;
+				}
+				cat.id = fileName(e.getKey());
+				categories.put(cat.id, cat);
 			}
-			cat.id = fileName(e.getKey());
-			categories.put(cat.id, cat);
-		}
-
-		// 条目：按 category 字段归入章节
-		List<GuideEntry> allEntries = new ArrayList<>();
-		for (Map.Entry<Identifier, Resource> e : manager.listResources(ENTRY_DIR,
-			p -> p.getPath().endsWith(".json")).entrySet()) {
+	
+			// 条目：按 category 字段归入章节
+			List<GuideEntry> allEntries = new ArrayList<>();
+			for (Map.Entry<Identifier, Resource> e : manager.listResources(BOOK_DIR + "/" + langDir + "/entries",
+				p -> p.getPath().endsWith(".json")).entrySet()) {
 			GuideEntry entry = loadResource(e.getKey(), e.getValue(), GuideEntry.class);
 			if (entry != null) {
 				allEntries.add(entry);

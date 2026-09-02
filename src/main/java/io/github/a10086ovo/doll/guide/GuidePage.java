@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 指南书页面。参考 Patchouli 的 page 概念，简化支持三种类型：
+ * 指南书页面。简化支持三种类型：
  * <ul>
  *   <li>{@code text}：纯文本页（支持 \n 换行）</li>
  *   <li>{@code item}：物品展示页（图标 + 标题 + 描述）</li>

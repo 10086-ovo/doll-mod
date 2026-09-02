@@ -39,7 +39,7 @@
   - `item` — 装备（`EnderAxeItem`、`NetherSwordItem`、`PaleBowItem`、`ThornsShieldItem`）、头颅、盾、`GuideBookItem`、刷怪蛋 `DollSpawnEggItem`。
   - `block` — 7 种头颅方块（`*DollHeadBlock` + `*DollSkullType` + `*DollHeadBlockEntity`）+ `RockAnvilBlock`（三级损伤）+ `SculkShrineBlock`（祭坛）。
   - `config` — 外置配置 `DollConfig`（`config/dollmod/doll.json`）。
-  - `guide` — 指南书数据模型与加载（Patchouli 风格 JSON）。
+  - `guide` — 指南书数据模型与加载（自定义 JSON）。
   - `inventory` — `DollInventory`（45 格人偶背包）。
   - `loot` — `SeaArmorLootInjector`（海洋套装战利品注入）。
   - `recipe` — `DollUpgradeRecipe`（升级配方）。
@@ -100,6 +100,11 @@
   - 能力判定用 `findBestPickaxeStack()`（背包里 Tier 最高的镐）。**修复缺陷**：旧 `findPickaxeStack()` 只按格子顺序返回第一把镐（石镐在前、钻石镐在后时，人偶误判"挖不动钻石矿"而绕开它）。
   - 实际挖掘用 `findPickaxeForState(state)`（在 `isCorrectToolForDrops(state)` 为真的镐里挑 Tier 最低的一把），把钻石 / 下界合金镐留给真正需要的矿，省耐久。
   - 分级 `pickaxeTierLevel()`：26.2 已移除 `TieredItem`，改为测 `isCorrectToolForDrops` 在参考方块上的结果定级——铁矿石（`NEEDS_STONE_TOOL`）=石级、钻石矿（`NEEDS_IRON_TOOL`）=铁级、黑曜石（`NEEDS_DIAMOND_TOOL`）=钻石级；下界合金镐单独记最高级，保证优先用钻石镐省耐久；木/金镐连铁矿石都挖不动 → 0 级。**正确性始终由 `isCorrectToolForDrops` 兜底，分级只用于"够用的镐里挑最弱"的排序**，即便分级偏差也绝不会选到不够用的镐。
+
+### 药水效果常量名（26.2 改名，踩坑）
+- 26.2 已将挖掘疲劳从 `MobEffects.DIG_SLOWDOWN` 改名为 **`MobEffects.MINING_FATIGUE`**（`DIG_SLOWDOWN` 编译直接报"找不到符号"）。凡涉及清除/施加挖掘疲劳（如海洋人偶清主人挖掘疲劳）务必用新名。
+- 其余常用常量名在 26.2 保持：`SLOWNESS`、`SPEED`、`JUMP_BOOST`、`HASTE`、`POISON`、`WITHER`、`ABSORPTION`、`WATER_BREATHING` 等。若要核查任何效果常量，用 `javap -cp <minecraft-client.jar> net.minecraft.world.effect.MobEffects` 列全量字段。
+- **吸收（金心）**：`ABSORPTION` 等级对应血量 = `4×(amp+1)`，无法精确表达"5 颗"（10 点）——amp=2 → 12 点（6 颗）。做"额外金色血量"类能力时按此换算并明确数值。
 
 ### 自定义头颅（Custom Head）——MC 26.2 全栈配方（重点）
 > **本项目 7 种人偶头颅（warden / pale / forest / nether / sea / ender / guide）的实现是多次踩坑总结出来的全栈方案**，不是"加个纹理"那么简单。26.2 的自定义头颅涉及**方块 / 方块实体 / 方块实体渲染器 / 物品特殊模型 / 两个 SkullBlockRenderer Mixin** 五层，缺一环就紫黑块或根本不渲染。记录如下，新增头颅照着抄。
@@ -220,7 +225,7 @@
 ## 6. 指南书 / 搜索系统
 
 ### 指南书（GuideBook）
-- 数据为 Patchouli 风格 JSON，位于 `assets/doll-mod/patchouli_books/guide_book/`（book.json + categories + entries）。
+- 数据为 JSON，位于 `assets/doll-mod/guide_book/`（book.json + categories + entries）。
 - 加载在客户端进行（`GuideBookContent.get()` 传 `Minecraft.getInstance().getResourceManager()`），懒加载并缓存；服务端 `GuideBookItem` 只返回成功，打开动作由 `DollModClient` 注入 `openScreenAction`，避免 main 包引用 client。
 - 首次进世界自动发放（`GuideBookGivenStore` 记忆 UUID 防重复）。
 - **图标引用用注册 ID（如 `doll-mod:xxx`），不是 Java 字段名。**
@@ -231,7 +236,9 @@
 - 搜索半径 **100 区块（1600 格）**，以玩家发起时位置为中心；结果缓存 LRU + 断线清理，防内存泄漏。
 - 群系搜索**异步化**：主线程只取 `BiomeSource`/`Sampler` 引用、提交工作线程做纯噪声采样（`getNoiseBiome`，不生成区块），完成后回主线程写缓存并发包。旧实现每格 `level.getBiome()` 强制同步生成区块，是多人卡顿主因。
 - 结构 / 村庄搜索用原版 `findNearestMapStructure`（半径单位区块），不生成区块；性能关键：中心 100 区块 1 次 + 外围 8 方向（70 区块处各 30 区块半径）1 次，共 9 次调用、全部收敛在 100 区块半径内。旧实现约 50 次调用、最远 12600 格。
-- 每 tick 搜索配额 `MAX_SEARCHES_PER_TICK=2`，多人同点刷新时摊到后续 tick，避免主线程过载。
+- 结构 / 村庄搜索按 **跨 tick 分片** 执行（`STRUCTURE_SLICES_PER_TICK=3`，每次 `findNearestMapStructure` 为一片，9 片分 3 tick 递进），消除单 tick 瞬时峰值；界面在结果回此前持续呈"搜索中"。
+- **世界级共享缓存**（多人核心收益）：以「维度:目标」为中心点各异的候选坐标条目（每目标 ≤8 条），甲搜过、乙在搜索半径内以乙坐标过滤+排序即可复用，同一目标多人不再各查一遍；服务器启动清空（结构位置随种子而定，跨世界不复用）。
+- 每玩家 2s 冷却 + 每目标共享条目上限 + LRU 结果缓存（上限 256 玩家）+ 断线清理，防主线程过载与内存泄漏。
 - 打卡状态存 `SearchMarkStore`，玩家 NBT 键 `guide_search_marks`，跨会话持久。
 
 ## 7. 资源 / 数据生成
@@ -273,9 +280,10 @@
 - 遍历方块优先 `BlockPos.MutableBlockPos` 复用，避免每格分配对象（见 §4「减少对象分配」）。
 
 ### 资源 / 搜索层（多人卡顿的历史教训）
-- 群系搜索用 `getNoiseBiome` 纯噪声采样放**工作线程**（主线程只提交任务），勿用 `level.getBiome()`（会强制同步生成区块）。→ `DollNetworking.startBiomeSearchAsync`。
-- 结构搜索减至 9 次 `findNearestMapStructure`（不生成区块），勿做全半径多次采样。
-- `MAX_SEARCHES_PER_TICK=2` + 每玩家 2s 冷却 + LRU 结果缓存（上限 256 玩家）+ 断线清理，防主线程过载与内存泄漏。
+- 群系搜索用 `getNoiseBiome` 纯噪声采样放**工作线程**（主线程只提交任务；固定 3 线程池），勿用 `level.getBiome()`（会强制同步生成区块）。→ `DollNetworking.startBiomeSearchAsync`。
+- 结构 / 村庄搜索依赖服务端线程专属的 `StructureManager`，**不可逕移工作线程**（线程不安全）；以粒子级安全之道——跨 tick 分片递进，每 tick 有界执行。→ `DollNetworking` 的 `STRUCTURE_SLICES_PER_TICK` + `pendingSearches`。
+- 结构位置随种子固定，落**世界级共享缓存**按中心点复用，多人搜索同一目标免重复调用 `findNearestMapStructure`（多人不卡之根本）。
+- 每玩家 2s 冷却 + 结构分片预算 `STRUCTURE_SLICES_PER_TICK` + 任务队列上限 64 + LRU 结果缓存（上限 256 玩家）+ 断线清理，防主线程过载与内存泄漏。
 - 召回前用 `getChunk(..., ChunkStatus.FULL, false)` 做存档存在性检查，**避免对不存在区块同步建块**（重模组存档可卡数秒）。
 
 ### 内存 / 生命周期

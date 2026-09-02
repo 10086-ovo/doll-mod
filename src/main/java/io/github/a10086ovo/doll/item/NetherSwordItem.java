@@ -36,7 +36,7 @@ import java.util.function.Consumer;
  * 玩家专属能力（与末影斧同模式，人偶不触发——人偶另有自身常驻抗火逻辑，见 DollEntity）：
  * <ul>
  *   <li>手持（主手或副手）时持续获得抗火效果，放下后 2 秒内自然消退</li>
- *   <li>手持时生命上限额外 +10（20 → 30，{@code NetherSwordHealthMixin} 维护，放下回落）</li>
+ *   <li>手持时获得 6 颗金色血量（吸收 amp=2，12 点，{@code NetherSwordHealthMixin} 维护，放下消退）</li>
  *   <li>攻击命中点燃目标 4 秒（与原版火焰附加 I 时长一致，可与火焰附加附魔叠加）</li>
  *   <li>长按右键蓄力 1 秒：召唤一把飞行的地狱剑（{@link NetherFlyingSwordEntity}），
  *       自动攻击 16 格半径内最近的敌对生物；同时仅一把，重复召唤顶替旧剑</li>

@@ -47,6 +47,7 @@ import net.minecraft.world.entity.projectile.hurtingprojectile.WitherSkull;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
@@ -115,6 +116,7 @@ import net.minecraft.sounds.SoundSource;
 
 import io.github.a10086ovo.doll.config.DollConfig;
 import io.github.a10086ovo.doll.entity.DollNavigator;
+import io.github.a10086ovo.doll.item.PaleBowItem;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -751,7 +753,7 @@ public class DollEntity extends Avatar {
 	 * 在人偶快捷栏（36-43）中查找近战武器，返回找到的槽位索引，未找到返回 -1。
 	 */
 	private int findMeleeWeaponInHotbar() {
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 8; i++) {
+		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
 			if (isMeleeWeapon(inventory.getItem(i))) {
 				return i;
 			}
@@ -998,8 +1000,12 @@ public class DollEntity extends Avatar {
 	 * 其他人偶 isEnderDoll() 为 false，零影响。
 	 */
 	@Override
-	public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
-		if (isEnderDoll() && source.getEntity() != null) {
+		public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
+			// 幽匿人偶投射物免疫（类似凋零二阶段）
+			if (isWardenDoll() && source.getDirectEntity() instanceof net.minecraft.world.entity.projectile.Projectile) {
+				return false;
+			}
+			if (isEnderDoll() && source.getEntity() != null) {
 			// 投射物（arrows/trident/wither skull 等）100% 闪避；近战（来源实体非投射物）67%
 			boolean isProjectile = source.getDirectEntity() instanceof net.minecraft.world.entity.projectile.Projectile;
 			float dodgeChance = isProjectile ? ENDER_DODGE_CHANCE_PROJECTILE : ENDER_DODGE_CHANCE;
@@ -1284,9 +1290,10 @@ public class DollEntity extends Avatar {
 			applyFearAura();
 		}
 		if (getDollVariant() == DollVariant.NETHER) {
-			applyNetherPacifyAura();
-			applyNetherBurnAura();
-		}
+				updateNetherAuraCenter();
+				applyNetherPacifyAura();
+				applyNetherBurnAura();
+			}
 		if (getDollVariant() == DollVariant.SEA) {
 			applySeaPacifyAura();
 			applySeaPlayerAura();
@@ -2005,10 +2012,21 @@ public class DollEntity extends Avatar {
 			target.setLastHurtByPlayer(this.getOwnerUuid(), 100);
 		}
 		// 下界人偶火焰附加：近战命中后点燃目标 8 秒；手持地狱剑翻倍 16 秒（灼烧伤害×2）
-		if (hit && getDollVariant() == DollVariant.NETHER) {
-			target.igniteForSeconds(hasNetherSwordEquipped() ? 16.0f : 8.0f);
-		}
-		return hit;
+			if (hit && getDollVariant() == DollVariant.NETHER) {
+				target.igniteForSeconds(hasNetherSwordEquipped() ? 16.0f : 8.0f);
+			}
+			// 末影斧暴击音效 / 粒子（人偶端：玩家端由 PlayerEnderAxeMixin 处理）
+			if (hit && weapon.getItem() instanceof EnderAxeItem && this.level() instanceof ServerLevel serverLevel) {
+				serverLevel.playSound(null, target.getX(), target.getY(), target.getZ(),
+					SoundEvents.PLAYER_ATTACK_CRIT, SoundSource.PLAYERS, 1.0f, 1.0f);
+				serverLevel.sendParticles(ParticleTypes.CRIT,
+					target.getX(), target.getY() + target.getBbHeight() * 0.5, target.getZ(),
+					15, 0.2, 0.2, 0.2, 0.0);
+				serverLevel.sendParticles(ParticleTypes.ENCHANTED_HIT,
+					target.getX(), target.getY() + target.getBbHeight() * 0.5, target.getZ(),
+					15, 0.2, 0.2, 0.2, 0.0);
+			}
+			return hit;
 	}
 
 	/**
@@ -2902,7 +2920,7 @@ public class DollEntity extends Avatar {
 	private boolean hasHoeAndWaterInHotbar() {
 		boolean hoe = false;
 		boolean water = false;
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 8; i++) {
+		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
 			ItemStack stack = inventory.getItem(i);
 			if (stack.isEmpty()) {
 				continue;
@@ -3675,7 +3693,7 @@ public class DollEntity extends Avatar {
 
 	/** 快捷栏工具池（36-43）是否有斧头（砍树模式开启前提）。跟随开关格 44 不算工具位。 */
 	private boolean hasAxeInHotbar() {
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 8; i++) {
+		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
 			if (inventory.getItem(i).getItem() instanceof AxeItem) {
 				return true;
 			}
@@ -3685,7 +3703,7 @@ public class DollEntity extends Avatar {
 
 	/** 快捷栏工具池（36-43）是否有镐子（挖矿模式开启前提）。跟随开关格 44 不算工具位。 */
 	private boolean hasPickaxeInHotbar() {
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 8; i++) {
+		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
 			if (isPickaxe(inventory.getItem(i))) {
 				return true;
 			}
@@ -5152,6 +5170,7 @@ public class DollEntity extends Avatar {
 	 * 26.2 中力量/火焰/击退/穿透附魔会在构造/命中时由原版自动应用，无需手动处理。
 	 */
 	private void updateBowMind(ItemStack weapon) {
+		int paleChargeTicks = isPaleDollPaleBow() ? BOW_CHARGE_TICKS / 3 : BOW_CHARGE_TICKS;
 		if (bowChargeTicks < 0) {
 			// 未拉弓：有弹药才启动（同时进入使用状态，客户端摆出双持拉弓姿势）
 			if (!hasAmmoForBow(weapon)) {
@@ -5159,7 +5178,7 @@ public class DollEntity extends Avatar {
 			}
 			bowChargeTicks = 0;
 			beginUsingRangedWeapon();
-		} else if (bowChargeTicks >= BOW_CHARGE_TICKS) {
+		} else if (bowChargeTicks >= paleChargeTicks) {
 			// 已拉满：等可发射时机（拉满状态保持，目标进入射程即射，避免反复拉弓抖动）
 			if (attackCooldown <= 0 && canShoot(rangedTarget)) {
 				endUsingRangedWeapon(); // 放弦复位（先于发射，避免放箭帧仍保持拉弓姿势）
@@ -5172,8 +5191,16 @@ public class DollEntity extends Avatar {
 		}
 	}
 
-	/** 弓是否有弹药可用：无限附魔恒真，否则背包要有箭。 */
+	/** 苍白人偶持苍白弓时，是否启用专属特效（快速蓄力 + 高速箭矢 + 不耗箭）。 */
+	private boolean isPaleDollPaleBow() {
+		return getDollVariant() == DollVariant.PALE
+			&& getRangedWeapon().getItem() instanceof PaleBowItem;
+	}
+
+	/**
+	 * 弓是否有弹药可用：无限附魔恒真，苍白人偶持苍白弓恒真，否则背包要有箭。 */
 	private boolean hasAmmoForBow(ItemStack weapon) {
+		if (isPaleDollPaleBow()) return true;
 		if (EnchantmentHelper.getItemEnchantmentLevel(enchantmentHolder(Enchantments.INFINITY), weapon) > 0) {
 			return true;
 		}
@@ -5185,16 +5212,19 @@ public class DollEntity extends Avatar {
 		if (!(this.level() instanceof ServerLevel serverLevel)) {
 			return;
 		}
+		boolean paleBow = isPaleDollPaleBow();
+		float paleBowPower = paleBow ? BOW_SHOOT_POWER * 2.0f : BOW_SHOOT_POWER;
+		float paleBowDivergence = paleBow ? 0.0f : BOW_SHOOT_DIVERGENCE;
 		ItemStack ammo = findArrowInInventory();
-		boolean infinite = EnchantmentHelper.getItemEnchantmentLevel(enchantmentHolder(Enchantments.INFINITY), weapon) > 0;
+		boolean infinite = paleBow || EnchantmentHelper.getItemEnchantmentLevel(enchantmentHolder(Enchantments.INFINITY), weapon) > 0;
 		if (ammo.isEmpty() && !infinite) {
 			return;
 		}
 		if (ammo.isEmpty()) {
 			ammo = new ItemStack(Items.ARROW); // 无限附魔时凭空生成
 		}
-		AbstractArrow arrow = ProjectileUtil.getMobArrow(this, ammo, BOW_SHOOT_POWER, weapon);
-		shootProjectileAt(arrow, predictAim(rangedTarget, BOW_SHOOT_POWER), BOW_SHOOT_POWER, BOW_SHOOT_DIVERGENCE);
+		AbstractArrow arrow = ProjectileUtil.getMobArrow(this, ammo, paleBowPower, weapon);
+		shootProjectileAt(arrow, predictAim(rangedTarget, paleBowPower), paleBowPower, paleBowDivergence);
 		this.playSound(SoundEvents.SKELETON_SHOOT, 1.0f, 1.0f / (this.getRandom().nextFloat() * 0.4f + 0.8f));
 		serverLevel.addFreshEntity(arrow);
 		if (!infinite) {
@@ -5393,7 +5423,7 @@ public class DollEntity extends Avatar {
 	 * 在人偶快捷栏（36-43）中查找弓或弩，返回找到的槽位索引，未找到返回 -1。
 	 */
 	private int findRangedWeaponInHotbar() {
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 8; i++) {
+		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
 			if (isRangedWeapon(inventory.getItem(i))) {
 				return i;
 			}
@@ -5747,12 +5777,15 @@ public class DollEntity extends Avatar {
 	 */
 	@Override
 	public void remove(RemovalReason reason) {
-		// 人偶移除即从恐惧光环登记表移除：受影响生物的 AI 自然恢复（未持久化 NoAi，无需手动恢复）
-		removePaleAuraCenter(this.getUUID());
+		// 人偶移除即从光环登记表移除：受影响生物的 AI 自然恢复（未持久化 NoAi，无需手动恢复）
+			removePaleAuraCenter(this.getUUID());
+			removeNetherAuraCenter(this.getUUID());
 		super.remove(reason);
-		if (!reason.shouldSave()) {
-			DollRecallRegistry.remove(this.getUUID());
-		}
+				// 维度切换时（CHANGED_DIMENSION）旧实体被移除，旧坐标失效，
+				// 故一并清除登记——新维度实体将在下一 tick 重登记。
+				if (!reason.shouldSave() || reason == RemovalReason.CHANGED_DIMENSION) {
+						DollRecallRegistry.remove(this.getUUID());
+				}
 	}
 
 	/**
@@ -5943,19 +5976,17 @@ public class DollEntity extends Avatar {
 	/** 查找斧头：先快捷栏（36-43），快捷栏没有再到存储区/其余格兜底；未找到返回空。
 	 *  斧头耗尽时按此顺序拿下一把可用斧头（存储区备件也能立即接上）。 */
 	private ItemStack findAxeStack() {
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 8; i++) {
+		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
 			ItemStack stack = inventory.getItem(i);
 			if (!stack.isEmpty() && stack.getItem() instanceof AxeItem) {
 				return stack;
 			}
 		}
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
-			if (i >= DollMode.HOTBAR_SLOT_START && i < DollMode.HOTBAR_SLOT_START + 8) {
+			if (i >= DollMode.HOTBAR_SLOT_START && i < DollMode.HOTBAR_SLOT_START + 9) {
 				continue; // 快捷栏已查过
 			}
-			if (i == DollMode.HOTBAR_SLOT_START + 8) {
-				continue; // 44 跟随开关格
-			}
+			
 			ItemStack stack = inventory.getItem(i);
 			if (!stack.isEmpty() && stack.getItem() instanceof AxeItem) {
 				return stack;
@@ -5966,7 +5997,7 @@ public class DollEntity extends Avatar {
 
 	/** 快捷栏（36-43）查找锄头，返回物品；未找到返回空。 */
 	private ItemStack findHoeStack() {
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 8; i++) {
+		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
 			ItemStack stack = inventory.getItem(i);
 			if (!stack.isEmpty() && stack.getItem() instanceof HoeItem) {
 				return stack;
@@ -5978,19 +6009,17 @@ public class DollEntity extends Avatar {
 	/** 查找镐子：先快捷栏（36-43），快捷栏没有再到存储区/其余格兜底；未找到返回空。
 	 *  镐子耗尽时按此顺序拿下一把可用镐子（存储区备件也能立即接上）。 */
 	private ItemStack findPickaxeStack() {
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 8; i++) {
+		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
 			ItemStack stack = inventory.getItem(i);
 			if (isPickaxe(stack)) {
 				return stack;
 			}
 		}
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
-			if (i >= DollMode.HOTBAR_SLOT_START && i < DollMode.HOTBAR_SLOT_START + 8) {
+			if (i >= DollMode.HOTBAR_SLOT_START && i < DollMode.HOTBAR_SLOT_START + 9) {
 				continue; // 快捷栏已查过
 			}
-			if (i == DollMode.HOTBAR_SLOT_START + 8) {
-				continue; // 44 跟随开关格
-			}
+			
 			ItemStack stack = inventory.getItem(i);
 			if (isPickaxe(stack)) {
 				return stack;
@@ -6008,9 +6037,7 @@ public class DollEntity extends Avatar {
 		ItemStack best = ItemStack.EMPTY;
 		int bestLevel = -1;
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
-			if (i == DollMode.HOTBAR_SLOT_START + 8) {
-				continue; // 44 跟随开关格
-			}
+			
 			ItemStack stack = inventory.getItem(i);
 			if (!isPickaxe(stack)) {
 				continue;
@@ -6035,9 +6062,7 @@ public class DollEntity extends Avatar {
 		ItemStack best = ItemStack.EMPTY;
 		int bestLevel = Integer.MAX_VALUE;
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
-			if (i == DollMode.HOTBAR_SLOT_START + 8) {
-				continue; // 44 跟随开关格
-			}
+			
 			ItemStack stack = inventory.getItem(i);
 			if (!isPickaxe(stack)) {
 				continue;
@@ -6083,7 +6108,7 @@ public class DollEntity extends Avatar {
 
 	/** 快捷栏（36-43）查找钓鱼竿，返回物品；未找到返回空。 */
 	private ItemStack findFishingRodStack() {
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 8; i++) {
+		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
 			ItemStack stack = inventory.getItem(i);
 			if (isFishingRod(stack)) {
 				return stack;
@@ -6908,6 +6933,15 @@ public class DollEntity extends Avatar {
 	 */
 	private static final Map<UUID, Vec3> paleAuraCenters = new HashMap<>();
 
+	/**
+	 * 下界人偶岩浆无减速光环登记表（仅服务端内存态）。
+	 * <p>
+	 * 存活下界人偶每 tick 把当前光环中心登入此表，供 {@link #isInNetherAura} 低开销判定。
+	 * 此表用于 {@link io.github.a10086ovo.doll.mixin.EntityLavaSpeedMixin} 中让光环内任意生物（含主人/玩家）在岩浆里不受移动减速。
+	 * 人偶死亡/卸载/换维度移除条目，自然恢复岩浆减速。
+	 */
+	private static final Map<UUID, Vec3> netherAuraCenters = new HashMap<>();
+
 	/** 每 tick 更新本苍白人偶在光环登记表中的中心；非苍白/已死亡则移除。 */
 	private void updatePaleAuraCenter() {
 		if (getDollVariant() == DollVariant.PALE && this.isAlive() && !this.level().isClientSide()) {
@@ -6927,6 +6961,42 @@ public class DollEntity extends Avatar {
 	/** 服务器启动时清空登记表（跨存档不残留旧光环中心）。 */
 	public static void clearPaleAuraCenters() {
 		paleAuraCenters.clear();
+	}
+
+	/** 每 tick 更新本下界人偶在光环登记表中的中心；非下界/已死亡则移除。 */
+	private void updateNetherAuraCenter() {
+		if (getDollVariant() == DollVariant.NETHER && this.isAlive() && !this.level().isClientSide()) {
+			netherAuraCenters.put(this.getUUID(), getAuraCenter());
+		} else {
+			netherAuraCenters.remove(this.getUUID());
+		}
+	}
+
+	/** 人偶移除/死亡时从登记表移除。 */
+	private static void removeNetherAuraCenter(UUID uuid) {
+		if (uuid != null) {
+			netherAuraCenters.remove(uuid);
+		}
+	}
+
+	/** 服务器启动时清空登记表（跨存档不残留旧光环中心）。 */
+	public static void clearNetherAuraCenters() {
+		netherAuraCenters.clear();
+	}
+
+	/** 低开销判断：位置是否落在任意下界人偶的 16 格光环内。 */
+	public static boolean isInNetherAura(Vec3 pos) {
+		if (netherAuraCenters.isEmpty()) return false;
+		double r2 = 16.0 * 16.0;
+		for (Vec3 center : netherAuraCenters.values()) {
+			if (pos.distanceToSqr(center) <= r2) return true;
+		}
+		return false;
+	}
+
+	/** 兼容实体签名重载。 */
+	public static boolean isInNetherAura(Entity entity) {
+		return entity != null && isInNetherAura(entity.position());
 	}
 
 	/**
@@ -7276,8 +7346,8 @@ public class DollEntity extends Avatar {
 		double radius = 16.0;
 		AABB box = createAuraAABB(center, radius);
 		// 重平衡：藤蔓缠绕覆盖范围内所有敌方生物（Enemy）AoE，不再限于森林列表；
-		// 缓慢 IV（amp3）+ 中毒（原版 POISON 固定 1 点/秒，amplifier 不影响每秒伤害）。
-		// 副手荆棘盾的"100% 反伤"由 ThornsShieldMixin 单独处理，此处不再叠加毒伤。
+		// 缓慢 IV（amp3）。原「中毒」已移除——毒伤移交副手荆棘盾的反伤（ThornsShieldMixin 单独处理），
+		// 常态藤蔓不再附加中毒。
 		List<Mob> mobs = serverLevel.getEntities(
 			EntityTypeTest.forClass(Mob.class),
 			box,
@@ -7288,18 +7358,17 @@ public class DollEntity extends Avatar {
 				continue;
 			}
 			mob.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 40, 3, false, false)); // 缓慢 IV
-			mob.addEffect(new MobEffectInstance(MobEffects.POISON, 60, 0, true, true)); // 中毒 1 点/秒
 		}
 	}
 
 	// ------------------------------------------------------------------
-	// 森林人偶天赋：敌方生物高亮（半径 16 格，与藤蔓光环同范围，光灵箭式 GLOWING 描边）
+	// 森林人偶天赋：敌方生物高亮（半径 32 格，光灵箭式 GLOWING 描边）
 	// ------------------------------------------------------------------
 
 	private int forestMarkCooldown = 0;
 
 	/**
-	 * 森林人偶威胁标记（每 20 tick，以光环为中心半径 16 格，与藤蔓光环同范围）：
+	 * 森林人偶威胁标记（每 20 tick，以光环为中心半径 32 格）：
 	 * 对范围内的陆地敌对生物施加 {@link MobEffects#GLOWING}（光灵箭同款白色描边高亮），
 	 * 持续刷新使其稳定可见，方便主人看清贴脸威胁。离开范围或人偶不在场即自然过期。
 	 * 仅 FOREST 变体触发，且仅主人在线时生效（联机时其他玩家不享受该圈）。
@@ -7316,7 +7385,7 @@ public class DollEntity extends Avatar {
 		if (owner == null || !owner.isAlive()) {
 			return;
 		}
-		double radius = 16.0;
+		double radius = 32.0;
 		Vec3 center = getAuraCenter();
 		AABB box = createAuraAABB(center, radius);
 		List<Mob> mobs = serverLevel.getEntities(
@@ -7454,6 +7523,10 @@ public class DollEntity extends Avatar {
 		}
 		// 水下呼吸：只要在主人的 16 格内就持续给予
 		owner.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, 200, 0, false, false));
+		// 清除主人身上的挖掘疲劳（MINING_FATIGUE）——海洋人偶庇护主人，避免减速/虚弱采集带来的手感拖沓
+		if (owner.hasEffect(MobEffects.MINING_FATIGUE)) {
+			owner.removeEffect(MobEffects.MINING_FATIGUE);
+		}
 		// 水下速掘：仅当主人身处水中时给予急迫(HASTE)，离开水不加速。
 		// 高等级抵消水中(非地面)挖掘 ÷5 惩罚：游泳时≈1.16×陆地、站海底≈5.8×陆地。
 		if (owner.isInWater()) {
@@ -7462,16 +7535,21 @@ public class DollEntity extends Avatar {
 	}
 
 	// ------------------------------------------------------------------
-	// 向导人偶引导光环：主人 速度II + 跳跃II + 免疫凋零（半径 16 格，仅主人）
+	// 向导人偶引导光环：主人 速度II + 跳跃II + 护甲+4（半径 32 格，仅主人）
 	// ------------------------------------------------------------------
+
+	// 护甲 +4 的 transient 修饰符（不写盘），主人离开光环范围时移除
+	private static final Identifier GUIDE_ARMOR_MOD_ID =
+		Identifier.fromNamespaceAndPath(DollModConstants.MOD_ID, "guide_armor_bonus");
+	private static final AttributeModifier GUIDE_ARMOR_MOD =
+		new AttributeModifier(GUIDE_ARMOR_MOD_ID, 4.0, AttributeModifier.Operation.ADD_VALUE);
 
 	private int guideAuraCooldown = 0;
 
 	/**
-	 * 向导人偶引导光环（每 20 tick，半径 16 格）：
-	 * 主人在人偶 16 格范围内时持续获得 速度 II（SPEED amp1）+ 跳跃 II（JUMP_BOOST amp1），
-	 * 并清除身上的 凋零（WITHER）效果以实现"免疫凋零"。
-	 * 效果 duration≈10s，每 20 tick 重刷；主人离开范围后不再刷新，效果自然过期。
+	 * 向导人偶引导光环（每 20 tick，半径 32 格）：
+	 * 主人在人偶 32 格范围内时持续获得 速度 II（SPEED amp1）+ 跳跃 II（JUMP_BOOST amp1）+ 护甲 +4，
+	 * 效果 duration≈10s，每 20 tick 重刷；主人离开范围后不再刷新（效果自然过期、护甲修饰符移除）。
 	 * 仅主人受益（联机时朋友不享受），且仅 GUIDE 变体触发。
 	 */
 	private void applyGuideAura() {
@@ -7487,16 +7565,22 @@ public class DollEntity extends Avatar {
 			return;
 		}
 		Vec3 center = getAuraCenter();
-		double radius = 16.0;
+		double radius = 32.0;
 		if (owner.position().distanceToSqr(center) > radius * radius) {
-			return; // 主人不在光环内，不刷新（已有效果将自然过期）
+			// 主人不在光环内：若身上残留护甲修饰符则移除，其余效果（速度/跳跃）自然过期
+			AttributeInstance armorAttr = owner.getAttribute(Attributes.ARMOR);
+			if (armorAttr != null && armorAttr.hasModifier(GUIDE_ARMOR_MOD_ID)) {
+				armorAttr.removeModifier(GUIDE_ARMOR_MOD_ID);
+			}
+			return;
 		}
 		// 速度 II（SPEED amp1）+ 跳跃 II（JUMP_BOOST amp1），持续 200 tick（10 秒）
 		owner.addEffect(new MobEffectInstance(MobEffects.SPEED, 200, 1, false, false));
 		owner.addEffect(new MobEffectInstance(MobEffects.JUMP_BOOST, 200, 1, false, false));
-		// 免疫凋零：清除主人身上的凋零效果（每 20 tick 兜底一次，期间不累积凋零伤害）
-		if (owner.hasEffect(MobEffects.WITHER)) {
-			owner.removeEffect(MobEffects.WITHER);
+		// 护甲 +4：transient 修饰符，范围内持续提供
+		AttributeInstance armorAttr = owner.getAttribute(Attributes.ARMOR);
+		if (armorAttr != null && !armorAttr.hasModifier(GUIDE_ARMOR_MOD_ID)) {
+			armorAttr.addTransientModifier(GUIDE_ARMOR_MOD);
 		}
 	}
 
@@ -7581,7 +7665,7 @@ public class DollEntity extends Avatar {
 		return ownerUuid != null && ownerUuid.equals(player.getUUID());
 	}
 
-	private Player getOwnerPlayer() {
+	public Player getOwnerPlayer() {
 		if (ownerUuid == null) {
 			return null;
 		}

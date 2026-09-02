@@ -13,8 +13,8 @@
 		"SpecialModelRenderersMixin",
 		"WitherSkullRenderStateMixin",
 		"WitherSkullRendererMixin"
-	],
-	"injectors": {
+		],
+		"injectors": {
 		"defaultRequire": 1
 	},
 	"overwrites": {
