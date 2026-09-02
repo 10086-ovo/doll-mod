@@ -1,0 +1,18 @@
+{
+	"name": "Upgrade & Recycle",
+	"icon": "doll-mod:doll_egg_s2",
+	"category": "getting_started",
+	"sortnum": 3,
+	"pages": [
+		{
+			"type": "text",
+			"title": "Upgrade",
+			"text": "Place a lower-tier egg in the center of a crafting table surrounded by materials. The upgraded egg summons a new doll inheriting the name and settings.\n\nSee \"Doll Tiers\" for material requirements."
+		},
+		{
+			"type": "text",
+			"title": "Recycle & Death",
+			"text": "Right-click a doll with its egg to retrieve it. The egg carries the doll's inventory data.\n\nOn death: drops all items. All eggs become invalid. Cannot be recovered."
+		}
+	]
+}

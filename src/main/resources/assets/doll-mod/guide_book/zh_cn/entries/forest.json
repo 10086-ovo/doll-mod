@@ -1,0 +1,51 @@
+{
+	"name": "森林人偶",
+	"icon": "doll-mod:forest_doll_egg",
+	"category": "special",
+	"sortnum": 1,
+	"pages": [
+		{
+			"type": "text",
+			"title": "基础属性",
+			"text": "森林人偶擅长用藤蔓控制敌对生物，并为主人提供持续恢复，适合长期在野外活动。\n\n• 生命值：120\n• 恢复 IV + 抗性 II（无抗火）"
+		},
+		{
+			"type": "text",
+			"title": "光环与能力",
+			"text": "光环\n• 藤蔓缠绕：32 格内敌对生物缓慢 IV（离开范围自然过期）\n• 威胁标记：32 格内陆地敌对生物高亮（光灵箭式描边）\n• 主人回血：32 格内主人持续获得恢复 I\n• 友善生物吸引：吸引附近未驯服的动物靠近\n\n副手荆棘盾\n森林人偶副手持荆棘盾牌时，受击 100% 反弹所受伤害。"
+		},
+		{
+			"type": "text",
+			"title": "获取方式",
+			"text": "先合成森林人偶头颅，再用它合成森林人偶蛋，最后在铁砧上赐名即可召唤。配方见下两页。"
+		},
+		{
+			"type": "crafting",
+			"title": "合成配方",
+			"pattern": [
+				"MM",
+				"MM"
+			],
+			"keys": {
+				"M": "minecraft:mossy_cobblestone"
+			},
+			"result": "doll-mod:forest_doll_head",
+			"text": "4 苔石摆 2×2 合成森林人偶头颅。"
+		},
+		{
+			"type": "crafting",
+			"title": "合成配方",
+			"pattern": [
+				"OOO",
+				"OHO",
+				"OOO"
+			],
+			"keys": {
+				"O": "minecraft:oak_log",
+				"H": "doll-mod:forest_doll_head"
+			},
+			"result": "doll-mod:forest_doll_egg",
+			"text": "8 橡木原木围一圈，中间放森林人偶头颅，合成森林人偶蛋。"
+		}
+	]
+}

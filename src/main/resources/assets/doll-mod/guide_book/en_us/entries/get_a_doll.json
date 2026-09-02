@@ -1,0 +1,18 @@
+{
+  "name": "How to Get a Doll",
+  "icon": "doll-mod:doll_egg_s1",
+  "category": "getting_started",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "text",
+      "title": "Summoning Process",
+      "text": "1. Craft a Doll Egg (tier 1–5 or special variant)\n2. Name it on an anvil\n3. Right-click the ground with the named egg to summon\n\nThe egg is not consumed — it becomes bound to the doll. Right-click ground again to teleport the doll there.\n\nOnly a named egg can summon. Each egg is uniquely bound to its doll's UUID."
+    },
+    {
+      "type": "text",
+      "title": "Important Notes",
+      "text": "• First-time players receive a Guide Book automatically (one per player per world)\n• Right-click the doll with its egg to retrieve it; the egg carries inventory data\n• When a doll dies, all its eggs become invalid\n\nSee \"Dolls\" category for normal egg recipes, and \"Advanced Dolls\" for special variants."
+    }
+  ]
+}

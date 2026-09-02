@@ -1,0 +1,18 @@
+{
+  "name": "Quick Start",
+  "icon": "doll-mod:doll_egg_s1",
+  "category": "basics",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "text",
+      "title": "Basic Operations",
+      "text": "Right-click a doll to open its inventory — equip weapons, armor, and tools.\n\nBaton: right-click a doll to select it, then right-click blocks to set a work area. Shift-right-click the doll to clear it.\n\nRemote: right-click anywhere to open the control panel for managing all dolls' modes and follow status.\n\nBaton is crafted from 3 sticks. Remote is 2 iron ingots + 1 redstone. See \"Baton & Remote\" entry."
+    },
+    {
+      "type": "text",
+      "title": "Life and Death",
+      "text": "When a doll dies, it drops all items. All corresponding eggs become invalid. A dead doll cannot be recovered.\n\nRight-click a doll with its egg to retrieve it safely at any time."
+    }
+  ]
+}

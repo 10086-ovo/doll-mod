@@ -1,0 +1,56 @@
+{
+	"name": "向导人偶",
+	"icon": "doll-mod:guide_doll_egg",
+	"category": "special",
+	"sortnum": 0,
+	"pages": [
+		{
+			"type": "text",
+			"title": "基础属性",
+			"text": "向导人偶定位为辅助与探索型人偶，不会主动攻击，但能为附近的主人提供引导光环和坐标搜索能力。\n\n• 生命值：120\n• 恢复 IV + 抗性 II（无抗火）"
+		},
+		{
+			"type": "text",
+			"title": "引导光环",
+			"text": "光环半径 32 格，主人在范围内时持续获得：\n• 速度 II\n• 跳跃 II\n• 护甲 +4（离开范围后护甲加成收回）\n\n仅主人受益，离开范围后效果自然过期。"
+		},
+		{
+			"type": "text",
+			"title": "坐标搜索",
+			"text": "在向导人偶的物品栏界面点击左侧「搜索」按钮，打开统一搜索菜单：\n\n• 顶部三个页签：结构 / 群系 / 村庄，列出当前维度可搜索的目标\n• 点击目标即开始搜索，结果按与主人的水平距离由近到远排列\n• 每行显示目标名称、水平距离与坐标\n• 右侧「对勾」按钮可手动打卡标记，标记自动保存，方便区分已去过的目标\n\n搜索功能跨重启持久化，标记数据不会丢失。"
+		},
+		{
+			"type": "text",
+			"title": "获取方式",
+			"text": "先合成向导人偶头颅，再用它合成向导人偶蛋，最后在铁砧上赐名即可召唤。配方见下两页。"
+		},
+		{
+			"type": "crafting",
+			"title": "合成配方",
+			"pattern": [
+				"CC",
+				"CC"
+			],
+			"keys": {
+				"C": "minecraft:compass"
+			},
+			"result": "doll-mod:guide_doll_head",
+			"text": "4 指南针摆 2×2 合成向导人偶头颅。"
+		},
+		{
+			"type": "crafting",
+			"title": "合成配方",
+			"pattern": [
+				"PPP",
+				"PHP",
+				"PPP"
+			],
+			"keys": {
+				"P": "minecraft:paper",
+				"H": "doll-mod:guide_doll_head"
+			},
+			"result": "doll-mod:guide_doll_egg",
+			"text": "8 张纸围一圈，中间放向导人偶头颅，合成向导人偶蛋。"
+		}
+	]
+}

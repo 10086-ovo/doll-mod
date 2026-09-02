@@ -1,0 +1,23 @@
+{
+  "name": "Wild Warden Doll",
+  "icon": "doll-mod:warden_doll_head",
+  "category": "endgame",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "text",
+      "title": "Base Stats",
+      "text": "Hostile boss summoned by the Sculk Shrine.\n\n• HP: 300, Attack: 10 (melee)\n• Speed: 0.3 (mimics Warden)\n• Weak Regen I, full knockback resistance\n• Immune to fire, lava, and all projectile damage\n\nAttacks all non-Creative/non-Spectator mobs. Retaliates when hit."
+    },
+    {
+      "type": "text",
+      "title": "Sonic Boom Attack",
+      "text": "When target is out of melee range, charges and fires a sonic boom:\n\n• Damage: 6 (armor-piercing)\n• Charge: 1.5s (audio cue plays)\n• Cooldown: 7s\n• Range: 32 blocks, pulls target toward boss"
+    },
+    {
+      "type": "text",
+      "title": "Emergence & Drops",
+      "text": "Rises from the Shrine over 5 seconds (smoke + soul fire particles). Invulnerable during animation. Roars when ready.\n\n60% chance to drop a Warden Doll Head (+10% per Looting). Craft with 8 Sculk blocks for the Warden Doll Egg."
+    }
+  ]
+}

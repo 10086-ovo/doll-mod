@@ -1,0 +1,33 @@
+{
+	"name": "Pale Bow",
+	"icon": "doll-mod:pale_bow",
+	"category": "items",
+	"sortnum": 3,
+	"pages": [
+		{
+			"type": "text",
+			"title": "Overview",
+			"text": "Pale Garden-themed bow. 1536 durability (4x vanilla bow). Enchantable (Power, Flame, Punch, Infinity, etc.).\n\nVulnerability effect: arrows apply +50% damage taken for 5s. Stacks with Pale Doll's fear aura (total +100%).\nRepair: resin."
+		},
+		{
+			"type": "text",
+			"title": "Pale Doll Exclusive",
+			"text": "When the Pale Doll uses the Pale Bow:\n\n• No arrows required — fires without ammo\n• Faster draw time\n• Faster arrow velocity"
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				" RS",
+				"R S",
+				" RS"
+			],
+			"keys": {
+				"R": "minecraft:resin_brick",
+				"S": "minecraft:string"
+			},
+			"result": "doll-mod:pale_bow",
+			"text": "3 resin bricks + 3 string, arranged like a vanilla bow."
+		}
+	]
+}

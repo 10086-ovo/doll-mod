@@ -1,0 +1,33 @@
+{
+	"name": "Nether Sword",
+	"icon": "doll-mod:nether_sword",
+	"category": "items",
+	"sortnum": 5,
+	"pages": [
+		{
+			"type": "text",
+			"title": "Overview",
+			"text": "Nether-themed melee weapon. Base damage 8, attack speed 2.0 (matches Netherite Sword).\n\nOwner effects (not dolls):\n• Continuous Fire Resistance while held\n• Attacks set target on fire for 4s\n• 6 golden hearts (12 absorption) while held\n• Hold right-click 1s: summons a flying sword"
+		},
+		{
+			"type": "text",
+			"title": "Flying Nether Sword",
+			"text": "Orbits the owner. Auto-attacks nearest hostile mob within 16 blocks. Dive-bomb: 8 damage + 8s burn. Only one active at a time.\n\nRepair: blaze rods.\n\nNether Doll synergy: all burn durations doubled."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				" N ",
+				" N ",
+				" S "
+			],
+			"keys": {
+				"N": "minecraft:blaze_rod",
+				"S": "minecraft:stick"
+			},
+			"result": "doll-mod:nether_sword",
+			"text": "2 blaze rods + 1 stick vertically."
+		}
+	]
+}

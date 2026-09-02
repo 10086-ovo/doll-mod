@@ -1,0 +1,9 @@
+{
+    "replace": false,
+    "values": [
+        "doll-mod:sea_helmet",
+        "doll-mod:sea_chestplate",
+        "doll-mod:sea_leggings",
+        "doll-mod:sea_boots"
+    ]
+}

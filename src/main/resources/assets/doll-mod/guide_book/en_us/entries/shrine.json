@@ -1,0 +1,28 @@
+{
+	"name": "Sculk Shrine",
+	"icon": "doll-mod:sculk_shrine",
+	"category": "endgame",
+	"sortnum": 0,
+	"pages": [
+		{
+			"type": "text",
+			"title": "How to Use",
+			"text": "Ritual block that summons the Wild Warden Doll.\n\n1. Place the Shrine anywhere\n2. Right-click with an Echo Shard\n3. One shard is consumed, the boss appears\n\nEach shrine requires the previous boss dead before summoning again.\n\nDefeat the boss for a chance to drop a Warden Doll Head. See \"Wild Warden Doll\" and \"Warden Doll\" entries."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"DDD",
+				"DSD",
+				"DDD"
+			],
+			"keys": {
+				"D": "minecraft:deepslate_bricks",
+				"S": "minecraft:soul_sand"
+			},
+			"result": "doll-mod:sculk_shrine",
+			"text": "8 deepslate bricks surround 1 soul sand."
+		}
+	]
+}

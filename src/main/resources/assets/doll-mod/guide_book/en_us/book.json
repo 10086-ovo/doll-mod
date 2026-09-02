@@ -1,0 +1,5 @@
+{
+	"name": "Doll Guide Book",
+	"landingText": "Your loyal adventure companion that never leaves you alone.\n\nDolls fight, mine, chop, farm, fish, and even sacrifice themselves to save you.\n\nClick a category on the left to start reading.",
+	"bookTexture": "doll-mod:textures/gui/guide_book.png"
+}

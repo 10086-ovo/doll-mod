@@ -1,0 +1,29 @@
+{
+	"name": "Ender Axe",
+	"icon": "doll-mod:ender_axe",
+	"category": "items",
+	"sortnum": 6,
+	"pages": [
+		{
+			"type": "text",
+			"title": "Overview",
+			"text": "Hybrid melee/thrown weapon. Attack speed 1.6. Every attack is a guaranteed critical hit (jump-crit sound).\n\n• Melee damage: 10. Can strip logs.\n• Thrown: hold right-click to charge, release to throw. Retrievable.\n• 80% dodge chance while held (main or offhand).\n• Executes mobs below 30% HP.\n\nRepair: gold ingots.\n\nEnder Doll synergy: execute threshold rises from 25% to 55%."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"GE",
+				"GS",
+				" S"
+			],
+			"keys": {
+				"G": "minecraft:gold_ingot",
+				"E": "minecraft:ender_pearl",
+				"S": "minecraft:stick"
+			},
+			"result": "doll-mod:ender_axe",
+			"text": "2 gold ingots + 1 ender pearl + 1 stick."
+		}
+	]
+}

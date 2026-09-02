@@ -1,0 +1,51 @@
+{
+	"name": "Forest Doll",
+	"icon": "doll-mod:forest_doll_egg",
+	"category": "special",
+	"sortnum": 1,
+	"pages": [
+		{
+			"type": "text",
+			"title": "Base Stats",
+			"text": "Excels at controlling hostile mobs with vines and providing sustained regen. Ideal for outdoor adventures.\n\nHP: 120. Regen IV + Resistance II."
+		},
+		{
+			"type": "text",
+			"title": "Aura & Abilities",
+			"text": "Radius: 32 blocks.\n• Slowness IV on hostile mobs (expires on leaving range)\n• Threat Marking: hostile land mobs highlighted (spectral-arrow outline)\n• Owner: continuous Regen I within range\n• Attracts nearby untamed animals\n\nOffhand Thorns Shield: 100% damage reflection."
+		},
+		{
+			"type": "text",
+			"title": "How to Obtain",
+			"text": "Craft the Forest Doll Head, then the Forest Doll Egg. Name the egg on an anvil to summon."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"MM",
+				"MM"
+			],
+			"keys": {
+				"M": "minecraft:mossy_cobblestone"
+			},
+			"result": "doll-mod:forest_doll_head",
+			"text": "4 mossy cobblestone in a 2x2 grid."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"OOO",
+				"OHO",
+				"OOO"
+			],
+			"keys": {
+				"O": "minecraft:oak_log",
+				"H": "doll-mod:forest_doll_head"
+			},
+			"result": "doll-mod:forest_doll_egg",
+			"text": "8 oak logs surround the head."
+		}
+	]
+}

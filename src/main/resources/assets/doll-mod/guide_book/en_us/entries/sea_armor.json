@@ -1,0 +1,33 @@
+{
+	"name": "Sea Armor",
+	"icon": "doll-mod:sea_chestplate",
+	"category": "items",
+	"sortnum": 4,
+	"pages": [
+		{
+			"type": "text",
+			"title": "Overview",
+			"text": "Helmet, Chestplate, Leggings, Boots. Stats match diamond armor. Compatible with smithing template trims.\n\nTotal defense: 20. Toughness: 2.0. Enchantability: 10.\n\nRepair: prismarine shards or nautilus shells."
+		},
+		{
+			"type": "text",
+			"title": "How to Obtain",
+			"text": "No crafting recipe. Found only in Buried Treasure:\n• 91% chance to appear\n• Two non-duplicate pieces per chest\n• Random durability, 50% chance of random enchantment"
+		},
+		{
+				"type": "text",
+				"title": "Set Effects",
+				"text": "Surf Boots: walk/run/jump on water. Sneak to sink. Fall damage negated on water.\nCurrent Helmet: infinite Water Breathing.\nAbyssal Chestplate: clear underwater vision (night vision).\nTide Leggings: increased swim speed. If you are NOT wearing Surf Boots, the leggings have an extra trick:"
+			},
+			{
+				"type": "text",
+				"title": "Tide Leggings: Water Clutch",
+				"text": "While wearing Tide Leggings and **not** wearing Surf Boots, when you:\n• are holding Sneak (Shift) to crouch\n• have a fall distance over 3.5 blocks (about to take fall damage)\n\nthe leggings automatically place a water source beneath your feet, so you land safely without injury; the water disappears once you are safe.\n\nEach clutch trigger costs 1 durability on the leggings.\n\n**Tip:** Keep holding Shift while falling from high up and the leggings will keep cushioning you all the way down."
+			},
+			{
+				"type": "text",
+				"title": "Full Set & Sea Doll",
+				"text": "Full set: permanent Resistance II.\nSea Doll: each piece worn adds 10% damage taken (40% total for 4 pieces)."
+			}
+	]
+}

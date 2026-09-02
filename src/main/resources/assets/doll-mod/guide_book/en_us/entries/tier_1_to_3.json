@@ -1,0 +1,97 @@
+{
+	"name": "Doll Tiers",
+	"icon": "doll-mod:doll_egg_s1",
+	"category": "getting_started",
+	"sortnum": 2,
+	"pages": [
+		{
+			"type": "text",
+			"title": "Tier Overview",
+			"text": "Normal dolls: 5 tiers. Higher tiers = more health and stronger regen.\n\nTier 1: 20 HP\nTier 2: 40 HP, Regen I\nTier 3: 60 HP, Regen II\nTier 4: 80 HP, Regen III + Resistance I\nTier 5: 100 HP, Regen IV + Resistance II\n\nAll tiers can use all 8 work modes. The Warden Doll (200 HP) is a separate endgame variant."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				" W ",
+				"WCW",
+				" W "
+			],
+			"keys": {
+				"W": "minecraft:crafting_table",
+				"C": "minecraft:chest"
+			},
+			"result": "doll-mod:doll_egg_s1",
+			"text": "4 crafting tables surround 1 chest in a cross pattern."
+		},
+		{
+			"type": "text",
+			"title": "Upgrade Path",
+			"text": "Place the current egg in the center of a crafting table, surround with 8 materials. The upgraded egg summons a new doll that inherits the name and settings.\n\nT1 → T2: 8 copper ingots\nT2 → T3: 4 copper + 4 iron\nT3 → T4: 4 iron + 4 gold\nT4 → T5: 4 iron + 2 gold + 2 diamonds"
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"CCC",
+				"CEC",
+				"CCC"
+			],
+			"keys": {
+				"C": "minecraft:copper_ingot",
+				"E": "doll-mod:doll_egg_s1"
+			},
+			"result": "doll-mod:doll_egg_s2",
+			"text": "8 copper ingots surround a Tier 1 egg to produce Tier 2."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"CIC",
+				"IEI",
+				"CIC"
+			],
+			"keys": {
+				"C": "minecraft:copper_ingot",
+				"I": "minecraft:iron_ingot",
+				"E": "doll-mod:doll_egg_s2"
+			},
+			"result": "doll-mod:doll_egg_s3",
+			"text": "Corners: copper, sides: iron, surrounding a Tier 2 egg."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"IGI",
+				"GEG",
+				"IGI"
+			],
+			"keys": {
+				"I": "minecraft:iron_ingot",
+				"G": "minecraft:gold_ingot",
+				"E": "doll-mod:doll_egg_s3"
+			},
+			"result": "doll-mod:doll_egg_s4",
+			"text": "Corners: iron, sides: gold, surrounding a Tier 3 egg."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"IDI",
+				"GEG",
+				"IDI"
+			],
+			"keys": {
+				"I": "minecraft:iron_ingot",
+				"D": "minecraft:diamond",
+				"G": "minecraft:gold_ingot",
+				"E": "doll-mod:doll_egg_s4"
+			},
+			"result": "doll-mod:doll_egg_s5",
+			"text": "Corners: iron, top/bottom: diamond, sides: gold, surrounding Tier 4 egg."
+		}
+	]
+}

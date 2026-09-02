@@ -1,0 +1,28 @@
+{
+	"name": "幽匿灵龛",
+	"icon": "doll-mod:sculk_shrine",
+	"category": "endgame",
+	"sortnum": 0,
+	"pages": [
+		{
+			"type": "text",
+			"title": "使用方法",
+			"text": "幽匿灵龛是用于召唤野生幽匿人偶的仪式方块。\n\n1. 将灵龛放置在任意位置\n2. 手持回响碎片右键灵龛\n3. 消耗一个回响碎片，召唤一只野生幽匿人偶\n\n野生幽匿人偶拥有生命值 300 和音波远程攻击。每个灵龛在上一个召唤的野生幽匿人偶死亡之前不能再次召唤。\n\n击败野生幽匿人偶后有 60% 概率掉落幽匿人偶头颅，用头颅合成幽匿人偶蛋后即可驯服。野生体的属性与应对策略见「野生幽匿人偶」条目，完整驯服流程见「幽匿人偶」条目。"
+		},
+		{
+			"type": "crafting",
+			"title": "合成配方",
+			"pattern": [
+				"DDD",
+				"DSD",
+				"DDD"
+			],
+			"keys": {
+				"D": "minecraft:deepslate_bricks",
+				"S": "minecraft:soul_sand"
+			},
+			"result": "doll-mod:sculk_shrine",
+			"text": "8 深板岩砖围一圈，中间放灵魂沙，合成幽匿灵龛。"
+		}
+	]
+}

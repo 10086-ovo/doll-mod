@@ -1,0 +1,28 @@
+{
+	"name": "Rock Anvil",
+	"icon": "doll-mod:rock_anvil",
+	"category": "items",
+	"sortnum": 0,
+	"pages": [
+		{
+			"type": "text",
+			"title": "Overview",
+			"text": "Cheap alternative to the Iron Anvil. Functions identically — naming, repairing, and combining enchantments.\n\nThree damage states: intact → cracked → chipped → destroyed. 3 uses per stage, 9 total. Falls from height cause damage stage downgrades."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"CCC",
+				" S ",
+				"SSS"
+			],
+			"keys": {
+				"C": "minecraft:cobblestone",
+				"S": "minecraft:cobblestone_slab"
+			},
+			"result": "doll-mod:rock_anvil",
+			"text": "3 cobblestone + 4 cobblestone slabs."
+		}
+	]
+}

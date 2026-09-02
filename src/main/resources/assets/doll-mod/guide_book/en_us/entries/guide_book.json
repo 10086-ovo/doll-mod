@@ -1,0 +1,18 @@
+{
+  "name": "Guide Book",
+  "icon": "doll-mod:guide_book",
+  "category": "items",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "text",
+      "title": "Overview",
+      "text": "Your portable reference for all mod mechanics and recipes.\n\n• First-time players receive one automatically (one per player per world)\n• Right-click to open\n• Enchantment glint for easy identification"
+    },
+    {
+      "type": "text",
+      "title": "How to Use",
+      "text": "Select a category from the left sidebar, choose an entry, and flip pages. The footer cycles through \"Did You Know?\" trivia.\n\nCannot be crafted — only granted on first login."
+    }
+  ]
+}

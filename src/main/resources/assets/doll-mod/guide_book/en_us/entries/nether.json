@@ -1,0 +1,51 @@
+{
+	"name": "Nether Doll",
+	"icon": "doll-mod:nether_doll_egg",
+	"category": "special",
+	"sortnum": 4,
+	"pages": [
+		{
+			"type": "text",
+			"title": "Base Stats",
+			"text": "Fully adapted to the Nether. Immune to fire, lava, and Wither effect.\n\nHP: 120. Regen IV + Resistance II + Fire Resistance."
+		},
+		{
+			"type": "text",
+			"title": "Aura & Abilities",
+			"text": "Melee/Archer mode fires fire charges (20 damage, 5s burn, 3s cooldown).\n\nAura (16 blocks): hostile Nether mobs cannot target. Owner gets continuous Fire Resistance + lava movement speed freedom.\n\nNether Sword synergy: all burn durations doubled."
+		},
+		{
+			"type": "text",
+			"title": "How to Obtain",
+			"text": "Craft the Nether Doll Head, then the Nether Doll Egg. Name the egg on an anvil to summon."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"QQ",
+				"QQ"
+			],
+			"keys": {
+				"Q": "minecraft:quartz_block"
+			},
+			"result": "doll-mod:nether_doll_head",
+			"text": "4 quartz blocks in a 2x2 grid."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"NNN",
+				"NHN",
+				"NNN"
+			],
+			"keys": {
+				"N": "minecraft:netherrack",
+				"H": "doll-mod:nether_doll_head"
+			},
+			"result": "doll-mod:nether_doll_egg",
+			"text": "8 netherrack surround the head."
+		}
+	]
+}
