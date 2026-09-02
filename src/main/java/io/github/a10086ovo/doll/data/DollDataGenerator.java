@@ -579,8 +579,8 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 			"%s 前方无法挖通，盾构机停止");
 		addMsg(b, "mine_backpack_full", en, "%s backpack is full, mining paused (resumes when cleared)",
 			"%s 背包已满，暂缓挖矿（清理背包后自动恢复）");
-		addMsg(b, "no_pickaxe", en, "No pickaxe in the hotbar, cannot enable Mining mode",
-			"快捷栏中没有镐子，无法开启挖矿模式");
+		addMsg(b, "no_pickaxe", en, "No pickaxe in the inventory, cannot enable Mining mode",
+			"物品栏中没有镐子，无法开启挖矿模式");
 		addMsg(b, "not_owner", en, "This spawn egg is not bound to the target doll",
 			"此刷怪蛋绑定的人偶不是目标人偶，无法回收");
 		addMsg(b, "invalidated", en, "The doll for this spawn egg has died",
@@ -592,13 +592,13 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 			"此位置附近没有可站立的落点，召回失败");
 		addMsg(b, "recall_not_found", en, "Cannot locate the doll's chunk; try again near the doll",
 			"找不到人偶所在区块，请靠近人偶所在区域后再试");
-		addMsg(b, "no_melee_weapon", en, "No melee weapon in the hotbar",
-			"快捷栏中没有近战武器，无法开启近战模式");
-		addMsg(b, "no_ranged_weapon", en, "No bow or crossbow in the hotbar",
-			"快捷栏中没有弓或弩，无法开启射手模式");
+		addMsg(b, "no_melee_weapon", en, "No melee weapon in the inventory",
+			"物品栏中没有近战武器，无法开启近战模式");
+		addMsg(b, "no_ranged_weapon", en, "No bow or crossbow in the inventory",
+			"物品栏中没有弓或弩，无法开启射手模式");
 		addMsg(b, "no_seeds", en, "The doll has no seeds", "人偶缺少种子");
 		addMsg(b, "no_food", en, "The doll has no food", "人偶没有食物，无法开启喂食模式");
-		addMsg(b, "no_axe", en, "No axe in the hotbar", "快捷栏中没有斧头，无法开启砍树模式");
+		addMsg(b, "no_axe", en, "No axe in the inventory", "物品栏中没有斧头，无法开启砍树模式");
 		addMsg(b, "chop_stop_no_axe", en, "%s ran out of axes, chopping stopped",
 			"%s 斧头用完了，砍树模式停止");
 		// 运行时前置消失（方案A：所有模式前置消失即关模式并提示）
@@ -615,8 +615,8 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 		addMsg(b, "fish_stop_no_rod", en, "%s ran out of fishing rods, fishing stopped",
 			"%s 钓鱼竿用完了，钓鱼模式停止");
 		addMsg(b, "no_torch", en, "The doll has no torches", "人偶没有火把，无法开启插火把模式");
-		addMsg(b, "no_fishing_rod", en, "No fishing rod in the hotbar",
-			"快捷栏中没有钓鱼竿，无法开启钓鱼模式");
+		addMsg(b, "no_fishing_rod", en, "No fishing rod in the inventory",
+			"物品栏中没有钓鱼竿，无法开启钓鱼模式");
 		addMsg(b, "fish_follow_conflict", en, "The doll needs to focus on fishing",
 			"人偶需要认真钓鱼");
 		addMsg(b, "pale_sacrifice", en, "The pale doll sacrificed itself to save you",

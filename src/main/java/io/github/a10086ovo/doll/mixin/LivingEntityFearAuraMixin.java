@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * 此处仅保留跳跃抑制：{@code AbstractCubeMob}（史莱姆 / 岩浆怪 / 硫磺立方体的父类）覆写了
  * {@code tick()}，其中自带独立于 AI goal 的跳跃逻辑（{@code getJumpDelay} +
  * {@code jumpFromGround}）。仅取消 {@code serverAiStep}（见
- * {@link MobMixin#paleFearImmobilize}）无法阻止这类跳跃，因为
+ * {@code MobMixin#paleFearImmobilize}）无法阻止这类跳跃，因为
  * {@code AbstractCubeMob.tick()} 在 {@code super.tick()} 返回后继续执行自己的跳跃代码。
  * 本注入直接在 {@code LivingEntity.jumpFromGround()} HEAD 拦截：
  * 处于恐惧光环内的 {@link Enemy} 一律 cancel，从根源上阻断跳跃。

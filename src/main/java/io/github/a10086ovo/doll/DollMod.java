@@ -474,6 +474,9 @@ public class DollMod implements ModInitializer {
 	public void onInitialize() {
 		LOGGER.info("DollMod initializing...");
 
+		// 潮汐护腿「落地水」：玩家登出即澈簿，防水块簿泄漏
+		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> SeaArmorItem.drainPlayer(handler.getPlayer()));
+
 		// ========== 0. 外置配置：载入（缺失则首启自生）并应用到静态调参镜像 ==========
 		boolean cfgLoaded;
 		try {

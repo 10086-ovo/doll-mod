@@ -381,7 +381,7 @@ public class DollEntity extends Avatar {
 
 	// ---- 耕种模式（FARM）：锄地建 9x9 农田 / 播种 / 收获 / 补种 ----
 	// 行为分两档：
-	//   1) 快捷栏同时有锄头+水桶（缺一不可）且背包有种子 → 先锄一块标准 9x9 耕地（中心挖空放水），建好后转入种收；
+	//   1) 物品栏同时有锄头+水桶（缺一不可）且背包有种子 → 先锄一块标准 9x9 耕地（中心挖空放水），建好后转入种收；
 	//   2) 否则（背包只有种子）→ 直接对已有农田播种、收获成熟作物、收获后立刻补种。
 	// 种子从人偶物品栏取，收获物也放入人偶物品栏（装满才掉落在地）。
 	private static double FARM_SEARCH_RANGE = 12.0;        // 目标搜寻半径（以玩家或人偶为中心）
@@ -418,7 +418,7 @@ public class DollEntity extends Avatar {
 	// 避免误砍建筑里的木梁；选中的树用 BFS 收集全部原木，按 y 从低到高逐个尝试，
 	// 砍掉任意一块可达原木后，连锁破坏（模仿连锁挖矿模组）沿原木六向连通收集整棵树
 	// 剩余原木并瞬间掉落入包——不放大挖掘范围、不搭柱踮脚，一棵树只需砍一块；
-	// 整棵都够不着的树（如浮空树）暂时拉黑，稍后再试。斧头（快捷栏）是开启前提。
+	// 整棵都够不着的树（如浮空树）暂时拉黑，稍后再试。斧头（物品栏）是开启前提。
 	private static double CHOP_SEARCH_RANGE = 16.0;            // 找树半径（以玩家或人偶为中心）
 	private static double CHOP_REACH_SQR = 3.5 * 3.5;          // 挥斧工作距离
 	private static int CHOP_ACTION_COOLDOWN = 8;               // 挥斧冷却 tick
@@ -469,7 +469,7 @@ public class DollEntity extends Avatar {
 	private Vec3 torchNavTarget;             // 寻路目标
 
 	// ---- 挖矿模式（MINE）：BFS 扫描矿石 → 评分选目标 → 寻路 → 连锁挖矿 ----
-	// 快捷栏放镐头即可开启。扫描用 BFS 扩展壳层（找到 K 个矿就停，O(found) 不卡顿）；
+	// 物品栏放镐头即可开启。扫描用 BFS 扩展壳层（找到 K 个矿就停，O(found) 不卡顿）；
 	// 评分按 矿物价值 + 距离惩罚 + 深度奖励 + 簇奖励 + 可达性 加权选择目标；
 	// 钻石/绿宝石/远古残骸=100，金铁红石青金石=50，铜煤=20，下界石英=10。
 	// 挖矿带连锁破坏（仿砍树模式的整棵连锁）：挖掉任意一块矿石后，六向连通的
@@ -511,7 +511,7 @@ public class DollEntity extends Avatar {
 	private int dropPickupCooldown = 0;
 
 	// ---- 钓鱼模式（FISH）：找水域 → 岸边抛竿 → 等咬钩 → 收竿入包 ----
-	// 与跟随模式互斥且自动切换（开启钓鱼会自动关闭跟随，开启跟随会自动关闭钓鱼）；开启条件：快捷栏有钓鱼竿。
+	// 与跟随模式互斥且自动切换（开启钓鱼会自动关闭跟随，开启跟随会自动关闭钓鱼）；开启条件：物品栏有钓鱼竿。
 	// 抛竿后等待随机时长（鱼饵附魔按比例缩短），咬钩时水面溅起水花粒子与音效，
 	// 收竿按原版钓鱼战利品表（鱼/垃圾/宝藏）生成掉落进人偶存储区，
 	// 海之眷顾附魔提高宝藏权重，钓获附带少量经验。
@@ -749,11 +749,9 @@ public class DollEntity extends Avatar {
 			|| stack.getItem() instanceof MaceItem;
 	}
 
-	/**
-	 * 在人偶快捷栏（36-43）中查找近战武器，返回找到的槽位索引，未找到返回 -1。
-	 */
+	/** 在人偶物品栏（全45格，含快捷栏与存储区）中查找近战武器，返回找到的槽位索引，未找到返回 -1。 */
 	private int findMeleeWeaponInHotbar() {
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
+		for (int i = 0; i < inventory.getContainerSize(); i++) {
 			if (isMeleeWeapon(inventory.getItem(i))) {
 				return i;
 			}
@@ -794,7 +792,7 @@ public class DollEntity extends Avatar {
 			if (isFollowEnabled()) voiceConfirm(); else voiceNoTool();
 		} else {
 			int current = getActiveMode();
-			// 切换到钓鱼模式时，检查快捷栏是否有钓鱼竿
+			// 切换到钓鱼模式时，检查物品栏是否有钓鱼竿
 			if (modeSlot08 == DollMode.FISH.getIndex() && current != modeSlot08) {
 				if (findFishingRodStack().isEmpty()) {
 					Player owner = getOwnerPlayer();
@@ -805,7 +803,7 @@ public class DollEntity extends Avatar {
 					return false;
 				}
 			}
-			// 切换到近战模式时，检查快捷栏是否有近战武器
+			// 切换到近战模式时，检查物品栏是否有近战武器
 			// 幽匿/下界/末影人偶可无武器战斗（音波/烈焰弹/龙息兜底），跳过武器检查
 			if (modeSlot08 == DollMode.MELEE.getIndex() && current != modeSlot08
 				&& !hasInnateCombatAbility()) {
@@ -820,7 +818,7 @@ public class DollEntity extends Avatar {
 					return false;
 				}
 			}
-			// 切换到射手模式时，检查快捷栏是否有弓或弩
+			// 切换到射手模式时，检查物品栏是否有弓或弩
 			// 幽匿/下界/末影人偶可无武器战斗（音波/烈焰弹/龙息兜底），跳过武器检查
 			if (modeSlot08 == DollMode.RANGED.getIndex() && current != modeSlot08
 				&& !hasInnateCombatAbility()) {
@@ -858,7 +856,7 @@ public class DollEntity extends Avatar {
 				return false;
 			}
 		}
-			// 切换到砍树模式时，检查快捷栏是否有斧头
+			// 切换到砍树模式时，检查物品栏是否有斧头
 			if (modeSlot08 == DollMode.CHOP.getIndex() && current != modeSlot08) {
 				if (!hasAxeInHotbar()) {
 					Player owner = getOwnerPlayer();
@@ -869,8 +867,7 @@ public class DollEntity extends Avatar {
 					return false;
 				}
 			}
-			// 切换到挖矿模式时，检查快捷栏是否有镐头（与砍树模式同样只认快捷栏前置；
-			// 运行中的工具切换则由 findPickaxeStack 全背包兜底）
+			// 切换到挖矿模式时，检查物品栏是否有镐头；运行中的工具切换则由 findPickaxeStack 全背包兜底
 			if (modeSlot08 == DollMode.MINE.getIndex() && current != modeSlot08) {
 				if (!hasPickaxeInHotbar()) {
 					Player owner = getOwnerPlayer();
@@ -2073,7 +2070,7 @@ public class DollEntity extends Avatar {
 	 */
 	private void updateMeleeMind() {
 		attackCooldown = Math.max(0, attackCooldown - 1);
-		// 运行时前置检查（方案A）：普通人偶主手+热键栏均无近战武器 → 关闭模式并同步控制面板高亮
+		// 运行时前置检查（方案A）：普通人偶主手+物品栏均无近战武器 → 关闭模式并同步控制面板高亮
 		if (!hasInnateCombatAbility()
 				&& getItemBySlot(EquipmentSlot.MAINHAND).isEmpty() && findMeleeWeaponInHotbar() == -1) {
 			Player owner = getOwnerPlayer();
@@ -2878,15 +2875,14 @@ public class DollEntity extends Avatar {
 	}
 
 	/**
-	 * 物品放入人偶存储区（9-35）：先堆叠同种物品，再放空格；装满则掉落在地。
-	 * 只写存储区——护甲槽(1-4)/装饰槽(0/5/7/8)在 GUI 中禁止放置普通物品，
-	 * 快捷栏(36-44)留给模式前置物品（锄头/武器等），不能混入收获物。
+	 * 物品放入人偶存储区（9-44，快捷栏亦作可容之地）：先堆叠同种物品，再放空格；装满则掉落在地。
+	 * 只写存储区与快捷栏——护甲槽(1-4)/装饰槽(0/5/7/8)在 GUI 中禁止放置普通物品。
 	 */
 	public void addToDollInventory(ItemStack stack) {
 		if (stack.isEmpty()) {
 			return;
 		}
-		for (int i = DollScreenHandler.DOLL_STORAGE_START; i <= DollScreenHandler.DOLL_STORAGE_END; i++) {
+		for (int i = DollScreenHandler.DOLL_STORAGE_START; i <= DollScreenHandler.DOLL_HOTBAR_END; i++) {
 			ItemStack slot = inventory.getItem(i);
 			if (slot.isEmpty() || !ItemStack.isSameItemSameComponents(slot, stack) || slot.getCount() >= slot.getMaxStackSize()) {
 				continue;
@@ -2898,7 +2894,7 @@ public class DollEntity extends Avatar {
 				return;
 			}
 		}
-		for (int i = DollScreenHandler.DOLL_STORAGE_START; i <= DollScreenHandler.DOLL_STORAGE_END; i++) {
+		for (int i = DollScreenHandler.DOLL_STORAGE_START; i <= DollScreenHandler.DOLL_HOTBAR_END; i++) {
 			if (inventory.getItem(i).isEmpty()) {
 				inventory.setItem(i, stack.copy());
 				// 必须消费原栈：放入的是副本，若原栈不清空，调用方持有的引用（如
@@ -2907,7 +2903,7 @@ public class DollEntity extends Avatar {
 				return;
 			}
 		}
-		// 存储区满：掉落在地（原栈已转移，同样消费，避免调用方再持有一份）
+		// 存储区与快捷栏俱满：掉落在地（原栈已转移，同样消费，避免调用方再持有一份）
 		if (this.level() instanceof ServerLevel serverLevel) {
 			ItemEntity itemEntity = new ItemEntity(serverLevel, getX(), getY() + 0.5, getZ(), stack.copy());
 			itemEntity.setDefaultPickUpDelay();
@@ -2916,11 +2912,11 @@ public class DollEntity extends Avatar {
 		}
 	}
 
-	/** 快捷栏工具池（36-43）是否同时有锄头和水桶（建造模式的前提）。跟随开关格 44 不算工具位。 */
+	/** 人偶物品栏（全45格）是否同时有锄头和水桶（建造模式的前提）。 */
 	private boolean hasHoeAndWaterInHotbar() {
 		boolean hoe = false;
 		boolean water = false;
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
+		for (int i = 0; i < inventory.getContainerSize(); i++) {
 			ItemStack stack = inventory.getItem(i);
 			if (stack.isEmpty()) {
 				continue;
@@ -3691,9 +3687,8 @@ public class DollEntity extends Avatar {
 		return dx * dx + dz * dz <= reachSqr;
 	}
 
-	/** 快捷栏工具池（36-43）是否有斧头（砍树模式开启前提）。跟随开关格 44 不算工具位。 */
 	private boolean hasAxeInHotbar() {
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
+		for (int i = 0; i < inventory.getContainerSize(); i++) {
 			if (inventory.getItem(i).getItem() instanceof AxeItem) {
 				return true;
 			}
@@ -3701,9 +3696,8 @@ public class DollEntity extends Avatar {
 		return false;
 	}
 
-	/** 快捷栏工具池（36-43）是否有镐子（挖矿模式开启前提）。跟随开关格 44 不算工具位。 */
 	private boolean hasPickaxeInHotbar() {
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
+		for (int i = 0; i < inventory.getContainerSize(); i++) {
 			if (isPickaxe(inventory.getItem(i))) {
 				return true;
 			}
@@ -5420,10 +5414,10 @@ public class DollEntity extends Avatar {
 	}
 
 	/**
-	 * 在人偶快捷栏（36-43）中查找弓或弩，返回找到的槽位索引，未找到返回 -1。
+	 * 在人偶物品栏（全45格）中查找弓或弩，返回找到的槽位索引，未找到返回 -1。
 	 */
 	private int findRangedWeaponInHotbar() {
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
+		for (int i = 0; i < inventory.getContainerSize(); i++) {
 			if (isRangedWeapon(inventory.getItem(i))) {
 				return i;
 			}
@@ -5929,7 +5923,7 @@ public class DollEntity extends Avatar {
 		return EquipmentSlot.MAINHAND;
 	}
 
-	// ---- 手持前置工具渲染：按模式从快捷栏查找对应工具，不再按格子号硬映射 ----
+	// ---- 手持前置工具渲染：按模式从物品栏查找对应工具，不再按格子号硬映射 ----
 
 	/** 判断物品是否是镐子（26.2 无 PickaxeItem 类，用官方工具标签判定）。 */
 	private boolean isPickaxe(ItemStack stack) {
@@ -5941,13 +5935,13 @@ public class DollEntity extends Avatar {
 		return !stack.isEmpty() && stack.getItem() instanceof FishingRodItem;
 	}
 
-	/** 快捷栏（36-43）查找近战武器，返回物品；未找到返回空。 */
+	/** 在人偶物品栏（全45格，含存储区与快捷栏）中查找近战武器，返回物品；未找到返回空。 */
 	private ItemStack findMeleeWeaponStack() {
 		int slot = findMeleeWeaponInHotbar();
 		return slot == -1 ? ItemStack.EMPTY : inventory.getItem(slot);
 	}
 
-	/** 快捷栏（36-43）查找弓/弩，返回物品；未找到返回空。
+	/** 在人偶物品栏（全45格）中查找弓/弩，返回物品；未找到返回空。
 	 * 末影斧例外：忠诚附魔回归时可能落入背包任何格子，因此末影人偶查找末影斧时搜索全背包。
 	 */
 	private ItemStack findRangedWeaponStack() {
@@ -6106,9 +6100,9 @@ public class DollEntity extends Avatar {
 		return 0; // 木/金级：连铁矿石都挖不动
 	}
 
-	/** 快捷栏（36-43）查找钓鱼竿，返回物品；未找到返回空。 */
+	/** 人偶物品栏（全45格）查找钓鱼竿，返回物品；未找到返回空。 */
 	private ItemStack findFishingRodStack() {
-		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
+		for (int i = 0; i < inventory.getContainerSize(); i++) {
 			ItemStack stack = inventory.getItem(i);
 			if (isFishingRod(stack)) {
 				return stack;
@@ -6851,7 +6845,7 @@ public class DollEntity extends Avatar {
 	 * 后面明明还能堆 63 个圆石）。
 	 */
 	private boolean hasStorageSpace() {
-		for (int i = DollScreenHandler.DOLL_STORAGE_START; i <= DollScreenHandler.DOLL_STORAGE_END; i++) {
+		for (int i = DollScreenHandler.DOLL_STORAGE_START; i <= DollScreenHandler.DOLL_HOTBAR_END; i++) {
 			ItemStack stack = inventory.getItem(i);
 			if (stack.isEmpty() || stack.getCount() < stack.getMaxStackSize()) {
 				return true;
@@ -6865,7 +6859,7 @@ public class DollEntity extends Avatar {
 	 * 用于拾取前判断，避免"捡起来又掉回去"的空转。
 	 */
 	private boolean canFitInStorage(ItemStack stack) {
-		for (int i = DollScreenHandler.DOLL_STORAGE_START; i <= DollScreenHandler.DOLL_STORAGE_END; i++) {
+		for (int i = DollScreenHandler.DOLL_STORAGE_START; i <= DollScreenHandler.DOLL_HOTBAR_END; i++) {
 			ItemStack slot = inventory.getItem(i);
 			if (slot.isEmpty()) {
 				return true;
@@ -6924,7 +6918,7 @@ public class DollEntity extends Avatar {
 	 * <p>
 	 * 存活苍白人偶每 tick 把当前光环中心{@link #getAuraCenter()}登入此表，供：
 	 * <ul>
-	 *   <li>{@link io.github.a10086ovo.doll.mixin.MobMixin#paleFearAura} 与 {@link #isInPaleFearAura} 做索敌拦截 + 移动抑制的
+	 *   <li>{@code io.github.a10086ovo.doll.mixin.MobMixin#paleFearAura} 与 {@link #isInPaleFearAura} 做索敌拦截 + 移动抑制的
 	 *       低开销查询（O(活跃苍白人偶数) 次距离比较，替代每次 canAttack/hurt 都 32³ getEntities 扫描）；</li>
 	 *   <li>{@link io.github.a10086ovo.doll.mixin.LivingEntityFearAuraMixin} 30% 易伤倍率的低开销判定。</li>
 	 * </ul>
@@ -7006,14 +7000,14 @@ public class DollEntity extends Avatar {
 	 * <ul>
 	 *   <li><b>统一软化</b>：所有光环内 {@link Enemy}（含史莱姆/岩浆怪等接触伤害单位）一律
 	 *       清空当前目标、打断进行中的攻击——不再对史莱姆特例 {@code setNoAi(true)}。</li>
-	 *   <li><b>索敌抑制</b>：由 {@link io.github.a10086ovo.doll.mixin.MobMixin#paleFearAura} 在
+	 *   <li><b>索敌抑制</b>：由 {@code io.github.a10086ovo.doll.mixin.MobMixin#paleFearAura} 在
 	 *       {@code Mob.canAttack} HEAD 返回 false 实现（无法建立/维持任何目标）。</li>
-	 *   <li><b>移动抑制（非 NoAi）</b>：由 {@link io.github.a10086ovo.doll.mixin.MobMixin#paleFearImmobilize}
+	 *   <li><b>移动抑制（非 NoAi）</b>：由 {@code io.github.a10086ovo.doll.mixin.MobMixin#paleFearImmobilize}
 	 *       在 {@code Mob.serverAiStep} HEAD 取消 AI 滴答实现——寻路/仇恨/随机游荡一并停止，
 	 *       但重力与击退仍生效（非"粗暴冻结"）。判定基于本登记表，人偶卸载即条目移除，生物自然恢复。</li>
 	 *   <li><b>跳跃抑制</b>：{@code AbstractCubeMob}（史莱姆/岩浆怪/硫磺立方体的父类）覆写
 	 *       {@code tick()} 且自带独立于 AI goal 的跳跃逻辑，serverAiStep 取消无法阻止。
-	 *       由 {@link io.github.a10086ovo.doll.mixin.LivingEntityFearAuraMixin#paleFearNoJump} 在
+	 *       由 {@code io.github.a10086ovo.doll.mixin.LivingEntityFearAuraMixin#paleFearNoJump} 在
 	 *       {@code LivingEntity.jumpFromGround()} HEAD 拦截补完。</li>
 	 * </ul>
 	 * 30% 易伤由 {@link io.github.a10086ovo.doll.mixin.LivingEntityFearAuraMixin} 在伤害计算时按本登记表判定。
