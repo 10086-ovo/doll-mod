@@ -11,13 +11,14 @@ import org.spongepowered.asm.mixin.injection.Redirect;
  * 下界人偶岩浆光环：消除岩浆中移动阻力。
  * <p>
  * MC 26.2 已移除 {@code LivingEntity#getVelocityMultiplier()}，岩浆减速改为在
- * {@link LivingEntity#travelInLava(Vec3, double, boolean, double)} 内部对
+ * {@code LivingEntity#travelInLava(Vec3, double, boolean, double)} 内部对（IDEA 对私有织入方法之
+ * Javadoc link 常误报"无法访问"，用 code 样式免误警；符号已字节级实证存在）
  * {@code getDeltaMovement()} 硬编码缩放：
  * <ul>
  *   <li>浅岩浆：{@code movement.multiply(0.5, 0.8, 0.5)}（水平减速 50%、垂直 20%）</li>
  *   <li>深岩浆：{@code movement.scale(0.5)}（整体减速 50%）</li>
  * </ul>
- * 因此这里用 {@code @Redirect} 把 {@code travelInLava} 内的两处减速缩放替换掉：
+ * 用 {@code @Redirect} 把 {@code travelInLava} 内的两处减速缩放替换掉：
  * 当实体处于下界人偶 16 格光环内且在岩浆中时，直接返回原 {@code Vec3}，不减速。
  */
 @Mixin(LivingEntity.class)
