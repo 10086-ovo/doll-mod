@@ -23,12 +23,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.ItemUseAnimation;
 import net.minecraft.world.item.ToolMaterial;
-import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.ItemAttributeModifiers;
-import net.minecraft.world.item.component.TooltipDisplay;
 import net.minecraft.world.level.Level;
-
-import java.util.function.Consumer;
 
 /**
  * 地狱剑 —— 下界主题近战武器（数值对标下界合金剑，注册见 DollMod.NETHER_SWORD_ITEM）。

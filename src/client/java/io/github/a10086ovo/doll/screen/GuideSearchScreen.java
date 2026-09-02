@@ -12,7 +12,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.sounds.SoundEvents;
@@ -55,7 +54,6 @@ public class GuideSearchScreen extends Screen {
 	private static final int COLOR_TAB_SEL = 0xFF4A4555;
 	private static final int COLOR_TAB = 0xFF34303D;
 	private static final int COLOR_NAME = 0xFFFFFFFF;
-	private static final int COLOR_STATUS = 0xFFA0A0A0;
 	private static final int COLOR_HINT = 0xFF7A7487;
 	private static final int COLOR_DIST = 0xFFFFD75E;
 	private static final int COLOR_COORD = 0xFF9A93A6;
@@ -392,19 +390,13 @@ public class GuideSearchScreen extends Screen {
 			g.item(p.icon, leftPos + 10, ry + 4);
 			g.text(this.font, p.localizedName(), leftPos + 32, ry + 7, COLOR_NAME, true);
 			if (hover) {
+				lastPickHoverRow = pickScroll + i + 1;
 				g.setTooltipForNextFrame(this.font, Component.translatable("gui." + DollModConstants.MOD_ID + ".search_pick_hint"),
 					(int) lastMouseX, (int) lastMouseY);
 			}
 		}
 		if (pickByCat.size() > PICK_ROWS) {
-			int curRow = pickScroll + 1;
-			for (int i = 0; i < visible; i++) {
-				int ry = topPos + PICK_TOP + i * PICK_ROW;
-				if (isHovering(leftPos + 4, ry, PANEL_W - 8, PICK_ROW - 1, lastMouseX, lastMouseY)) {
-					curRow = pickScroll + i + 1;
-					break;
-				}
-			}
+			int curRow = Math.min(lastPickHoverRow, pickByCat.size());
 			String info = curRow + "/" + pickByCat.size();
 			g.text(this.font, info, leftPos + PANEL_W - 8 - this.font.width(info), topPos + PICK_TOP + PICK_ROWS * PICK_ROW + 8,
 				COLOR_HINT, true);

@@ -1,7 +1,5 @@
 package io.github.a10086ovo.doll.guide;
 
-import io.github.a10086ovo.doll.DollMod;
-
 /**
  * 指南书数据加载与缓存。
  * <p>

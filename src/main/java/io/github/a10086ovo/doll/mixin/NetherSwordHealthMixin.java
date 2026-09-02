@@ -5,6 +5,7 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.player.Player;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -26,8 +27,10 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class NetherSwordHealthMixin {
 
 	/** 吸收等级：amp=2 → 4×(2+1)=12 点 = 6 颗金色心 */
+	@Unique
 	private static final int ABSORPTION_AMPLIFIER = 2;
 	/** 续期时长（tick）：手持期间每 tick 续期，放下后自然消退 */
+	@Unique
 	private static final int ABSORPTION_TICKS = 40;
 
 	@Inject(method = "tick", at = @At("TAIL"))
