@@ -3,9 +3,9 @@
 build/
 out/
 
-# 编译产物与反编译参考（javap 输出）
-bin/
-net/
+# 编译产物与反编译参考（javap 输出，仅根目录）
+/bin/
+/net/
 
 # 游戏运行目录
 run/
