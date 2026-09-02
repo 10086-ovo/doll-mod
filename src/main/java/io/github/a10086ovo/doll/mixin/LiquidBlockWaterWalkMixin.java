@@ -16,6 +16,7 @@ import net.minecraft.world.phys.shapes.EntityCollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
@@ -34,6 +35,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class LiquidBlockWaterWalkMixin {
 
 	/** 水面承载薄层：置于水块顶面之下，供足落其上（局部坐标）。 */
+	@Unique
 	private static final VoxelShape WATER_WALK_FLOOR = Shapes.box(0.0, 0.8, 0.0, 1.0, 1.0, 1.0);
 
 	@Inject(
