@@ -7,7 +7,7 @@
     {
       "type": "text",
       "title": "Overview",
-      "text": "Forest-themed shield. Functions like a vanilla shield: right-click to block, negates damage, consumes durability.\n\n• Durability: 672 (2x iron sword). Enchantable.\n• Blocking reflects 2 thorns damage to attackers within 3 blocks (ignores armor)\n• Player use: reflected attacker receives infinite Poison"
+      "text": "Forest-themed shield. Functions like a vanilla shield: right-click to block, negates damage, consumes durability.\n\n• Durability: 672 (2x vanilla shield). Enchantable.\n• Blocking reflects 2 thorns damage to attackers within 3 blocks (ignores armor)\n• Player use: reflected attacker receives infinite Poison"
     },
     {
       "type": "text",

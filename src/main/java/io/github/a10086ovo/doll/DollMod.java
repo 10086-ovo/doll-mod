@@ -806,11 +806,8 @@ public class DollMod implements ModInitializer {
 
 		// ========== 5. 石砧损伤链 ==========
 		ROCK_ANVIL_BLOCK.nextVariant = CHIPPED_ROCK_ANVIL_BLOCK;
-		ROCK_ANVIL_BLOCK.prevVariant = null;
-		CHIPPED_ROCK_ANVIL_BLOCK.nextVariant = DAMAGED_ROCK_ANVIL_BLOCK;
-		CHIPPED_ROCK_ANVIL_BLOCK.prevVariant = ROCK_ANVIL_BLOCK;
-		DAMAGED_ROCK_ANVIL_BLOCK.nextVariant = null;
-		DAMAGED_ROCK_ANVIL_BLOCK.prevVariant = CHIPPED_ROCK_ANVIL_BLOCK;
+			CHIPPED_ROCK_ANVIL_BLOCK.nextVariant = DAMAGED_ROCK_ANVIL_BLOCK;
+			DAMAGED_ROCK_ANVIL_BLOCK.nextVariant = null;
 
 		// ========== 6. 网络与创造标签 ==========
 		DollNetworking.register();

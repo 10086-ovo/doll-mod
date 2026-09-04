@@ -12,7 +12,7 @@
 		{
 			"type": "text",
 			"title": "How to Obtain",
-			"text": "No crafting recipe. Found only in Buried Treasure:\n• 91% chance to appear\n• Two non-duplicate pieces per chest\n• Random durability, 50% chance of random enchantment"
+			"text": "No crafting recipe. Found only in Buried Treasure:\n• 91% chance to appear\n• Two to four non-duplicate pieces per chest\n• Random durability, 50% chance of random enchantment"
 		},
 		{
 				"type": "text",
@@ -27,7 +27,7 @@
 			{
 				"type": "text",
 				"title": "Full Set & Sea Doll",
-				"text": "Full set: permanent Resistance II.\nSea Doll: each piece worn adds 10% damage taken (40% total for 4 pieces)."
+				"text": "Full set: permanent Resistance II.\nSea Doll: each piece worn adds 10% melee and laser damage (40% total for 4 pieces)."
 			}
 	]
 }

@@ -1257,23 +1257,24 @@ public class DollEntity extends Avatar {
 		} else {
 			// 普通工人：按阶缩放（5 阶封顶 100HP / 恢复IV / 抗性II）
 			int level = getDollLevel();
-			if (level >= 4) {
+			if (level >= 5) {
 				if (!hasEffect(MobEffects.REGENERATION))
 					addEffect(new MobEffectInstance(MobEffects.REGENERATION, -1, 3, false, false));
 				if (!hasEffect(MobEffects.RESISTANCE))
 					addEffect(new MobEffectInstance(MobEffects.RESISTANCE, -1, 1, false, false));
-			} else if (level >= 3) {
+			} else if (level >= 4) {
 				if (!hasEffect(MobEffects.REGENERATION))
 					addEffect(new MobEffectInstance(MobEffects.REGENERATION, -1, 2, false, false));
 				if (!hasEffect(MobEffects.RESISTANCE))
 					addEffect(new MobEffectInstance(MobEffects.RESISTANCE, -1, 0, false, false));
-			} else if (level >= 2) {
+			} else if (level >= 3) {
 				if (!hasEffect(MobEffects.REGENERATION))
 					addEffect(new MobEffectInstance(MobEffects.REGENERATION, -1, 1, false, false));
-			} else if (level >= 1) {
+			} else if (level >= 2) {
 				if (!hasEffect(MobEffects.REGENERATION))
 					addEffect(new MobEffectInstance(MobEffects.REGENERATION, -1, 0, false, false));
 			}
+			// level 1（一阶）：不施加永久药水
 		}
 	}
 

@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * 在 LivingEntity.hurtServer HEAD 注入：
  * <ul>
  *   <li>玩家持荆棘盾牌格挡时：完全取消伤害（无伤格挡），消耗耐久，播放音效，荆棘反伤</li>
- *   <li>森林人偶副手持荆棘盾牌时：50% 反伤（不格挡伤害）</li>
+ *   <li>森林人偶副手持荆棘盾牌时：100% 反伤（不格挡伤害）</li>
  * </ul>
  * <p>
  * 注意：thorns 伤害类型属于 BYPASSES_SHIELD 标签，荆棘反伤不会触发攻击者的盾牌格挡，无递归风险。

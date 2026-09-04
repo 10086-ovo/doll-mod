@@ -159,11 +159,16 @@ public class RockAnvilBlock extends FallingBlock {
 	public void onLand(Level level, BlockPos pos, BlockState state, BlockState replacedState, FallingBlockEntity entity) {
 		if (!level.isClientSide()) {
 			int fallDistance = (int) Math.ceil(entity.fallDistance);
-			if (fallDistance > 1 && prevVariant != null) {
-				// 坠落时降级：chipped → rock, damaged → chipped
-				level.setBlock(pos, prevVariant.defaultBlockState()
-					.setValue(FACING, state.getValue(FACING))
-					.setValue(USES, 0), 3);
+			if (fallDistance > 1) {
+				// 坠落降级：rock → chipped → damaged，已破损则直接消失
+				RockAnvilBlock next = this.nextVariant;
+				if (next != null) {
+					level.setBlock(pos, next.defaultBlockState()
+						.setValue(FACING, state.getValue(FACING))
+						.setValue(USES, 0), 3);
+				} else {
+					level.removeBlock(pos, false);
+				}
 			}
 		}
 	}

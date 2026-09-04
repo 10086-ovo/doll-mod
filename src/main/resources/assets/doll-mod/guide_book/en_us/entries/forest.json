@@ -12,7 +12,7 @@
 		{
 			"type": "text",
 			"title": "Aura & Abilities",
-			"text": "Radius: 32 blocks.\n• Slowness IV on hostile mobs (expires on leaving range)\n• Threat Marking: hostile land mobs highlighted (spectral-arrow outline)\n• Owner: continuous Regen I within range\n• Attracts nearby untamed animals\n\nOffhand Thorns Shield: 100% damage reflection."
+			"text": "Auras (radius 16 blocks each):\n• Slowness IV on hostile mobs (expires on leaving range)\n• Threat Marking: hostile land mobs within 32 blocks highlighted (spectral-arrow outline)\n• Owner: continuous Regen I within range\n• Attracts nearby untamed animals\n\nOffhand Thorns Shield: reflects the full damage taken."
 		},
 		{
 			"type": "text",
