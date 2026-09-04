@@ -1,6 +1,7 @@
 package io.github.a10086ovo.doll.entity;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.Level;
@@ -87,6 +88,25 @@ public class DollNavigator {
 
 	public void setAllowWater(boolean allowWater) {
 		this.allowWater = allowWater;
+	}
+
+	/**
+	 * 全局默认【树叶/菌光体 = 实心障碍】：不进树叶格、不站树叶顶、不从树冠里/夹缝中穿过。
+	 * 根因在 canOccupy 的"脚下有碰撞箱=可落脚"判定：树叶有碰撞箱，被当成合法地面，
+	 * 于是任何寻路（跟随/巡逻/砍树等）都会踩着低矮灌丛和树冠走，爬上树后下不来、
+	 * 或在树冠夹缝里被卡住（用户多次实测：站在树叶上反复跳 / 寻路钻进树叶夹缝）。
+	 * 注意 26.2 中相邻树冠常互相穿插，但本开关只是把叶当墙绕行，不影响"树"的连通定义。
+	 */
+	private boolean foliageIsObstacle = true;
+
+	public void setFoliageIsObstacle(boolean obstacle) {
+		this.foliageIsObstacle = obstacle;
+	}
+
+	/** pos 是否为树叶/菌光体（砍树时当作实心障碍的方块族）。 */
+	private boolean isFoliage(BlockPos pos) {
+		BlockState s = level().getBlockState(pos);
+		return s.is(BlockTags.LEAVES) || s.is(BlockTags.WART_BLOCKS);
 	}
 
 	/** 是否已走完（或无路径）。 */
@@ -191,7 +211,7 @@ public class DollNavigator {
 		return reconstruct(cameFrom, best, start);
 	}
 
-	/** 生成当前位置的可达邻居（含上跳一格、下坡一格），八方向含穿墙检测。 */
+	/** 生成当前位置的可达邻居（同层 8 向 + 上跳一格 + 下坡/跳落 1..MAX_SAFE_FALL 格），八方向含穿墙检测。 */
 	private List<BlockPos> neighbors(BlockPos cur) {
 		neighborList.clear();
 		for (int[] d : DIRS) {
@@ -216,9 +236,35 @@ public class DollNavigator {
 		if (canOccupy(down) && isSafeLanding(down)) {
 			neighborList.add(down);
 		}
+		// 跳落边缘（drop edge）：nx 列向下 1..MAX_SAFE_FALL 内第一个可站立的安全落点。
+		// 原实现只允许"下 1 格"，人偶一旦被寻路带上 2-3 格高的矮坎/低树叶层就无路可下，
+		// 会原地反复跳（用户实测：卡在树叶上反复跳跃）。允许贴着边缘走下最多 MAX_SAFE_FALL
+		// 格，使树冠矮层/台阶边缘可正常下地；落点仍要求中段无碰撞 + 落脚无伤害。
+		for (int k = 2; k <= MAX_SAFE_FALL_BLOCKS; k++) {
+			BlockPos landing = nx.below(k);
+			if (!dropColumnClear(nx, k)) {
+				break; // 下落通道被挡：更深的落差必然也被挡，直接终止
+			}
+			if (canOccupy(landing) && isSafeLanding(landing)) {
+				neighborList.add(landing);
+				break; // 取最近的可站立落点即可
+			}
+		}
 	}
 	return neighborList;
 }
+
+	/** nx 列上自当前层向下 k 格的下落通道（y-1..y-k+1）是否畅通（无碰撞、无伤害方块）。 */
+	private boolean dropColumnClear(BlockPos nx, int k) {
+		for (int j = 1; j < k; j++) {
+			BlockPos cell = nx.below(j);
+			if (!level().getBlockState(cell).getCollisionShape(level(), cell).isEmpty()
+				|| isHazardous(cell)) {
+				return false;
+			}
+		}
+		return true;
+	}
 
 /**
  * 下坡落点是否安全：落点本身与脚下都不能是伤害性方块。
@@ -248,9 +294,14 @@ private boolean isHazardous(BlockPos pos) {
 	/**
 	 * 实体能否占据该列位置：本体格与头顶非固体（高 1.8 格）。
 	 * 陆地：脚下必须是固体支撑。海洋人偶(allowWater)：水方块且头顶有空间即可游泳。
-	 * 其他人偶 allowWater=false，水方块不可占据 → 行为与原 isStandable 完全一致，零影响。
+	 * 注：陆地人偶遇"脚下固体支撑的水格(如水坑)"时返回 true(可占据)，因为水没有碰撞箱、
+	 * 原版物理允许陆地生物站在浅水里并能自然走出——若把水当硬障碍会让人偶贴坑/误入后被卡。
+	 * 海泳人偶(allowWater=true)另有专用游泳分支。
 	 */
 	private boolean canOccupy(BlockPos pos) {
+		if (foliageIsObstacle && (isFoliage(pos) || isFoliage(pos.above()))) {
+			return false; // 砍树导航：不进树叶格，头也不埋进树叶（树冠矮檐下不穿行）
+		}
 		if (!level().getBlockState(pos).getCollisionShape(level(), pos).isEmpty()) {
 			return false;
 		}
@@ -258,7 +309,10 @@ private boolean isHazardous(BlockPos pos) {
 			return false;
 		}
 		if (!level().getBlockState(pos.below()).getCollisionShape(level(), pos.below()).isEmpty()) {
-			return true; // 陆地：脚下固体
+			if (foliageIsObstacle && isFoliage(pos.below())) {
+				return false; // 砍树导航：树叶/菌光体顶不可落脚（避免爬上树冠下不来）
+			}
+			return true; // 陆地：脚下固体（含水格——浅水可自然走出）
 		}
 		if (allowWater && isWater(pos)) {
 			return true; // 海洋人偶：水方块可游泳占据
@@ -273,6 +327,9 @@ private boolean isHazardous(BlockPos pos) {
 
 	/** 格子是否可通过（非固体，或上方可翻越）。用于对角线穿墙检测。 */
 	private boolean isPassable(BlockPos pos) {
+		if (foliageIsObstacle && isFoliage(pos)) {
+			return false; // 砍树导航：树叶不算可穿越侧壁，对角线不许切树叶角
+		}
 		if (level().getBlockState(pos).getCollisionShape(level(), pos).isEmpty()) {
 			return true;
 		}

@@ -170,6 +170,11 @@
 - **A* 每步下降天然 ≤1 格**：下降邻居恒为 `cur` 正下方 1 格，且 `canOccupy` 要求落点下方必有实心支撑 → 人偶**不会**主动走下悬崖 / 掉进深坑（早期注释误报过"会走下悬崖"，已证伪）。`neighbors()` 的 `down` 邻居额外经 `isSafeLanding()` 过滤：岩浆 / 火 / 岩浆块 / 仙人掌等伤害性落点排除，因为这类方块无碰撞箱会被 `canOccupy` 误判成可落脚。→ `DollNavigator.java`。
 - **`MAX_SAFE_FALL_BLOCKS = 3`**：安全落差上限（格），盾构机悬崖判定复用同一常量，保证"人偶敢走下去"与"盾构机敢挖过去"口径一致。
 
+### 入水自救 / 放水自困（2026-09-04 反编译实证）
+- **陆偶在水里几乎无水平推力是"掉进水坑出不来"的根因**：26.2 `travelInWater` 的水平推力由 `WATER_MOVEMENT_EFFICIENCY`（`RangedAttribute` 默认 **0.0**）决定：`speed += (getSpeed()-speed)*waterWalker`，空中再 `*=0.5`。陆偶默认 0 → 入水 `speed≈0.02`、游不到坑沿 → 原版出水 `jumpOutOfFluid`（需 `horizontalCollision` 贴墙）永不触发 → 永久卡死（诊断铁证：`zza=1` 指令已下但 `vel≈0`、`onGround=false`）。
+- **正解**：需要入水可自救的陆地类实体，在 `createXxxAttributes()` 里 `.add(Attributes.WATER_MOVEMENT_EFFICIENCY, 1.0)`，即可正常水平游向岸沿 → 由原版 `jumpOutOfFluid`(贴壁自动抬升 0.3) + `auto-step`(maxUpStep=1.0) 自行登岸。**这是纯原版物理根治，勿用逐 tick `setJumping`/直接 `setDeltaMovement` 强推**（会引入"跳出坑后一直跳跃停不下来"回归）。→ `entity/DollEntity.java:createDollAttributes`。
+- **放水自困的另面**：寻路终点节点常停在"可站的井格"上 → 人偶会站上未放水井格、原地放水自困。修复：放水动作加双守卫（`applyFarmInput` 移动侧 + `updateFarmMind` 决策侧），当目标=未放水 anchor 且 `blockPosition()==anchor` 时，先经 `tryStepOffUnplacedWell`/`findStandCellBeside` 引到井格旁同层(或高1格)安全站格再放水。`findStandCellBeside` **绝不选低 1 格**（会被水源漫灌）。→ `entity/DollEntity.java`。
+
 ### 挖矿模式（MINE）与盾构机
 - **设计决策（已与作者确认）**：① 跟随 + 挖矿共存 = 挖矿优先跟随（有矿目标时暂时离队去挖，挖完 / 无矿自动回跟随）；② 镐等级 = 严格匹配（`canPickaxeMine`，只挖当前镐挖得动且会掉落的矿）；③ "平地识别为悬崖"已修。
 - **镐等级唯一真相源 `canPickaxeMine(BlockState)`**：选目标 / 单块挖 / 连锁 / 盾构机掘进 / 盾构机侧向探矿 五个入口全部调用它，**不要各写一份判断**。→ `entity/DollEntity.java`。
@@ -227,7 +232,7 @@
 ### 指南书（GuideBook）
 - 数据为 JSON，位于 `assets/doll-mod/guide_book/`（book.json + categories + entries）。
 - 加载在客户端进行（`GuideBookContent.get()` 传 `Minecraft.getInstance().getResourceManager()`），懒加载并缓存；服务端 `GuideBookItem` 只返回成功，打开动作由 `DollModClient` 注入 `openScreenAction`，避免 main 包引用 client。
-- 首次进世界自动发放（`GuideBookGivenStore` 记忆 UUID 防重复）。
+- 每个新存档首次进入世界自动发放（`GuideBookGivenStore` 记录"按存档"的已发放状态；`SERVER_STARTED` 时清空内存记忆，使新存档可再次发放，同存档防重复靠 Mixin 写入 player.dat）。
 - **图标引用用注册 ID（如 `doll-mod:xxx`），不是 Java 字段名。**
 
 ### 向导人偶搜索

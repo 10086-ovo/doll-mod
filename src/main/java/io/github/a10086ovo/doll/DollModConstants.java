@@ -62,6 +62,4 @@ public class DollModConstants {
 	public static final String SEA_BOOTS_ID = "sea_boots";
 	// ---- 苍白弓 ----
 	public static final String PALE_BOW_ID = "pale_bow";
-	// ---- 海晶砂砾 ----
-	public static final String PRISMARINE_GRAVEL_ID = "prismarine_gravel";
 }

@@ -1,5 +1,5 @@
 {
 	"name": "Doll Guide Book",
-	"landingText": "Your loyal adventure companion that never leaves you alone.\n\nDolls fight, mine, chop, farm, fish, and even sacrifice themselves to save you.\n\nClick a category on the left to start reading.",
+	"landingText": "Travel with a doll as your companion.\n\nDolls can help with combat, mining, woodcutting, farming, and fishing, and absorb one fatal hit for you at a critical moment.\n\nClick a category on the left to start reading.",
 	"bookTexture": "doll-mod:textures/gui/guide_book.png"
 }

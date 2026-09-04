@@ -189,8 +189,13 @@ public class DollConfig {
 		public int searchCooldown = 20;
 		public int maxTreeBlocks = 4096;
 		public int treeBlacklistTicks = 600;
-		public int excursionMaxTicks = 400;
-		public double excursionMaxDist = 32.0;
+		// 跟随为主轴：路过砍 + 主人静止小偏离（对齐 Mine 的"顺路捡"哲学）
+		public int excursionMaxTicks = 100;
+		public double excursionMaxDist = 12.0;
+		public double followScanRange = 8.0;
+		public double followMaxTargetDist = 5.0;
+		public int ownerStillTicks = 80;
+		public int movingDepartureMaxTicks = 80;
 	}
 	public static class Sapling {
 		public double searchRange = 8.0;
@@ -508,10 +513,18 @@ public class DollConfig {
     "_c_mtree": "单棵树的原木上限",
     "tree_blacklist_ticks": 600,
     "_c_tbl": "整棵够不着的树拉黑时长",
-    "excursion_max_ticks": 400,
-    "_c_emax": "单次离队上限(20s)",
-    "excursion_max_dist": 32.0,
-    "_c_emaxd": "离队时距主人最远距离(格)"
+    "excursion_max_ticks": 100,
+    "_c_emax": "主人静止时单次小偏离上限(5s)",
+    "excursion_max_dist": 12.0,
+    "_c_emaxd": "小偏离时距主人最远距离(格)",
+    "follow_scan_range": 8.0,
+    "_c_fscan": "单位: 格。跟随时找树半径(只找顺路的)",
+    "follow_max_target_dist": 5.0,
+    "_c_fmdist": "单位: 格。主人行进中路过树原木距人偶硬上限",
+    "owner_still_ticks": 80,
+    "_c_ostill": "主人静止超此tick才允许小偏离(4s)",
+    "moving_departure_max_ticks": 80,
+    "_c_mdep": "主人行进中顺路偏离单次预算(4s)，静止偏离用excursion_max_ticks"
   },
   "sapling": {
     "_comment": "低优先级补种",

@@ -7,7 +7,7 @@
 		{
 			"type": "text",
 			"title": "Base Stats",
-			"text": "Freezes hostile mobs with a fear aura and can sacrifice itself to save the owner from fatal damage.\n\nHP: 120. Regen IV + Resistance II."
+			"text": "Freezes hostile mobs with a fear aura, and can take a fatal hit for the owner.\n\nHP: 120. Regen IV + Resistance II."
 		},
 		{
 			"type": "text",

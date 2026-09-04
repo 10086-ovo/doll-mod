@@ -173,8 +173,6 @@ public class DollMod implements ModInitializer {
 		id(DollModConstants.SEA_BOOTS_ID);
 	private static final Identifier PALE_BOW_KEY =
 			id(DollModConstants.PALE_BOW_ID);
-		private static final Identifier PRISMARINE_GRAVEL_KEY =
-		id(DollModConstants.PRISMARINE_GRAVEL_ID);
 
 	public static final EntityType<DollEntity> DOLL_ENTITY = Registry.register(
 		BuiltInRegistries.ENTITY_TYPE,
@@ -252,7 +250,6 @@ public class DollMod implements ModInitializer {
 	public static Item ROCK_ANVIL_ITEM;
 	public static Item CHIPPED_ROCK_ANVIL_ITEM;
 	public static Item DAMAGED_ROCK_ANVIL_ITEM;
-		public static Item PRISMARINE_GRAVEL_ITEM;
 
 	// ---- 升级配方（在 onInitialize 中创建，依赖已注册的物品字段）----
 	public static DollUpgradeRecipe DOLL_UPGRADE_TIER2;
@@ -539,14 +536,7 @@ public class DollMod implements ModInitializer {
 								.setId(ResourceKey.create(Registries.ITEM, PALE_BOW_KEY)))
 				);
 
-			PRISMARINE_GRAVEL_ITEM = Registry.register(
-				BuiltInRegistries.ITEM,
-				PRISMARINE_GRAVEL_KEY,
-				new Item(new Item.Properties()
-					.setId(ResourceKey.create(Registries.ITEM, PRISMARINE_GRAVEL_KEY)))
-			);
-
-			DOLL_BATON = Registry.register(
+				DOLL_BATON = Registry.register(
 			BuiltInRegistries.ITEM,
 			DOLL_BATON_KEY,
 			new DollBatonItem(new Item.Properties().stacksTo(1)
@@ -835,12 +825,13 @@ public class DollMod implements ModInitializer {
 		// 苍白弓被动：持有即持续隐身
 		PaleBowInvisibilityHandler.register();
 
-		// 清空跨会话内存态登记表
+		// 清空跨会话内存态登记表（含指南书"已发放"记忆，使每个新存档重新发放）
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
 			DollRecallRegistry.clear();
 			DollEntity.clearPaleAuraCenters();
 			DollEntity.clearNetherAuraCenters();
 			DollRecallService.clearInFlight();
+			GuideBookGivenStore.clear();
 		});
 
 		// 进入世界的玩家赠送指导书

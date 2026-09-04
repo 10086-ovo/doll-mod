@@ -404,6 +404,7 @@ public class DollEntity extends Avatar {
 	private boolean farmWaterPlaced;    // 中心水源是否已放置
 	private int farmActionCooldown = 0; // 动作冷却
 	private Vec3 farmNavTarget;         // 种植寻路目标（用于判断是否需要重算路径）
+	private Vec3 wellStandNav;          // 放水前的"站到井外"临时寻路目标（Part B 防自困）
 
 	// ---- 喂食模式（FEED）：玩家饿/血少时贴近喂饭 ----
 	// 触发条件：玩家血量 < 19 滴 且 无饱和度 且 饥饿度不满；开启要求背包有正向食物。
@@ -427,15 +428,52 @@ public class DollEntity extends Avatar {
 	private static int CHOP_SEARCH_COOLDOWN = 20;              // 找不到树后的重搜间隔 tick
 	private static int CHOP_MAX_TREE_BLOCKS = 4096;            // 单棵树的原木上限（防死循环，覆盖巨型丛林/深色橡木 2×2 巨树 + 相连邻树）
 	private static int CHOP_TREE_BLACKLIST_TICKS = 600;        // 整棵够不着的树拉黑时长（30 秒）
-	// ---- 砍树 × 跟随 共存：「砍树优先跟随」的离队边界 ----
-	// 跟随时人偶可以为砍树暂时脱离队列走向树，但离队必须有边界：
-	// 超时或离主人过远就放弃目标、回到主人身边，否则人偶会一路追着树越跑越远。
-	private static int CHOP_EXCURSION_MAX_TICKS = 400;               // 单次离队上限（20 秒）
-	private static double CHOP_EXCURSION_MAX_DIST_SQR = 32.0 * 32.0; // 离队时距主人的最远距离
-	/** 六方向邻接（BFS 连通树 + 邻接树叶检测） */
+	// ---- 砍树 × 跟随 共存：「跟随为主轴 + 顺路过路砍 + 小偏离」 ----
+	// 跟随时人偶以"回到主人身边"为主轴，不再为砍树长期脱离队列整块占位（旧 20秒/32格 模型已废）。
+	// 路过砍：行进途中某棵真树的一块原木当前够得着 → 停步连锁砍整棵，下 tick 继续跟随；
+	// 小偏离（commit-once，砍完/超预算才归队）：主人静止超 4 秒 → 8 格内任意真树；
+	// 主人行进中 → 只放行 5 格硬上限内(followMaxTargetDist)的"顺路"树，预算 movingDepartureMaxTicks。
+	// 真树判定走整棵连通+任一块贴叶（与 findTreeRoot 一致），大树不再因就近原木不贴叶被漏判。
+	// 离队边界收紧，防人偶一路追着树越跑越远（用户实测反馈）。
+	private static int CHOP_EXCURSION_MAX_TICKS = 100;               // 单次小偏离上限（5 秒）
+	private static double CHOP_EXCURSION_MAX_DIST_SQR = 12.0 * 12.0; // 偏离时距主人的最远距离
+	private static double CHOP_FOLLOW_SCAN_RANGE = 8.0;              // 跟随时找树半径（只找顺路的）
+	private static double CHOP_FOLLOW_MAX_TARGET_DIST_SQR = 5.0 * 5.0; // 主人行进中"顺路偏离"原木距人偶硬上限（超出只跟随、不追树）
+	private static int CHOP_OWNER_STILL_TICKS = 80;                  // 主人静止超过 4 秒才允许小偏离
+	private static int CHOP_MOVING_DEPARTURE_TICKS = 80;             // 主人行进中"顺路偏离"单次预算（4 秒）
+	/** 六方向邻接（真树判定 touchesLeavesOrWart 用；BFS 不再用树叶作桥） */
 	private static final int[][] TREE_NEIGHBORS = {
 		{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
 	};
+	/**
+	 * 「树」的定义（与用户拍板一致）：树 = 与被砍原木**直接原木连通**（26 向，含棱/角）的全部原木。
+	 * 关键：连锁**绝不跨越树叶**。方块数据里没有"树归谁所有"的信息，一旦允许跨树叶连通，
+	 * 相邻树冠相贴/相穿（黑森林、丛林）就会被并成"一棵树"，一次连锁清空整片森林（用户实测）。
+	 * 而自然生成的树，树干/树枝之间必原木相贴，两棵不同的树树干又永不相贴（生长互斥），
+	 * 因此 26 向原木连通在结构上保证：一次只放倒真正的一棵树，绝不误伤邻树。
+	 * 26 向（而非 6 向面连）是为了覆盖金合欢斜走的弯树干等"棱/角相贴"的原木链。
+	 * 被树叶完全隔断、原木够不着的冠内残木，由 chainFellTree 的悬浮残留清扫兜底清理。
+	 */
+	private static final int[][] TREE_LOG_ALL_NEIGHBORS = buildTreeAllNeighbors();
+
+	private static int[][] buildTreeAllNeighbors() {
+		int[][] dirs = new int[26][3];
+		int i = 0;
+		for (int dx = -1; dx <= 1; dx++) {
+			for (int dy = -1; dy <= 1; dy++) {
+				for (int dz = -1; dz <= 1; dz++) {
+					if (dx == 0 && dy == 0 && dz == 0) {
+						continue;
+					}
+					dirs[i][0] = dx;
+					dirs[i][1] = dy;
+					dirs[i][2] = dz;
+					i++;
+				}
+			}
+		}
+		return dirs;
+	}
 	private List<BlockPos> chopQueue;       // 当前树的待砍原木（y 升序）
 	private BlockPos chopTargetPos;         // 当前正在砍的原木
 	private int chopActionCooldown = 0;     // 挥斧冷却
@@ -443,7 +481,11 @@ public class DollEntity extends Avatar {
 	private Vec3 chopNavTarget;             // 砍树寻路目标
 	private BlockPos chopTreeRoot;          // 当前树的树根（y 最低原木），用于整棵拉黑判定
 	private final Map<BlockPos, Long> chopTreeBlacklist = new HashMap<>(); // 够不着的树根 -> 拉黑截止 gameTime
-	private int chopExcursionTicks = 0;                // 本次「离队砍树」已持续 tick 数（0 = 未离队）
+	private int chopExcursionTicks = 0;                // 本次「偏离砍树」已持续 tick 数（0 = 未偏离）
+	private int ownerStillTicks = 0;                   // 主人静止累计 tick（供「主人停时小偏离」判定）
+	private double ownerStillSampleX;                  // 主人位置采样（静止判定）
+	private double ownerStillSampleZ;
+	private boolean ownerStillSampled = false;
 
 	// 低优先级补种：背包有树苗时，在"找不到树可砍"的空闲间隙，就近种到草方块/泥土上
 	private static double SAPLING_SEARCH_RANGE = 8.0;      // 找可种方块半径
@@ -670,6 +712,10 @@ public class DollEntity extends Avatar {
 		CHOP_TREE_BLACKLIST_TICKS = c.chop.treeBlacklistTicks;
 		CHOP_EXCURSION_MAX_TICKS = c.chop.excursionMaxTicks;
 		CHOP_EXCURSION_MAX_DIST_SQR = c.chop.excursionMaxDist * c.chop.excursionMaxDist;
+		CHOP_FOLLOW_SCAN_RANGE = c.chop.followScanRange;
+		CHOP_FOLLOW_MAX_TARGET_DIST_SQR = c.chop.followMaxTargetDist * c.chop.followMaxTargetDist;
+		CHOP_OWNER_STILL_TICKS = c.chop.ownerStillTicks;
+		CHOP_MOVING_DEPARTURE_TICKS = c.chop.movingDepartureMaxTicks;
 
 		// ---- 低优先级补种 ----
 		SAPLING_SEARCH_RANGE = c.sapling.searchRange;
@@ -749,9 +795,12 @@ public class DollEntity extends Avatar {
 			|| stack.getItem() instanceof MaceItem;
 	}
 
-	/** 在人偶物品栏（全45格，含快捷栏与存储区）中查找近战武器，返回找到的槽位索引，未找到返回 -1。 */
+	/** 在人偶物品栏（全45格，含快捷栏与存储区，副手格除外）中查找近战武器，返回找到的槽位索引，未找到返回 -1。 */
 	private int findMeleeWeaponInHotbar() {
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
+			if (i == OFFHAND_SLOT) {
+				continue; // 副手格独立渲染，不作主手武器来源
+			}
 			if (isMeleeWeapon(inventory.getItem(i))) {
 				return i;
 			}
@@ -917,6 +966,7 @@ public class DollEntity extends Avatar {
 		farmWaterPlaced = false;
 		farmActionCooldown = 0;
 		farmNavTarget = null;
+		wellStandNav = null;
 		feedCooldown = 0;
 		chopQueue = null;
 		chopTargetPos = null;
@@ -1491,6 +1541,8 @@ public class DollEntity extends Avatar {
 	 * 两层通行空间。两层都被挡才判定为遮挡，允许翻越 1 格高台阶；
 	 * 高差 ≥2 格的垂直墙会被正确判为遮挡（触发 A* 绕路找楼梯），不会误判
 	 * 视线通畅而直线撞墙。
+	 * 树叶/菌光体例外：只要脚层或头层是叶就判遮挡——1 格高的灌丛/矮树冠只挡脚层，
+	 * 若按"两层都挡"判，人偶会直线撞进叶丛反复顶跳（用户实测"不把树叶当障碍"）。
 	 */
 	protected boolean hasLineOfSight(Vec3 target) {
 		double x0 = this.getX();
@@ -1508,8 +1560,9 @@ public class DollEntity extends Avatar {
 		double curX = x0;
 		double curZ = z0;
 		double fromY = this.getY();
-		// 重用单个 MutableBlockPos，避免每格分配 BlockPos + above() 两个对象
-		BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+		// 重用两个 MutableBlockPos（脚/头各一），避免每格分配 BlockPos 对象
+		BlockPos.MutableBlockPos footCursor = new BlockPos.MutableBlockPos();
+		BlockPos.MutableBlockPos headCursor = new BlockPos.MutableBlockPos();
 		for (int i = 1; i < steps; i++) {
 			curX += stepX;
 			curZ += stepZ;
@@ -1517,9 +1570,18 @@ public class DollEntity extends Avatar {
 			int bz = Mth.floor(curZ);
 			double t = i / (double) steps;
 			int footY = Mth.floor(fromY + (target.y - fromY) * t);
-			cursor.set(bx, footY, bz);
-			if (!level().getBlockState(cursor).getCollisionShape(level(), cursor).isEmpty()
-				&& !level().getBlockState(cursor.setY(footY + 1)).getCollisionShape(level(), cursor.setY(footY + 1)).isEmpty()) {
+			footCursor.set(bx, footY, bz);
+			BlockState footState = level().getBlockState(footCursor);
+			if (footState.is(BlockTags.LEAVES) || footState.is(BlockTags.WART_BLOCKS)) {
+				return false; // 脚层是叶：1 格高灌丛/叶墙挡路，改走 A* 绕行
+			}
+			headCursor.set(bx, footY + 1, bz);
+			BlockState headState = level().getBlockState(headCursor);
+			if (headState.is(BlockTags.LEAVES) || headState.is(BlockTags.WART_BLOCKS)) {
+				return false; // 头层是叶：不钻树冠
+			}
+			if (!footState.getCollisionShape(level(), footCursor).isEmpty()
+				&& !headState.getCollisionShape(level(), headCursor).isEmpty()) {
 				return false;
 			}
 		}
@@ -1714,12 +1776,30 @@ public class DollEntity extends Avatar {
 			return;
 		}
 		if (mode == DollMode.CHOP.getIndex()) {
-			// 砍树优先跟随：有树且在离队边界内 → 移动权交给砍树，人偶暂时脱离队列去砍；
-			// 砍完 / 目标失效 / 超时 / 离主人过远 → 自动回落到下面的跟随逻辑回主人身边
-			if (chopExcursionAllowed()) {
-				chopExcursionTicks++;
-				applyChopInput();
-				return;
+			// 跟随为主轴 + 顺路过路砍 + 小偏离（主人静止 8 格内 / 行进中 5 格硬上限内）。
+			// 移动权默认归跟随（落在本方法末尾 moveToPosition(owner)）；只有两种情况会抢占：
+			//  ① 路过砍：当前够得着树上原木 → 停步，交给 updateChopMind 连锁砍整棵；
+			//  ② 小偏离：目标够不着但 chopDepartureAllowed 放行 → 短暂离队导航去砍。
+			// 一旦偏离开始（chopExcursionTicks>0）就一路砍到底或超预算再归队（commit-once），
+			// 不因主人微移/瞬时越界反复清目标，避免人偶在树边打转；砍完/超预算自动回落跟随。
+			updateOwnerStill(owner);
+			if (chopTargetPos != null && isLogBlock(chopTargetPos)) {
+				if (canReachBlockPos(chopTargetPos, CHOP_REACH_SQR)) {
+					clearMovementInput(); // 路过砍：够得着，停步待砍（updateChopMind 本 tick 挥斧连锁）
+					return;
+				}
+				if (chopExcursionTicks > 0 || chopDepartureAllowed(owner, chopTargetPos)) {
+					if (chopExcursionTicks < chopDepartureBudget()) {
+						chopExcursionTicks++;
+						applyChopInput(); // 小偏离：导航去砍，砍完/超时/超界归队
+						return;
+					}
+				}
+				// 预算耗尽或不允许偏离：放弃远目标，回落纯跟随
+				chopTargetPos = null;
+				chopNavTarget = null;
+				chopQueue = null;
+				chopTreeRoot = null;
 			}
 			chopExcursionTicks = 0;
 		}
@@ -2575,6 +2655,11 @@ public class DollEntity extends Avatar {
 			clearMovementInput();
 			return;
 		}
+		// Part B 放水防自困：若目标正是"未放水的水井锚点"且人偶此刻站在该井格内，
+		// 先把人偶引到井格旁的安全站位，绝不在自己脚下放水（放水把自己困进 1 格深水井）。
+		if (tryStepOffUnplacedWell(farmTargetPos)) {
+			return; // 正在执行"站到井外"引导，本 tick 已消费移动输入
+		}
 		if (canReachFarmBlock(farmTargetPos)) {
 			clearMovementInput();
 			return;
@@ -2596,7 +2681,13 @@ public class DollEntity extends Avatar {
 		}
 		Vec3 node = navigator.advance();
 		if (node == null) {
-			// 路径走完仍未到达（目标在障碍后）→ 重新规划；仍不可达则交给下一次放弃
+			// 路径已走尽却仍未到达目标 → 说明目标被无法翻越的障碍隔开（寻路只能到最近可达点，
+			// 走完后 advance() 无节点可给）。此时若硬留 target 会反复重规划而人偶原地站桩。
+			// 判定确实够不着就直接放弃，换下一个可达目标，避免死循环停摆。
+			if (!canReachFarmBlock(farmTargetPos)) {
+				farmTargetPos = null;
+				farmActionCooldown = Math.max(farmActionCooldown, 5);
+			}
 			farmNavTarget = null;
 			clearMovementInput();
 			return;
@@ -2606,6 +2697,80 @@ public class DollEntity extends Avatar {
 		this.zza = 1.0f;
 		setSpeed((float) this.getAttributeValue(Attributes.MOVEMENT_SPEED) * FARM_MOVE_SPEED_FACTOR);
 		this.setSprinting(true);
+	}
+
+	/** 是否正站在"未放水的水井格"(farmAnchor) 内——此时绝不可原地放水自困。 */
+	private boolean isStandingInUnplacedWell(BlockPos pos) {
+		return farmAnchor != null && !farmWaterPlaced
+			&& pos.equals(farmAnchor)
+			&& blockPosition().equals(farmAnchor);
+	}
+
+	/**
+	 * Part B 放水防自困（移动侧引导）：目标=未放水水井 且 人偶正站在该井格内时，
+	 * 把它引到井格旁的安全可站格；到达后返回 false 交回常规放水流程（下 tick 在井外放水）。
+	 * @return true=本 tick 已接管移动输入（正在走去井外）；false=人偶不在井内 / 已站到井外。
+	 */
+	private boolean tryStepOffUnplacedWell(BlockPos wellPos) {
+		if (!isStandingInUnplacedWell(wellPos)) {
+			wellStandNav = null;
+			return false;
+		}
+		BlockPos spot = findStandCellBeside(wellPos);
+		if (spot == null) {
+			// 井四周无立足点（罕见）→ 放弃建这口井，防死循环，下轮另选锚点
+			farmAnchor = null;
+			farmWaterPlaced = false;
+			wellStandNav = null;
+			clearMovementInput();
+			return true;
+		}
+		Vec3 target = Vec3.atCenterOf(spot);
+		boolean recalc = wellStandNav == null
+			|| target.distanceToSqr(wellStandNav) > FARM_NAV_RECALC_SQR
+			|| navigator.isPathDone();
+		if (recalc) {
+			wellStandNav = target;
+			if (!navigator.computePath(target)) {
+				wellStandNav = null;
+				farmAnchor = null;
+				farmWaterPlaced = false;
+				clearMovementInput();
+				return true;
+			}
+		}
+		Vec3 node = navigator.advance();
+		if (node == null) {
+			wellStandNav = null;
+			clearMovementInput();
+			return true; // 走不到就本 tick 先不动，下 tick 重试/换锚点
+		}
+		smoothFaceTowards(node.x, node.z);
+		this.xxa = 0.0f;
+		this.zza = 1.0f;
+		setSpeed((float) this.getAttributeValue(Attributes.MOVEMENT_SPEED) * FARM_MOVE_SPEED_FACTOR);
+		this.setSprinting(true);
+		return true;
+	}
+
+	/** 在水井格旁找一块安全可站格（XZ 相邻环，排除井格本身）。
+	 *  优先同层(井格顶等高)，其次高 1 格，绝不选低 1 格——低格会被水源漫灌成流水把脚打湿/困住。找不到返回 null。 */
+	private BlockPos findStandCellBeside(BlockPos well) {
+		Level lvl = level();
+		for (int dy = 0; dy <= 1; dy++) {
+			for (int dx = -1; dx <= 1; dx++) {
+				for (int dz = -1; dz <= 1; dz++) {
+					if (dx == 0 && dz == 0) {
+						continue; // 排除水井格本身
+					}
+					BlockPos c = well.offset(dx, dy, dz);
+					if (isStandableSpot(lvl, c)) {
+						return c;
+					}
+				}
+			}
+		}
+		return null;
 	}
 
 	/** 是否够得着目标方块：水平距离在锄地半径内，且高度差允许翻越 1 格台阶后触达。 */
@@ -2663,6 +2828,11 @@ public class DollEntity extends Avatar {
 		if (canReachFarmBlock(farmTargetPos)) {
 			clearMovementInput();
 			smoothFaceTowards(farmTargetPos.getX() + 0.5, farmTargetPos.getZ() + 0.5);
+			// Part B 放水防自困（决策侧兜底）：人偶此刻站在未放水井格内时绝不原地放水——
+			// 先停手，等 applyFarmInput 把人偶引到井格旁的安全站位，下一 tick 才放。
+			if (isStandingInUnplacedWell(farmTargetPos)) {
+				return;
+			}
 			if (farmActionCooldown <= 0) {
 				performFarmAction(farmTargetPos);
 				farmTargetPos = null; // 做完一个换下一个
@@ -2686,32 +2856,55 @@ public class DollEntity extends Avatar {
 	}
 
 	/**
-	 * 选择当前工作目标：
-	 * 建造模式（快捷栏锄头+水桶且背包有种子）先在中心放水、再以水为中心锄 9x9 农田
-	 * （先放水可让后续锄出的耕地立即被湿润，避免先耕的地干涸回泥土），建好后转入种收；
-	 * 常规模式先收成熟作物，再往空耕地播种。
+	 * 选择当前工作目标。资源触发模型（与用户口径一致）：锄头+满水桶 → 触发"建造农田"（放水井+锄地），
+	 * 种子 → 触发"种植"，作物成熟 → 触发"收获"，彼此独立、不强绑一袋全有才干活。
+	 * 建造：先放水（水井湿润半径 4 格覆盖 9x9，后续锄出的耕地立即湿润），再以水为中心逐行蛇形锄 9x9
+	 * （见 {@link #scanFarmRegionSnake}），建好/缺锄头后转入同一水井 9x9 内的收/种。
+	 * 锄地强依赖锄头：锄头被拿走立刻不再选锄地目标（tillBlock 亦有硬校验兜底）。
+	 * 无水井责任田在维护时退回整片最近优先收/种（不改原行为，防回归）。
 	 */
 	private BlockPos selectFarmTarget() {
-		if (hasHoeAndWaterInHotbar() && hasSeedsInInventory()) {
-			ensureFarmAnchor();
-			if (farmAnchor != null) {
-				// 先放水：水井湿润半径 4 格，正好覆盖 9x9，后续锄地立即湿润
-				if (!farmWaterPlaced) {
-					return farmAnchor;
-				}
-				// 区域内还有未耕的方块 → 以水井为中心锄地
-				BlockPos tillPos = findTillableInRegion();
-				if (tillPos != null) {
-					return tillPos;
-				}
-				// 农田建好 → 转入常规种收（锚点保留，防止原地反复重建）
+		boolean canTill = !findHoeStack().isEmpty();      // 锄地需实际握有锄头
+		boolean canPlaceWell = hasFullWaterBucket();      // 放水井需满水桶（放一次→空桶）
+		boolean anchored = farmAnchor != null;
+		// 建水田：已在水田(in-progress/建成) 或 具备"锄头+满水桶"前提可新开垦
+		if (anchored || (canTill && canPlaceWell)) {
+			if (!anchored) {
+				ensureFarmAnchor(); // 为新建选一块可耕方块作水井中心
+				anchored = farmAnchor != null;
 			}
-		} else {
-			// 不再满足建造条件（锄头/水桶被拿走）→ 放弃建造状态
+			if (anchored) {
+				if (!farmWaterPlaced) {
+					if (canPlaceWell) {
+						return farmAnchor; // 先去放水（placeWaterAt 消耗满水桶→空桶）
+					}
+					// 无满水桶可放水、水井又未建成：放弃该次建田，回落常规维护
+					farmAnchor = null;
+					farmWaterPlaced = false;
+				} else {
+					// 水井已建好：锄地需锄头；收/种按资源独立推进（同一水井 9x9 内蛇形）
+					if (canTill) {
+						BlockPos tillPos = scanFarmRegionSnake(this::isTillableBlock);
+						if (tillPos != null) {
+							return tillPos;
+						}
+					}
+					BlockPos harvest = scanFarmRegionSnake(this::isMatureCropBlock);
+					if (harvest != null) {
+						return harvest;
+					}
+					if (hasSeedsInInventory()) {
+						return scanFarmRegionSnake(this::isFarmlandWithAirAbove);
+					}
+					return null; // 水田内无事可做 → 待命（不再回退扫整片）
+				}
+			}
+		} else if (anchored) {
+			// 有锚点却既不能锄也放不了水（锄头/水桶都缺且水井未成）→ 清掉防残留
 			farmAnchor = null;
 			farmWaterPlaced = false;
 		}
-		// 常规种收：先收成熟作物，再补种空耕地
+		// 常规维护（未随身建水田/无水井锚点）：整片最近优先收/种，保持原行为不回归
 		BlockPos harvest = scanFarmBlocks(getFarmWorkCenter(), (int) FARM_SEARCH_RANGE, this::isMatureCropBlock);
 		if (harvest != null) {
 			return harvest;
@@ -2720,6 +2913,16 @@ public class DollEntity extends Avatar {
 			return null;
 		}
 		return scanFarmBlocks(getFarmWorkCenter(), (int) FARM_SEARCH_RANGE, this::isFarmlandWithAirAbove);
+	}
+
+	/** 全背包是否有满水桶（放水井用）；副手格里的也算可用资源。 */
+	private boolean hasFullWaterBucket() {
+		for (int i = 0; i < inventory.getContainerSize(); i++) {
+			if (inventory.getItem(i).is(Items.WATER_BUCKET)) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** 确保 9x9 农田锚点有效：离锚点过远或为空时，在附近重新选一块可耕方块作为中心。 */
@@ -2739,36 +2942,46 @@ public class DollEntity extends Avatar {
 		}
 	}
 
-	/** 在 9x9 区域内找最近的可耕方块（中心留作水井，不参与锄地）。 */
-	private BlockPos findTillableInRegion() {
+	/**
+	 * 以水井（farmAnchor）为中心的 9x9 责任田内，按「逐行蛇形（boustrophedon）」顺序扫描，
+	 * 返回第一个满足谓词的方块（锄/收/种共用）。扫描几何与旧 findTillableInRegion 一致：
+	 * XZ 环 ±FARM_REGION_HALF、剔除中心水井格、每格允许 Y±1（覆盖坡地/挖低水坑边的高差），
+	 * 但顺序固定为蛇形逐行——行内沿 X 单向推进、行尾反向折回下一行，从西北角起、奇偶行换向。
+	 *
+	 * <p>消费式推进：某格被执行后不再满足谓词，下一 tick 从行首重扫到它时自然跳过而继续，
+	 * 因此无需持久游标、被打断/被玩家抢先做掉也能正确续接，人偶沿固定顺序贴田走、最少折返。
+	 * 作业区约束（withinWorkAreaXZ）依旧生效，防止越界锄到责任田外。
+	 *
+	 * @return 第一个满足条件的方块；区域内全无则返回 null
+	 */
+	private BlockPos scanFarmRegionSnake(java.util.function.Predicate<BlockPos> predicate) {
 		if (farmAnchor == null) {
 			return null;
 		}
-		BlockPos center = farmAnchor;
-		BlockPos best = null;
-		double bestDist = Double.MAX_VALUE;
-		for (int dy = -1; dy <= 1; dy++) {
-			for (int dx = -FARM_REGION_HALF; dx <= FARM_REGION_HALF; dx++) {
-				for (int dz = -FARM_REGION_HALF; dz <= FARM_REGION_HALF; dz++) {
-					if (dx == 0 && dz == 0) {
-						continue; // 中心留给水井
-					}
-					BlockPos p = center.offset(dx, dy, dz);
-					double d = p.distSqr(center);
-					if (d >= bestDist) {
+		BlockPos c = farmAnchor;
+		int h = FARM_REGION_HALF;
+		int span = 2 * h + 1; // 9
+		BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
+		for (int row = 0; row < span; row++) {
+			int oz = -h + row;
+			boolean forward = (row % 2 == 0);
+			for (int col = 0; col < span; col++) {
+				int ox = forward ? (-h + col) : (h - col);
+				if (ox == 0 && oz == 0) {
+					continue; // 中心留作水井，不参与锄/收/种
+				}
+				for (int dy = -1; dy <= 1; dy++) { // 列内允许微小高差
+					mpos.set(c.getX() + ox, c.getY() + dy, c.getZ() + oz);
+					if (!withinWorkAreaXZ(mpos)) {
 						continue;
 					}
-					if (!withinWorkAreaXZ(p)) {
-						continue;
-					}
-					if (isTillableBlock(p)) {
-						best = p;
-						bestDist = d;
+					if (predicate.test(mpos)) {
+						return mpos.immutable();
 					}
 				}
 			}
 		}
-		return best;
+		return null;
 	}
 
 	/** 在当前目标方块执行对应动作：优先放水（中心），其次收获、播种、锄地。 */
@@ -2788,8 +3001,12 @@ public class DollEntity extends Avatar {
 		return false;
 	}
 
-	/** 锄地：草方块/土径/泥土→耕地，砂土/缠根泥土→泥土（复刻原版锄头行为）。 */
+	/** 锄地：草方块/土径/泥土→耕地，砂土/缠根泥土→泥土（复刻原版锄头行为）。
+	 *  硬依赖锄头：背包无锄头则拒绝锄地——锄头被拿走即停（不凭空"空手锄地"）。 */
 	private boolean tillBlock(BlockPos pos) {
+		if (findHoeStack().isEmpty()) {
+			return false; // 无可用锄头：不能锄地
+		}
 		BlockState state = level().getBlockState(pos);
 		Block target = TILLABLE_TO_RESULT.get(state.getBlock());
 		if (target == null || !level().isEmptyBlock(pos.above())) {
@@ -2805,8 +3022,22 @@ public class DollEntity extends Avatar {
 		return true;
 	}
 
-	/** 中心放水：清空中心方块后放入水源（水桶不消耗，作为建造工具的象征）。 */
+	/**
+	 * 中心放水：清空中心方块后放入水源，并真实消耗 1 个满水桶 → 变为空桶
+	 * （玩家放入多少满水桶才能建多少口水井，不再凭空刷水）。
+	 * @return 放水成功；背包无满水桶则返回 false
+	 */
 	private boolean placeWaterAt(BlockPos pos) {
+		int bucketSlot = -1;
+		for (int i = 0; i < inventory.getContainerSize(); i++) {
+			if (inventory.getItem(i).is(Items.WATER_BUCKET)) {
+				bucketSlot = i;
+				break;
+			}
+		}
+		if (bucketSlot == -1) {
+			return false; // 无满水桶：放不了水
+		}
 		BlockState state = level().getBlockState(pos);
 		if (!state.isAir()) {
 			this.playSound(state.getSoundType().getBreakSound(), 1.0f, 1.0f);
@@ -2814,6 +3045,8 @@ public class DollEntity extends Avatar {
 			level().setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
 		}
 		level().setBlockAndUpdate(pos, Blocks.WATER.defaultBlockState());
+		// 消耗满水桶 → 空桶
+		inventory.setItem(bucketSlot, new ItemStack(Items.BUCKET));
 		farmWaterPlaced = true;
 		this.swing(InteractionHand.MAIN_HAND);
 		return true;
@@ -2912,30 +3145,11 @@ public class DollEntity extends Avatar {
 		}
 	}
 
-	/** 人偶物品栏（全45格）是否同时有锄头和水桶（建造模式的前提）。 */
-	private boolean hasHoeAndWaterInHotbar() {
-		boolean hoe = false;
-		boolean water = false;
-		for (int i = 0; i < inventory.getContainerSize(); i++) {
-			ItemStack stack = inventory.getItem(i);
-			if (stack.isEmpty()) {
-				continue;
-			}
-			if (stack.getItem() instanceof HoeItem) {
-				hoe = true;
-			} else if (stack.getItem() == Items.WATER_BUCKET) {
-				water = true;
-			}
-		}
-		return hoe && water;
-	}
-
 	/** 人偶物品栏是否有种子（作物/瓜藤类方块物品）。 */
 	private boolean hasSeedsInInventory() {
 		return findSeedSlotInInventory() >= 0;
 	}
 
-	/** 找到人偶物品栏中第一个种子物品（CropBlock/StemBlock 的方块物品）。 */
 	/**
 	 * 找到人偶物品栏中第一个可播种种子的槽位（找不到返回 -1）。
 	 * 返回槽位而非物品：播种挥动动画期间需要指向该槽让主手渲染种子。
@@ -3202,6 +3416,7 @@ public class DollEntity extends Avatar {
 			|| navigator.isPathDone();
 		if (recalc) {
 			chopNavTarget = target;
+			// 树叶=障碍已是 navigator 全局默认（不站树冠、不钻夹缝），此处无需特判
 			if (!navigator.computePath(target)) {
 				// 无路可达（如悬空树冠）→ 放弃该块，换下一块/下一棵树
 				chopTargetPos = null;
@@ -3215,6 +3430,16 @@ public class DollEntity extends Avatar {
 		if (node == null) {
 			chopNavTarget = null;
 			clearMovementInput();
+			// 路径走尽仍未够着（浮空树冠/高坎等无可站立点接近）：放弃该块并短时拉黑这棵树，
+			// 交给决策换下一棵，避免人偶站在树脚/树冠下反复重试（用户实测：卡在树叶上反复跳）。
+			if (chopTargetPos != null && !canReachBlockPos(chopTargetPos, CHOP_REACH_SQR)) {
+				if (chopTreeRoot != null && isLogBlock(chopTreeRoot)) {
+					chopTreeBlacklist.put(chopTreeRoot, level().getGameTime() + CHOP_TREE_BLACKLIST_TICKS);
+				}
+				chopTargetPos = null;
+				chopTreeRoot = null;
+				chopActionCooldown = Math.max(chopActionCooldown, 5);
+			}
 			return;
 		}
 		smoothFaceTowards(node.x, node.z);
@@ -3225,18 +3450,185 @@ public class DollEntity extends Avatar {
 	}
 
 	/**
-	 * 跟随时是否允许为砍树暂时脱离队列：有有效砍树目标 + 未超时 + 未离主人过远。
-	 * 砍树优先跟随，但离队必须有边界，否则人偶会一路追着树越跑越远。
+	 * 跟随主轴下的"主人静止"累计：主人每 tick 位移很小则 +1，一动就清零。
+	 * 供「主人停时小偏离砍树」判定——只在主人真的停下等待时人偶才短暂离开干活。
 	 */
-	private boolean chopExcursionAllowed() {
-		if (chopTargetPos == null || !isLogBlock(chopTargetPos)) {
+	private void updateOwnerStill(Player owner) {
+		double px = owner.getX();
+		double pz = owner.getZ();
+		if (!ownerStillSampled) {
+			ownerStillSampleX = px;
+			ownerStillSampleZ = pz;
+			ownerStillSampled = true;
+			ownerStillTicks = 0;
+			return;
+		}
+		double dx = px - ownerStillSampleX;
+		double dz = pz - ownerStillSampleZ;
+		ownerStillSampleX = px;
+		ownerStillSampleZ = pz;
+		if (dx * dx + dz * dz < 0.01 * 0.01) {
+			if (ownerStillTicks < CHOP_OWNER_STILL_TICKS * 2) {
+				ownerStillTicks++;
+			}
+		} else {
+			ownerStillTicks = 0;
+		}
+	}
+
+	/**
+	 * 跟随时是否允许朝某棵树的原木做「小偏离」：
+	 * ① 主人静止：偏离半径内（扫描已限定 followScanRange）的真树都放行；
+	 * ② 主人行进中：只放行「顺路」级目标 —— 原木距人偶 ≤ followMaxTargetDist（5 格硬上限），
+	 * 绝不为了远处的树脱离队列；离主人超过 excursionMaxDist 一律先归队。
+	 */
+	private boolean chopDepartureAllowed(Player owner, BlockPos candidate) {
+		if (owner == null || candidate == null) {
 			return false;
 		}
-		if (chopExcursionTicks >= CHOP_EXCURSION_MAX_TICKS) {
-			return false;
+		if (this.distanceToSqr(owner) > CHOP_EXCURSION_MAX_DIST_SQR) {
+			return false; // 离主人太远：先归队
 		}
+		if (ownerStillTicks >= CHOP_OWNER_STILL_TICKS) {
+			return true; // 主人静止：可小偏离
+		}
+		// 主人行进中：只放行 5 格硬上限（按水平距离算，y 轴小幅错位不缩水）内的顺路目标
+		double dx = this.getX() - (candidate.getX() + 0.5);
+		double dz = this.getZ() - (candidate.getZ() + 0.5);
+		return dx * dx + dz * dz <= CHOP_FOLLOW_MAX_TARGET_DIST_SQR;
+	}
+
+	/** 当前偏离预算：主人静止（等待期）用足额预算；主人行进中只给短预算防掉队。 */
+	private int chopDepartureBudget() {
+		return ownerStillTicks >= CHOP_OWNER_STILL_TICKS
+			? CHOP_EXCURSION_MAX_TICKS
+			: CHOP_MOVING_DEPARTURE_TICKS;
+	}
+
+	/**
+	 * 跟随时的"够得着即砍"探测：每 tick 只查人偶挥斧可达壳内的真树原木，
+	 * 有就立刻锁定目标（不经过整区扫描的 1Hz 冷却）——保证"明明很近 / y 轴错位
+	 * 但够得着"的树马上被砍，不再因为 1 秒一次的扫描间隙漏掉（对照挖矿跟随：
+	 * MINE 是目标为空就每 tick 重选、只有没找到才上冷却；砍树旧实现反而找到就冷却 20t，
+	 * 等于把路过速率锁死成 1 棵/秒，走路时近树被不断错过）。
+	 * 门控同小偏离：主人静止，或主人行进中且人偶没掉队太远（≤excursionMaxDist）
+	 * 才生效——密林里掉队过远先纯跟随追上，避免一路砍个不停越拉越远。
+	 * @return 是否已设目标（调用方直接进入挥斧流程）
+	 */
+	private boolean tryPickReachableChopTarget() {
 		Player owner = getOwnerPlayer();
-		return owner == null || this.distanceToSqr(owner) <= CHOP_EXCURSION_MAX_DIST_SQR;
+		if (owner == null) {
+			return false;
+		}
+		if (ownerStillTicks < CHOP_OWNER_STILL_TICKS
+			&& this.distanceToSqr(owner) > CHOP_EXCURSION_MAX_DIST_SQR) {
+			return false; // 主人行进中且人偶掉队过远：先追上主人
+		}
+		BlockPos center = this.blockPosition();
+		BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
+		BlockPos best = null;
+		double bestDistSqr = Double.MAX_VALUE;
+		// 只扫 canReach 可达壳：x/z ±4、y 从脚 -4..+5，覆盖"y 轴错位但够得着"的树干（逐格再以 canReach 精筛）
+		for (int y = center.getY() - 4; y <= center.getY() + 5; y++) {
+			for (int x = center.getX() - 4; x <= center.getX() + 4; x++) {
+				for (int z = center.getZ() - 4; z <= center.getZ() + 4; z++) {
+					mpos.set(x, y, z);
+					if (!isLogBlock(mpos) || !touchesLeavesOrWart(mpos)) {
+						continue; // 只认真树（原木贴叶/菌光体），跳过建筑木
+					}
+					if (!canReachBlockPos(mpos, CHOP_REACH_SQR)) {
+						continue;
+					}
+					double d = mpos.distSqr(center);
+					if (d < bestDistSqr) {
+						bestDistSqr = d;
+						best = mpos.immutable();
+					}
+				}
+			}
+		}
+		if (best == null) {
+			return false;
+		}
+		chopTargetPos = best;
+		chopNavTarget = null;
+		chopQueue = null;
+		chopTreeRoot = null;
+		chopExcursionTicks = 0;
+		return true;
+	}
+
+	/**
+	 * 跟随时选砍树目标（路过式）：只在人偶身边 {@link #CHOP_FOLLOW_SCAN_RANGE} 内找真树。
+	 * 真树判定与非跟随一致走「整棵连通 + 任一块贴叶」（复用 {@link #collectTreeLogs}），
+	 * 避免大树/高树冠因「就近那块原木恰好不贴叶」被整棵漏判（用户实测：树在 5 格内却不砍）。
+	 * 只接受当前可行动目标：够得着（路过砍）或 {@link #chopDepartureAllowed} 放行
+	 * （主人静止小偏离 / 行进中 5 格硬上限顺路偏离）。带冷却，避免每 tick 全量扫。
+	 * 未跟随时不调用（走 advanceChopQueue）。
+	 */
+	private void pickFollowingChopTarget() {
+		if (chopSearchCooldown > 0) {
+			chopSearchCooldown--;
+			return;
+		}
+		Player followOwner = getOwnerPlayer();
+		BlockPos center = this.blockPosition();
+		int r = (int) Math.ceil(CHOP_FOLLOW_SCAN_RANGE);
+		// 跟随与作业区互斥：跟随时不限制作业区（否则在作业区外跟随主人时，身边的树全被排除）
+		boolean areaRestricted = !isFollowEnabled();
+		Set<BlockPos> scanned = new HashSet<>();
+		BlockPos bestTarget = null;
+		BlockPos bestRoot = null;
+		double bestDistSqr = Double.MAX_VALUE;
+		BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
+		// 纵向窗口 -4..+12：覆盖矮坡/坎下的树与较高树冠，连锁砍只需够到任意一块
+		for (int y = center.getY() - 4; y <= center.getY() + 12; y++) {
+			for (int x = center.getX() - r; x <= center.getX() + r; x++) {
+				for (int z = center.getZ() - r; z <= center.getZ() + r; z++) {
+					mpos.set(x, y, z);
+					if (scanned.contains(mpos) || !isLogBlock(mpos)
+						|| (areaRestricted && !withinWorkAreaXZ(mpos))) {
+						continue;
+					}
+					List<BlockPos> tree = collectTreeLogs(mpos); // 整棵连通（原木+树叶作跳板），已按距人偶升序
+					scanned.addAll(tree);
+					BlockPos minY = null;
+					boolean realTree = false;
+					for (BlockPos log : tree) {
+						if (minY == null || log.getY() < minY.getY()) {
+							minY = log;
+						}
+						if (!realTree && touchesLeavesOrWart(log)) {
+							realTree = true;
+						}
+					}
+					if (!realTree || minY == null || isTreeBlacklisted(minY)) {
+						continue; // 建筑木头/孤立原木不砍；近期导航失败拉黑的树稍后再试
+					}
+					for (BlockPos log : tree) {
+						if (log.distSqr(center) >= bestDistSqr) {
+							break; // 升序：同一棵树的后续只会更远
+						}
+						if (canReachBlockPos(log, CHOP_REACH_SQR) || chopDepartureAllowed(followOwner, log)) {
+							bestTarget = log;
+							bestRoot = minY;
+							bestDistSqr = log.distSqr(center);
+							break; // 该树取最近的一块可用原木即可
+						}
+					}
+				}
+			}
+		}
+		if (bestTarget == null) {
+			chopSearchCooldown = CHOP_SEARCH_COOLDOWN; // 附近没可行动的树，稍后再找
+			return;
+		}
+		chopTargetPos = bestTarget;
+		chopNavTarget = null;
+		chopQueue = null;
+		chopTreeRoot = bestRoot;
+		chopExcursionTicks = 0; // 新一轮偏离重新计时
+		chopSearchCooldown = CHOP_SEARCH_COOLDOWN;
 	}
 
 	/**
@@ -3413,15 +3805,27 @@ public class DollEntity extends Avatar {
 		if (chopTargetPos != null && !isLogBlock(chopTargetPos)) {
 			chopTargetPos = null;
 		}
-		// 跟随时离队超时 / 离主人过远 → 放弃目标回到主人身边（下一轮会重挑更近的树）
-		if (isFollowEnabled() && chopTargetPos != null && !chopExcursionAllowed()) {
-			chopTargetPos = null;
-			chopNavTarget = null;
-			chopQueue = null;
-			chopTreeRoot = null;
+		// 跟随时：路过砍目标当前够得着则保留；够不着且偏离尚未开始/不允许 → 放弃回主人身边
+		// （移动阶段先跑：允许的偏离会先把 chopExcursionTicks 置 >0 并导航，这里 commit-once 不拆台）
+		if (isFollowEnabled() && chopTargetPos != null && !canReachBlockPos(chopTargetPos, CHOP_REACH_SQR)) {
+			Player followOwner = getOwnerPlayer();
+			if (chopExcursionTicks <= 0 && !chopDepartureAllowed(followOwner, chopTargetPos)) {
+				chopTargetPos = null;
+				chopNavTarget = null;
+				chopQueue = null;
+				chopTreeRoot = null;
+			}
 		}
 		if (chopTargetPos == null) {
-			advanceChopQueue();
+			if (isFollowEnabled()) {
+				// 跟随：先做每 tick 的"够得着即砍"探测（不等 1Hz 冷却，路过/错 y 轴但够得着立刻砍）；
+				// 探不到再走整区扫描（主人静止 8 格偏离 / 行进中 5 格硬上限顺路偏离）
+				if (!tryPickReachableChopTarget()) {
+					pickFollowingChopTarget();
+				}
+			} else {
+				advanceChopQueue();
+			}
 		}
 		if (chopTargetPos == null) {
 			// 没树可砍：低优先级补种树苗（背包有树苗且附近有草方块/泥土时顺手种）
@@ -3552,10 +3956,11 @@ public class DollEntity extends Avatar {
 	}
 
 	/**
-	 * BFS 收集与 root 六向连通的全部原木（限 CHOP_MAX_TREE_BLOCKS），按离人偶的距离从近到远排序。
-	 * 原木与树叶都作为 BFS 跳板（visited+入队），但只把原木计入结果：
-	 * 2×2 巨型丛林/深色橡木树冠中的分支原木常与主干隔着树叶，纯原木连通会漏掉它们。
-	 * 树叶不产出（chainFellTree 只掉落原木），仅用于跨越树冠间隙连通整棵树。
+	 * BFS 收集与 root 原木连通的整棵原木（限 CHOP_MAX_TREE_BLOCKS），按离人偶的距离从近到远排序。
+	 * 树的定义见 {@link #TREE_LOG_ALL_NEIGHBORS}：只走【原木之间的 26 向连通】，绝不跨树叶——
+	 * 否则黑森林/丛林里树冠相贴的相邻树会被并成"一棵树"（用户实测整片森林被一次清空）。
+	 * 自然生成的树树干/树枝必原木相贴、两棵树树干又永不相贴，故本定义在结构上保证一次只放倒一棵。
+	 * 被树叶完全隔断的原木残木（如有）由 chainFellTree 的悬浮残留清扫兜底。
 	 * 连锁破坏下砍任意一块原木即可整棵清空，因此按距离就近先砍，而不是从下往上。
 	 */
 	private List<BlockPos> collectTreeLogs(BlockPos root) {
@@ -3566,16 +3971,13 @@ public class DollEntity extends Avatar {
 		visited.add(root);
 		while (!queue.isEmpty() && result.size() < CHOP_MAX_TREE_BLOCKS) {
 			BlockPos cur = queue.poll();
-			if (isLogBlock(cur)) {
-				result.add(cur);
-			}
-			for (int[] d : TREE_NEIGHBORS) {
+			result.add(cur);
+			for (int[] d : TREE_LOG_ALL_NEIGHBORS) {
 				BlockPos next = cur.offset(d[0], d[1], d[2]);
 				if (visited.contains(next)) {
 					continue;
 				}
-				BlockState nextState = level().getBlockState(next);
-				if (nextState.is(BlockTags.LOGS) || nextState.is(BlockTags.LEAVES)) {
+				if (isLogBlock(next)) {
 					visited.add(next);
 					queue.add(next);
 				}
@@ -3584,6 +3986,145 @@ public class DollEntity extends Avatar {
 		BlockPos dollPos = this.blockPosition();
 		result.sort(Comparator.comparingDouble(log -> log.distSqr(dollPos))); // 就近先砍
 		return result;
+	}
+
+	/**
+	 * 「定根」：确定本次连锁要放倒的原木集合。先用 log-only 26 向连通收集被砍原木所在分量；
+	 * 若该分量已含「落定地面的原木」（树干/树根触地），说明是一棵完整真树，直接放倒整棵。
+	 * 否则说明人偶砍到的是「只贴叶、不触地的孤立冠木」（如站在高处砍到的金合欢斜枝、
+	 * 丛林木冠内横枝）——此时若照旧只放倒这团孤立冠木，下方树干与树根不会被连锁（用户实测：
+	 * "人偶 y 轴比树根高时树根不被连锁"）。故在此孤立冠木的垂直脚印下方，向下找回本树的
+	 * 落定树干作为「准树根」，把从准树根出发的完整落定分量并入放倒集合。
+	 *
+	 * <p>防误伤约束（与用户拍板一致：不跨树叶、绝不并邻树）：向下找回只在「孤立冠木自身的
+	 * XZ 脚印 ±1」内直向下探，且目标必须是「落定地面的分量」——两棵不同的树树干永不相贴、
+	 * 亦不会共享同一垂直脚印，故这里即便横向差 1 格也只可能是本树弯斜的树干，不会跳去邻树；
+	 * 若向下探不到落定树干（纯悬空建筑木），则保守只放倒原孤立分量本身，不扩散。
+	 *
+	 * @return 本次要放倒的原木集合（含被砍块；已去重、按距人偶升序）
+	 */
+	private List<BlockPos> resolveFellSet(BlockPos chopped) {
+		List<BlockPos> comp = collectTreeLogs(chopped);
+		if (comp.isEmpty()) {
+			return comp;
+		}
+		boolean hasGroundRoot = false;
+		for (BlockPos log : comp) {
+			if (isGroundSettledLog(log)) {
+				hasGroundRoot = true;
+				break;
+			}
+		}
+		if (hasGroundRoot) {
+			return comp; // 完整真树（含树根触地端），直接整棵放倒
+		}
+		// 孤立冠木：向下认回本树的落定树干/树根（真孤立冠木很小；异常巨大的先行放弃，走保守放倒）
+		if (comp.size() > 256) {
+			return comp;
+		}
+		BlockPos pseudoRoot = findSettledTrunkBelow(comp);
+		if (pseudoRoot == null) {
+			return comp; // 找不到落定树干（如纯悬空建筑木）：保守只放倒原孤立分量
+		}
+		List<BlockPos> trunk = collectTreeLogs(pseudoRoot);
+		Set<BlockPos> merged = new HashSet<>(comp.size() + trunk.size());
+		merged.addAll(comp);
+		merged.addAll(trunk);
+		List<BlockPos> fell = new ArrayList<>(merged);
+		BlockPos dollPos = this.blockPosition();
+		fell.sort(Comparator.comparingDouble(log -> log.distSqr(dollPos))); // 就近先砍
+		return fell;
+	}
+
+	/** 该原木是否「落定地面」：正下方一格是实心且非树叶/菌光体/原木的方块（地面/石/土…）。
+	 * 树干最底端接触地面 → 视为真树的落定端（树根）。 */
+	private boolean isGroundSettledLog(BlockPos log) {
+		BlockPos below = log.below();
+		BlockState s = level().getBlockState(below);
+		if (s.is(BlockTags.LOGS) || s.is(BlockTags.LEAVES) || s.is(BlockTags.WART_BLOCKS)) {
+			return false;
+		}
+		return !s.getCollisionShape(level(), below).isEmpty();
+	}
+
+	/**
+	 * 孤立冠木向下找回本树落定树干：只在「孤立冠木自身 XZ 脚印 ±1」的范围内向下扫（覆盖弯斜
+	 * 树干，横向不跨过树叶延伸），对扫到的每块原木求其所在 log-only 分量；若该分量「落定地面」
+	 * （含触地树根）则以其 y 最低点为候选准树根，取水平上最贴近孤立冠木的一个作为本树树干。
+	 * 两棵不同的树树干永不相贴、不共享垂直脚印，故脚印 ±1 内向下只会认回本树，不会跳去邻树。
+	 * @return 准树根（该落定分量中 y 最低的原木）；找不到返回 null
+	 */
+	private BlockPos findSettledTrunkBelow(List<BlockPos> comp) {
+		if (comp == null || comp.isEmpty()) {
+			return null;
+		}
+		int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
+		int minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+		for (BlockPos p : comp) {
+			if (p.getX() < minX) minX = p.getX();
+			if (p.getX() > maxX) maxX = p.getX();
+			if (p.getZ() < minZ) minZ = p.getZ();
+			if (p.getZ() > maxZ) maxZ = p.getZ();
+		}
+		int lowY = Integer.MAX_VALUE;
+		for (BlockPos p : comp) {
+			if (p.getY() < lowY) lowY = p.getY();
+		}
+		// 在孤立冠木的 XZ 脚印(±1)范围内、只向下扫（最低到冠木下方 CHOP 范畴：最多降 40 格）
+		int downLimit = lowY - 40;
+		BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
+		BlockPos bestCandidate = null;
+		double bestDistToCompSqr = Double.MAX_VALUE;
+		// 先收集脚印邻域内所有原木，再对每个属于「落定分量」的取其分量最低端为根候选
+		Set<BlockPos> seenLogs = new HashSet<>();
+		for (int x = minX - 1; x <= maxX + 1; x++) {
+			for (int z = minZ - 1; z <= maxZ + 1; z++) {
+				for (int y = lowY - 1; y >= downLimit; y--) {
+					mpos.set(x, y, z);
+					if (!isLogBlock(mpos) || seenLogs.contains(mpos)) {
+						continue;
+					}
+					seenLogs.add(mpos.immutable());
+					List<BlockPos> sub = collectTreeLogs(mpos);
+					BlockPos rootOf = null;
+					int rY = Integer.MAX_VALUE;
+					boolean settled = false;
+					for (BlockPos l : sub) {
+						if (l.getY() < rY) {
+							rY = l.getY();
+							rootOf = l;
+						}
+						if (isGroundSettledLog(l)) {
+							settled = true;
+						}
+					}
+				if (!settled || rootOf == null) {
+					continue;
+				}
+				// 选水平上最贴近孤立冠木的落定分量（本树树干），避免误取邻树（邻树地面根水平更远）
+				double distToComp = distToComp(rootOf, comp);
+					if (distToComp < bestDistToCompSqr) {
+						bestDistToCompSqr = distToComp;
+						bestCandidate = rootOf;
+					}
+				}
+			}
+		}
+		return bestCandidate;
+	}
+
+	/** 该点与某集合的水平距离平方（取集合内最近一块）。 */
+	private double distToComp(BlockPos pos, List<BlockPos> comp) {
+		double best = Double.MAX_VALUE;
+		for (BlockPos c : comp) {
+			double dx = pos.getX() - c.getX();
+			double dz = pos.getZ() - c.getZ();
+			double d = dx * dx + dz * dz;
+			if (d < best) {
+				best = d;
+			}
+		}
+		return best;
 	}
 
 	/** 是否为原木/菌柄（#minecraft:logs）。 */
@@ -3630,17 +4171,19 @@ public class DollEntity extends Avatar {
 
 	/**
 	 * 连锁砍树（模仿连锁挖矿模组，砍树模式的核心能力）：砍掉一块原木后，
-	 * 从该位置沿原木六向连通（BFS）收集整棵树剩余原木，全部静默掉落进
-	 * 人偶存储区并移除方块（不逐块播粒子/音效，避免几十上百块刷屏卡顿）。
-	 * 不是放大挖掘范围：只连锁原木连通体，建筑木头/踮脚柱（已移除）等
-	 * 不与树连通的方块不会被误拆；上限沿用 CHOP_MAX_TREE_BLOCKS 防死循环。
+	 * 先「定根」确定要放倒的整棵原木集合（孤立冠木会向下认回本树的落定树干/树根，
+	 * 见 {@link #resolveFellSet}），再全部静默掉落进人偶存储区并移除方块
+	 * （不逐块播粒子/音效，避免几十上百块刷屏卡顿）。
+	 * 树的定义 = 原木自连体（见 collectTreeLogs 注释）：相邻树冠即使互相穿插也绝不被并树，
+	 * 否则黑森林一次连锁会清空整片森林。建筑木头等不与树连通的方块不会被误拆；
+	 * 上限沿用 CHOP_MAX_TREE_BLOCKS 防死循环；被树叶隔断的冠内残木由悬浮清扫兜底。
 	 * 掉落物超背包容量时由 addToDollInventory 兜底落地，不会丢物品。
 	 */
 	private void chainFellTree(BlockPos chopped) {
 		if (!(this.level() instanceof ServerLevel serverLevel)) {
 			return;
 		}
-		List<BlockPos> rest = collectTreeLogs(chopped);
+		List<BlockPos> rest = resolveFellSet(chopped);
 		ItemStack axe = findAxeStack();
 		int mined = 0;
 		for (BlockPos pos : rest) {
@@ -3659,6 +4202,10 @@ public class DollEntity extends Avatar {
 			serverLevel.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
 			mined++;
 		}
+		// 悬浮断层残留：面连通收不到的金合欢稀疏树冠等，做有界清扫（严格判定，见方法注释）
+		if (mined > 0) {
+			mined += sweepFloatingLogs(serverLevel, rest, chopped, axe);
+		}
 		// 连锁的每块原木消耗 1 点斧头耐久（与玩家逐块砍一致）
 		if (!axe.isEmpty() && mined > 0) {
 			axe.hurtAndBreak(mined, this, EquipmentSlot.MAINHAND);
@@ -3666,9 +4213,110 @@ public class DollEntity extends Avatar {
 	}
 
 	/**
+	 * 悬浮残留清扫（有界、低风险）：原木 26 向放倒后，只在本树放倒空洞四周的小范围内，
+	 * 把仍悬空的断层原木一并清掉——极少数树形中确实存在"仅靠树叶隔开、原木够不着"的冠内原木
+	 * （如巨型丛林冠内横枝），主 BFS 收不到。判定从严防误删建筑/邻树：
+	 * ① 必须在放倒空洞（felled∪chopped）水平 ±3 / 垂直 -1..+8 范围内，且清扫盒面积有上限；
+	 * ② 必须"悬浮"：正下方 8 格内没有任何【非叶实心】支撑（树叶/菌光体不算支撑）；
+	 * ③ 必须与树叶/菌光体面贴，或与已清扫残木/空洞相接（树残骸一定贴叶，纯建筑不会）。
+	 * 地面建筑有支撑、纯木悬空建筑不贴叶、邻树树干有支撑或超出空洞邻接范围，均不会被误删。
+	 * @return 额外清掉的原木数
+	 */
+	private int sweepFloatingLogs(ServerLevel serverLevel, List<BlockPos> felled, BlockPos chopped, ItemStack axe) {
+		if (felled.size() > 2048) {
+			return 0; // 主放倒规模异常巨大（不应再发生，兜底保护）：不做二次清扫
+		}
+		int minX = chopped.getX(), maxX = chopped.getX();
+		int minY = chopped.getY(), maxY = chopped.getY();
+		int minZ = chopped.getZ(), maxZ = chopped.getZ();
+		for (BlockPos p : felled) {
+			if (p.getX() < minX) minX = p.getX();
+			if (p.getX() > maxX) maxX = p.getX();
+			if (p.getY() < minY) minY = p.getY();
+			if (p.getY() > maxY) maxY = p.getY();
+			if (p.getZ() < minZ) minZ = p.getZ();
+			if (p.getZ() > maxZ) maxZ = p.getZ();
+		}
+		// 清扫盒过大说明放倒范围横跨很宽（树冠成片），宁可不扫，保持保守
+		long box = (long) (maxX - minX + 7) * (maxZ - minZ + 7) * (maxY - minY + 10);
+		if (box > 40000L) {
+			return 0;
+		}
+		Set<BlockPos> hole = new HashSet<>(felled.size() + 1);
+		hole.addAll(felled);
+		hole.add(chopped);
+		Set<BlockPos> swept = new HashSet<>();
+		int removed = 0;
+		for (int pass = 0; pass < 3; pass++) {
+			boolean changed = false;
+			for (int x = minX - 3; x <= maxX + 3; x++) {
+				for (int z = minZ - 3; z <= maxZ + 3; z++) {
+					for (int y = minY - 1; y <= maxY + 8; y++) {
+						BlockPos p = new BlockPos(x, y, z);
+						if (hole.contains(p) || swept.contains(p) || !isLogBlock(p)) {
+							continue;
+						}
+						if (!isFloatingRemnant(p) || !isLeafLinkedRemnant(p, hole, swept)) {
+							continue;
+						}
+						BlockState state = serverLevel.getBlockState(p);
+						LootParams.Builder builder = new LootParams.Builder(serverLevel)
+							.withParameter(LootContextParams.ORIGIN, Vec3.atCenterOf(p))
+							.withParameter(LootContextParams.TOOL, axe)
+							.withOptionalParameter(LootContextParams.THIS_ENTITY, this)
+							.withOptionalParameter(LootContextParams.BLOCK_STATE, state);
+						for (ItemStack drop : state.getDrops(builder)) {
+							addToDollInventory(drop);
+						}
+						serverLevel.setBlock(p, Blocks.AIR.defaultBlockState(), 3);
+						swept.add(p);
+						removed++;
+						changed = true;
+					}
+				}
+			}
+			if (!changed) {
+				break;
+			}
+		}
+		if (removed > 0 && !axe.isEmpty()) {
+			axe.hurtAndBreak(removed, this, EquipmentSlot.MAINHAND);
+		}
+		return removed;
+	}
+
+	/** 悬浮判定：正下方 1..8 格内无任何【非叶实心】支撑（树叶/菌光体不算支撑，树干/地面才算）。 */
+	private boolean isFloatingRemnant(BlockPos log) {
+		for (int dy = 1; dy <= 8; dy++) {
+			BlockPos below = log.below(dy);
+			BlockState s = level().getBlockState(below);
+			if (!s.is(BlockTags.LEAVES) && !s.is(BlockTags.WART_BLOCKS)
+				&& !s.getCollisionShape(level(), below).isEmpty()) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/** 与放倒空洞/已清扫残木/树叶菌光体面贴 → 判定为树的残骸而不是建筑。 */
+	private boolean isLeafLinkedRemnant(BlockPos log, Set<BlockPos> hole, Set<BlockPos> swept) {
+		for (int[] d : TREE_NEIGHBORS) {
+			BlockPos n = log.offset(d[0], d[1], d[2]);
+			if (hole.contains(n) || swept.contains(n)) {
+				return true;
+			}
+			BlockState ns = level().getBlockState(n);
+			if (ns.is(BlockTags.LEAVES) || ns.is(BlockTags.WART_BLOCKS)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * 是否够得着目标方块：水平距离在范围内；垂直方向向上放宽到 5 格、
-	 * 向下 2.5 格——连锁破坏下只需够着树上任意一块原木即可整棵砍完，
-	 * 垂直放宽保证站在树旁（或略高/略低处）都能砍到第一块。
+	 * 向下 4 格（站在坎上/坡边也能砍到低处的树）——连锁破坏下只需够着树上
+	 * 任意一块原木即可整棵砍完，垂直放宽保证站在树旁（或略高/略低处）都能砍到第一块。
 	 */
 	private boolean canReachBlockPos(BlockPos pos, double reachSqr) {
 		double dx = this.getX() - (pos.getX() + 0.5);
@@ -3677,7 +4325,7 @@ public class DollEntity extends Avatar {
 			return false;
 		}
 		double dy = (pos.getY() + 0.5) - this.getY();
-		return dy <= 5.0 && dy >= -2.5;
+		return dy <= 5.0 && dy >= -4.0;
 	}
 
 	/** 仅水平距离是否在工作范围内（用于判断"水平够得着但垂直够不着"的悬空目标）。 */
@@ -3721,6 +4369,7 @@ public class DollEntity extends Avatar {
 	private ItemStack findTorchInInventory() {
 		// 第一优先：火把类
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
+			if (i == OFFHAND_SLOT) continue; // 副手格不参与主手渲染/放置
 			ItemStack stack = inventory.getItem(i);
 			if (stack.isEmpty()) continue;
 			if (stack.getItem() instanceof BlockItem bi) {
@@ -3731,6 +4380,7 @@ public class DollEntity extends Avatar {
 		}
 		// 第二优先：南瓜灯
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
+			if (i == OFFHAND_SLOT) continue;
 			ItemStack stack = inventory.getItem(i);
 			if (stack.isEmpty()) continue;
 			if (stack.getItem() instanceof BlockItem bi && bi.getBlock() == Blocks.JACK_O_LANTERN) {
@@ -3739,6 +4389,7 @@ public class DollEntity extends Avatar {
 		}
 		// 第三优先：灯笼类
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
+			if (i == OFFHAND_SLOT) continue;
 			ItemStack stack = inventory.getItem(i);
 			if (stack.isEmpty()) continue;
 			if (stack.getItem() instanceof BlockItem bi
@@ -3748,6 +4399,7 @@ public class DollEntity extends Avatar {
 		}
 		// 第四优先：全方块光源（可浮空放置）
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
+			if (i == OFFHAND_SLOT) continue;
 			ItemStack stack = inventory.getItem(i);
 			if (stack.isEmpty()) continue;
 			if (stack.getItem() instanceof BlockItem bi && isFullBlockLightSource(bi.getBlock())) {
@@ -4373,7 +5025,9 @@ public class DollEntity extends Avatar {
 		}
 		if (mineTargetPos == null) {
 			mineExcursionTicks = 0;
-			if (mineSearchCooldown > 0) {
+			if (tryPickReachableMineTarget()) {
+				// 已锁定挥镐可达的矿：直接落进下方"够得着即挖"流程，不等冷却
+			} else if (mineSearchCooldown > 0) {
 				mineSearchCooldown--;
 				clearMovementInput();
 				return;
@@ -4429,6 +5083,53 @@ public class DollEntity extends Avatar {
 			return;
 		}
 		// 距离远或需先走到站立点：移动由 applyMineInput 负责
+	}
+
+	/**
+	 * 挖矿的"够得着即挖"探测（对齐砍树 tryPickReachableChopTarget）：每 tick 只查
+	 * 挥镐可达壳内的矿，有就立刻锁定——防止 mineSearchCooldown（"没找到矿"后的 20t 冷却）
+	 * 期间新进入范围的矿被错过（跟随走路路过近矿、或挖完一处矿脉冷却未消时）。
+	 * @return 是否已设目标（够得着，直接走下方"够得着即挖"流程）
+	 */
+	private boolean tryPickReachableMineTarget() {
+		if (!hasStorageSpace()) {
+			return false; // 背包满：交给主流程站立等待清包
+		}
+		BlockPos center = this.blockPosition();
+		BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
+		BlockPos best = null;
+		double bestDistSqr = Double.MAX_VALUE;
+		for (int y = center.getY() - 4; y <= center.getY() + 5; y++) {
+			for (int x = center.getX() - 4; x <= center.getX() + 4; x++) {
+				for (int z = center.getZ() - 4; z <= center.getZ() + 4; z++) {
+					mpos.set(x, y, z);
+					if (!isOreBlock(mpos) || !passesMineEdgeChecks(mpos)) {
+						continue;
+					}
+					if (!hasAdjacentAir(mpos)) {
+						continue; // 埋藏矿：不掘进（与跟随"顺路捡"同口径）
+					}
+					if (!canReachBlockPos(mpos, MINE_REACH_SQR) || !hasLineOfSight(mpos)) {
+						continue; // 只挖当前直接够得着的矿
+					}
+					if (!canPickaxeMine(level().getBlockState(mpos))) {
+						continue; // 镐等级不足：不浪费
+					}
+					double d = mpos.distSqr(center);
+					if (d < bestDistSqr) {
+						bestDistSqr = d;
+						best = mpos.immutable();
+					}
+				}
+			}
+		}
+		if (best == null) {
+			return false;
+		}
+		mineTargetPos = best;
+		mineStandPos = null;
+		mineNavTarget = null;
+		return true;
 	}
 
 	/** 选择挖矿目标：BFS 壳层扫描 + 边缘过滤 + 镐等级分级匹配 + 评分排序，返回最高分矿石。 */
@@ -5418,6 +6119,9 @@ public class DollEntity extends Avatar {
 	 */
 	private int findRangedWeaponInHotbar() {
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
+			if (i == OFFHAND_SLOT) {
+				continue; // 副手格不参与
+			}
 			if (isRangedWeapon(inventory.getItem(i))) {
 				return i;
 			}
@@ -5948,6 +6652,9 @@ public class DollEntity extends Avatar {
 		// 末影人偶优先在全背包查找末影斧作为远程武器（投掷形式）
 		if (isEnderDoll()) {
 			for (int i = 0; i < inventory.getContainerSize(); i++) {
+				if (i == OFFHAND_SLOT) {
+					continue; // 副手格不参与
+				}
 				ItemStack stack = inventory.getItem(i);
 				if (!stack.isEmpty() && stack.getItem() instanceof EnderAxeItem) {
 					return stack;
@@ -5957,6 +6664,9 @@ public class DollEntity extends Avatar {
 		// 下界人偶在全背包查找地狱剑作为远程武器（投掷形式）
 		if (isNetherDoll()) {
 			for (int i = 0; i < inventory.getContainerSize(); i++) {
+				if (i == OFFHAND_SLOT) {
+					continue; // 副手格不参与
+				}
 				ItemStack stack = inventory.getItem(i);
 				if (!stack.isEmpty() && stack.getItem() instanceof NetherSwordItem) {
 					return stack;
@@ -5977,6 +6687,9 @@ public class DollEntity extends Avatar {
 			}
 		}
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
+			if (i == OFFHAND_SLOT) {
+				continue; // 副手格独立渲染，绝不作为主手/使用工具来源（防"双手持斧"重复渲染）
+			}
 			if (i >= DollMode.HOTBAR_SLOT_START && i < DollMode.HOTBAR_SLOT_START + 9) {
 				continue; // 快捷栏已查过
 			}
@@ -5989,9 +6702,21 @@ public class DollEntity extends Avatar {
 		return ItemStack.EMPTY;
 	}
 
-	/** 快捷栏（36-43）查找锄头，返回物品；未找到返回空。 */
+	/** 快捷栏及存储区（副手格除外）查找锄头，返回物品；未找到返回空。 */
 	private ItemStack findHoeStack() {
 		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
+			ItemStack stack = inventory.getItem(i);
+			if (!stack.isEmpty() && stack.getItem() instanceof HoeItem) {
+				return stack;
+			}
+		}
+		for (int i = 0; i < inventory.getContainerSize(); i++) {
+			if (i == OFFHAND_SLOT) {
+				continue; // 副手格不参与
+			}
+			if (i >= DollMode.HOTBAR_SLOT_START && i < DollMode.HOTBAR_SLOT_START + 9) {
+				continue; // 快捷栏已查过
+			}
 			ItemStack stack = inventory.getItem(i);
 			if (!stack.isEmpty() && stack.getItem() instanceof HoeItem) {
 				return stack;
@@ -6010,6 +6735,9 @@ public class DollEntity extends Avatar {
 			}
 		}
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
+			if (i == OFFHAND_SLOT) {
+				continue; // 副手格不参与主手工具/使用
+			}
 			if (i >= DollMode.HOTBAR_SLOT_START && i < DollMode.HOTBAR_SLOT_START + 9) {
 				continue; // 快捷栏已查过
 			}
@@ -6031,7 +6759,9 @@ public class DollEntity extends Avatar {
 		ItemStack best = ItemStack.EMPTY;
 		int bestLevel = -1;
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
-			
+			if (i == OFFHAND_SLOT) {
+				continue; // 副手格不参与
+			}
 			ItemStack stack = inventory.getItem(i);
 			if (!isPickaxe(stack)) {
 				continue;
@@ -6056,7 +6786,9 @@ public class DollEntity extends Avatar {
 		ItemStack best = ItemStack.EMPTY;
 		int bestLevel = Integer.MAX_VALUE;
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
-			
+			if (i == OFFHAND_SLOT) {
+				continue; // 副手格不参与
+			}
 			ItemStack stack = inventory.getItem(i);
 			if (!isPickaxe(stack)) {
 				continue;
@@ -6100,9 +6832,12 @@ public class DollEntity extends Avatar {
 		return 0; // 木/金级：连铁矿石都挖不动
 	}
 
-	/** 人偶物品栏（全45格）查找钓鱼竿，返回物品；未找到返回空。 */
+	/** 人偶物品栏（全45格，副手格除外）查找钓鱼竿，返回物品；未找到返回空。 */
 	private ItemStack findFishingRodStack() {
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
+			if (i == OFFHAND_SLOT) {
+				continue; // 副手格不参与
+			}
 			ItemStack stack = inventory.getItem(i);
 			if (isFishingRod(stack)) {
 				return stack;
@@ -7676,7 +8411,12 @@ public class DollEntity extends Avatar {
 			.add(Attributes.MOVEMENT_SPEED, 0.1)
 			.add(Attributes.ATTACK_DAMAGE, 1.0)
 			.add(Attributes.FOLLOW_RANGE, 32.0)
-			.add(Attributes.ATTACK_KNOCKBACK);
+			.add(Attributes.ATTACK_KNOCKBACK)
+			// 26.2 水移效率：默认 0(范围 0~1)。人偶掉进自己放的 1 格深水井/任何浅水时会漂浮且
+			// 在水中几乎无水平推力(vel≈0)，既到不了岸沿、也触发不了原版 jumpOutOfFluid 自动上台阶，
+			// 从而永久卡死。置为 1.0 使人偶在水里有正常水平移动能力 → 能游到岸沿，
+			// 由原版 jumpOutOfFluid(水中贴壁自动抬升 0.3)+auto-step 登岸。这是根治，非逐 tick 强推。
+			.add(Attributes.WATER_MOVEMENT_EFFICIENCY, 1.0);
 	}
 
 	/**
