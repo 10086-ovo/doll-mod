@@ -11,7 +11,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * 下界/海洋/森林人偶安抚光环 — 索敌层拦截（等价创造模式机制）。
+ * 下界/海洋/末影人偶安抚光环 — 索敌层拦截（等价创造模式机制）。
  * <p>
  * 创造模式玩家不被攻击的核心是 {@code Player.canBeSeenAsEnemy()} 返回 false，
  * 导致 {@code Mob.canAttack(player)} 返回 false，所有索敌路径无法将玩家设为目标。
@@ -20,17 +20,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * 效果等价于"目标对该类生物不可见为敌人"——仇恨无法建立，无需每 tick 清除。
  * <p>
  * 已有遗留仇恨（Mixin 生效前 / 被 alertOthers 等非 canAttack 路径设置）
- * 由 {@link DollEntity#applyNetherPacifyAura()} / {@link DollEntity#applySeaPacifyAura()}
- * 低频清理。
+ * 由对应天赋类的低频清理光环处理（{@code tickAura}：下界/海洋/末影各自按生物类型清理）。
  * <p>
  * 注意：森林人偶<b>不</b>在此拦截——其"敌怪安抚（仇恨豁免）"天赋已被移除，
- * 仅保留 {@link DollEntity#applyForestVineAura()} 的藤蔓缠绕减速（不阻止仇恨）。
+ * 仅保留藤蔓缠绕减速（不阻止仇恨，见 ForestDollTalent）。
  */
 @Mixin(Mob.class)
 public class MobMixin {
 
 	/**
-	 * 合并下界/海洋安抚光环为单次注入，避免同一方法上两个 @Inject 各执行一次类型匹配。
+	 * 合并下界/海洋/末影安抚光环为单次注入，避免同一方法上多个 @Inject 各执行一次类型匹配。
 	 */
 	@Inject(method = "canAttack(Lnet/minecraft/world/entity/LivingEntity;)Z", at = @At("HEAD"), cancellable = true)
 	private void dollModPacifyAura(LivingEntity target, CallbackInfoReturnable<Boolean> cir) {
@@ -48,6 +47,14 @@ public class MobMixin {
 			if (DollEntity.isSeaDollProtected(target)) {
 				cir.setReturnValue(false);
 			}
+			return;
+		}
+		// 末地敌对生物：检查目标是否被末影人偶保护
+		if (DollEntity.isEndMobType(self.getType())) {
+			if (DollEntity.isEnderDollProtected(target)) {
+				cir.setReturnValue(false);
+			}
+			return;
 		}
 	}
 

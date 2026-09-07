@@ -7,7 +7,7 @@
 		{
 			"type": "text",
 			"title": "Overview",
-			"text": "Hybrid melee/thrown weapon. Attack speed 1.6. Every attack is a guaranteed critical hit (jump-crit sound).\n\n• Melee damage: 9. Can strip logs.\n• Thrown: hold right-click to charge, release to throw. Retrievable.\n• 80% dodge chance while held (main or offhand).\n• Executes mobs below 30% HP.\n\nRepair: gold ingots.\n\nEnder Doll synergy: execute threshold rises from 25% to 55%."
+			"text": "Hybrid melee/thrown weapon. Attack speed 1.6. Melee attacks are guaranteed critical hits (jump-crit sound & particles).\n\n• Melee damage: 10 (netherite-axe tier). Can strip logs.\n• Guaranteed melee crit: final damage ×1.5 (single multiplier, no stacking).\n• Thrown: hold right-click to charge, release to throw. Base damage 10 on hit. Retrievable.\n• 80% dodge chance while held (main or offhand).\n• Executes mobs below 30% HP.\n\nRepair: gold ingots.\n\nThe doll can wield this axe in melee or throw it, and a thrown axe also executes at 30% HP. While a doll wields it, the execute threshold takes the higher of the two values (25% base / 30% axe = 30%)."
 		},
 		{
 			"type": "crafting",

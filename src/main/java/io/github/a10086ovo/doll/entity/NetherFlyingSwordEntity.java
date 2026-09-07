@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 飞行地狱剑 —— 召唤者蓄力召唤的伴生守护飞剑（注册见 DollMod.NETHER_FLYING_SWORD_ENTITY）。
+ * 飞行下界剑 —— 召唤者蓄力召唤的伴生守护飞剑（注册见 DollMod.NETHER_FLYING_SWORD_ENTITY）。
  * <p>
  * 支持玩家与下界人偶作为召唤者（owner 泛化为 {@link LivingEntity}）。
  * 继承 {@link ItemEntity} 复用原版物品载体基建（关闭拾取/合并/重力/老化），

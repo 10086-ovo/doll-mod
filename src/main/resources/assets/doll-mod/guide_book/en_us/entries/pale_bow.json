@@ -1,33 +1,33 @@
 {
-	"name": "Pale Bow",
-	"icon": "doll-mod:pale_bow",
-	"category": "items",
-	"sortnum": 3,
-	"pages": [
-		{
-			"type": "text",
-			"title": "Overview",
-			"text": "Pale Garden-themed bow. 1536 durability (4x vanilla bow). Enchantable (Power, Flame, Punch, Infinity, etc.).\n\nVulnerability effect: arrows apply +50% damage taken for 5s. Stacks with Pale Doll's fear aura (total +100%).\nRepair: resin."
-		},
-		{
-			"type": "text",
-			"title": "Pale Doll Exclusive",
-			"text": "When the Pale Doll uses the Pale Bow:\n\n• No arrows required — fires without ammo\n• Faster draw time\n• Faster arrow velocity"
-		},
-		{
-			"type": "crafting",
-			"title": "Crafting Recipe",
-			"pattern": [
-				" RS",
-				"R S",
-				" RS"
-			],
-			"keys": {
-				"R": "minecraft:resin_brick",
-				"S": "minecraft:string"
-			},
-			"result": "doll-mod:pale_bow",
-			"text": "3 resin bricks + 3 string, arranged like a vanilla bow."
-		}
-	]
+  "name": "Pale Bow",
+  "icon": "doll-mod:pale_bow",
+  "category": "items",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "text",
+      "title": "Overview",
+      "text": "A Pale Garden-themed ranged weapon with higher durability than the vanilla bow.\n\n• Keeps all vanilla bow mechanics: charge to shoot, enchantable (Power, Flame, Punch, Infinity, etc.)\n• Durability 1536 (four times the vanilla bow's 384)\n• Uses any arrow as ammo (same as the vanilla bow)\n\nVulnerability effect\n• Arrow hits apply Vulnerability: +50% damage taken for 5s\n• Works for both the owner and dolls\n• Repeated hits only refresh the duration, do not stack the multiplier\n• If the target is frozen by a Pale Doll's Fear Aura, the two vulnerabilities stack for +100% damage taken in total"
+    },
+    {
+      "type": "text",
+      "title": "Pale Doll Bonus",
+      "text": "When a Pale Doll uses the Pale Bow, it gets the following bonuses:\n\n• No ammo needed: can draw and shoot directly, consuming no ammunition\n• Faster charge: draws to full more quickly\n• Faster arrows: fired arrows fly faster"
+    },
+    {
+      "type": "crafting",
+      "title": "Crafting Recipe",
+      "pattern": [
+        " RS",
+        "R S",
+        " RS"
+      ],
+      "keys": {
+        "R": "minecraft:resin_brick",
+        "S": "minecraft:string"
+      },
+      "result": "doll-mod:pale_bow",
+      "text": "3 resin bricks + 3 string in the same zigzag layout as the vanilla bow. Resin bricks are smelted from resin blocks found in the Pale Garden."
+    }
+  ]
 }

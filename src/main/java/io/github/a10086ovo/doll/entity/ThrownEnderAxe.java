@@ -47,7 +47,7 @@ public class ThrownEnderAxe extends AbstractArrow implements ItemSupplier {
 	private static final EntityDataAccessor<Boolean> ID_FOIL =
 		SynchedEntityData.defineId(ThrownEnderAxe.class, EntityDataSerializers.BOOLEAN);
 
-	private static final float BASE_DAMAGE = 9.0f;
+	private static final float BASE_DAMAGE = 10.0f;
 	private static final float EXECUTE_THRESHOLD = 0.3f;
 
 	private boolean dealtDamage;
@@ -176,8 +176,9 @@ public class ThrownEnderAxe extends AbstractArrow implements ItemSupplier {
 				this.doKnockback(livingTarget, source);
 				this.doPostHurtEffects(livingTarget);
 
-				// 玩家投掷时附带 30% 斩杀
-				if (owner instanceof Player && livingTarget.isAlive() && livingTarget.getHealth() > 0.0f) {
+				// 末影斧自带 30% 斩杀：玩家与人偶投掷均触发（此前仅玩家生效，人偶投掷时 30% 斩杀丢失）
+				if ((owner instanceof Player || owner instanceof DollEntity)
+						&& livingTarget.isAlive() && livingTarget.getHealth() > 0.0f) {
 					float ratio = livingTarget.getHealth() / livingTarget.getMaxHealth();
 					if (ratio <= EXECUTE_THRESHOLD) {
 						// 用有限值斩杀：Float.MAX_VALUE 经伤害链路乘除可能溢出为 Infinity/NaN

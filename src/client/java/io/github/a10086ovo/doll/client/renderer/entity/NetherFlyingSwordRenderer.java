@@ -16,7 +16,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.util.Unit;
 
 /**
- * 飞行地狱剑渲染器 —— 仿 {@link net.minecraft.client.renderer.entity.ThrownTridentRenderer} / 末影斧渲染器。
+ * 飞行下界剑渲染器 —— 仿 {@link net.minecraft.client.renderer.entity.ThrownTridentRenderer} / 末影斧渲染器。
  * <p>
  * 用 {@link NetherFlyingSwordModel} 渲染 3D 剑，模型剑尖沿 +Y。全姿态定向（由实体同步 yaw/pitch/roll）：
  * <ul>

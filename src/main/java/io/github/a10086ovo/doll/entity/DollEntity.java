@@ -11,6 +11,8 @@ import io.github.a10086ovo.doll.mode.DollMode;
 import io.github.a10086ovo.doll.network.payload.DollSnapshot;
 import io.github.a10086ovo.doll.network.payload.UpdateDollSnapshotPayload;
 import io.github.a10086ovo.doll.screen.DollScreenHandler;
+import io.github.a10086ovo.doll.entity.talent.DollTalent;
+import io.github.a10086ovo.doll.entity.talent.DollTalents;
 import net.fabricmc.fabric.api.menu.v1.ExtendedMenuProvider;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.core.BlockPos;
@@ -309,35 +311,32 @@ public class DollEntity extends Avatar {
 
 	// ---- 幽匿人偶音波攻击（WARDEN 变体被动，近战/射手模式均触发） ----
 	// 无距离限制：只要锁定了目标就蓄力发射。4 秒冷却期间不蓄力。
-	private static int SONIC_CHARGE_TICKS = 30;          // 蓄力前摇 1.5 秒（对齐音效长度）
-	private static int SONIC_COOLDOWN_TICKS = 80;       // 发射后冷却 4 秒
-	private static float SONIC_BOOM_DAMAGE = 30.0f;     // 音波伤害（平衡重做：20→30）
-	private static double SONIC_PULL_STRENGTH = 0.15;   // 拉扯强度（距离比例）
-	private int sonicChargeTicks = -1;  // -1 = 不在蓄力
-	private int sonicCooldown = 0;      // 发射后冷却计数
+	// 蓄力/冷却的逐偶实例状态已随技能迁入 WardenDollTalent，常量留在本类供其读取（applyConfig 可调）。
+	public static int SONIC_CHARGE_TICKS = 30;          // 蓄力前摇 1.5 秒（对齐音效长度）
+	public static int SONIC_COOLDOWN_TICKS = 80;       // 发射后冷却 4 秒
+	public static float SONIC_BOOM_DAMAGE = 30.0f;     // 音波伤害（平衡重做：20→30）
+	public static double SONIC_PULL_STRENGTH = 0.15;   // 拉扯强度（距离比例）
 
 	// ---- 下界人偶烈焰弹（NETHER 变体被动，近战/射手模式均触发） ----
 	// 对齐幽匿音波框架：锁定目标 → 无需武器 → 自动发射。
 	// 差异：无蓄力前摇（烈焰人也不蓄力）、低伤害高频、弹道投射物可被遮挡。
-	private static int FIREBALL_COOLDOWN_TICKS = 60;      // 发射后冷却 3 秒
+	// 发射冷却的逐偶实例状态已随技能迁入 NetherDollTalent，常量留在本类供其读取。
+	public static int FIREBALL_COOLDOWN_TICKS = 60;      // 发射后冷却 3 秒
 	/** 烈焰弹伤害（public 供 WitherSkullMixin 引用——原版 onHitEntity 硬编码 8.0f，需 Mixin 替换） */
 	public static float FIREBALL_DAMAGE = 20.0f;         // 烈焰弹伤害
-	private int fireballCooldown = 0;    // 发射后冷却计数
 
-	// ---- 末影人偶龙息喷吐 + 瞬移处决（ENDER 变体被动，近战/射手模式均触发） ----
-	// 龙息喷吐：发射 WitherSkull（和下界人偶统一投射物），命中后生成龙息云造成范围持续伤害。3 秒冷却。
+	// ---- 末影人偶末影弹 + 瞬移处决（ENDER 变体被动，近战/射手模式均触发） ----
+	// 末影弹：发射 WitherSkull（和下界人偶统一投射物），命中后按命中点做 3 格范围爆破。3 秒冷却。
 	//   对齐下界烈焰弹框架：锁定目标 → 无需武器 → 自动发射 → WitherSkull 投射物。
-	//   差异：命中效果不同——下界点燃 5 秒，末影生成龙息云（AreaEffectCloud 即时伤害 II）。
-	//   WitherSkullMixin 按 owner 变体区分行为：NETHER→燃烧，ENDER→龙息云。
+	//   与下界唯一差异在命中特效：下界点燃 5 秒，末影不点燃（仅范围伤害，无龙息云）。
+	//   WitherSkullMixin 按 owner 变体区分行为：NETHER→点燃，ENDER→仅爆破。
 	//   渲染端按变体区分贴图：NETHER→nether_doll.png，ENDER→ender_doll.png。
-	// 瞬移处决：目标血量 ≤ EXECUTE_THRESHOLD 时瞬移过去直接斩杀。60 秒冷却。
-	//   原版末影人瞬移机制 + 斩杀判定，处决后瞬移回原位。
-	private static int BREATH_COOLDOWN_TICKS = 60;        // 龙息喷吐冷却 3 秒
-	private static int EXECUTE_COOLDOWN_TICKS = 1200;     // 瞬移处决冷却 60 秒
-	private static float EXECUTE_HEALTH_THRESHOLD = 0.25f; // 目标血量百分比阈值（25%）
-	private static float EXECUTE_HEALTH_THRESHOLD_AXE = 0.55f; // 持末影斧时斩杀线提升至 55%（基础25%+斧30%）
-	private int breathCooldown = 0;     // 龙息喷吐冷却计数
-	private int executeCooldown = 0;    // 瞬移处决冷却计数
+	// 瞬移处决：目标血量 ≤ 斩杀线时**原地立即斩杀**，无冷却（天赋向补刀，非特殊技能）。
+	//   已去掉「瞬移到敌后/停顿演出/瞬移回归」等瞬移表现；闪避瞬移（受击被动）保留。
+	//   自制 BOSS（野生幽匿人偶）豁免。实现已迁入 EnderDollTalent.tickCombat，此处仅保留常量供其读取。
+	public static int BREATH_COOLDOWN_TICKS = 60;        // 末影弹发射冷却 3 秒——供 EnderDollTalent 读取
+	public static float EXECUTE_HEALTH_THRESHOLD = 0.25f; // 目标血量百分比阈值（25%）——供 EnderDollTalent 读取
+	public static float EXECUTE_HEALTH_THRESHOLD_AXE = 0.30f; // 持末影斧时斩杀线取最大值 30%——供 EnderDollTalent 读取
 
 	// 末影人偶闪避（ENDER 变体受击被动）：收到"攻击类伤害"时按来源类型完全免伤并瞬移躲避。
 	// 近战（来源实体非投射物）67% 概率；投射物（arrows/trident/wither skull 等）100% 概率。
@@ -349,13 +348,11 @@ public class DollEntity extends Avatar {
 	// ---- 海洋人偶激光蓄力（SEA 变体被动，近战/射手模式均触发） ----
 	// 对齐原版守卫者：蓄力 → 视线内 hitscan → 魔法伤害（绕护甲）。
 	// 差异：粒子光束（不创建实体），蓄力 3 秒，冷却 2 秒，高频低伤法师定位。
-	private static int LASER_CHARGE_TICKS = 30;         // 蓄力前摇 1.5 秒（原 3 秒，缩短更跟手）
-	private static int LASER_COOLDOWN_TICKS = 20;       // 发射后冷却 1 秒（原 2 秒，呼应高频低伤法师）
-	private static float LASER_DAMAGE = 20.0f;          // 魔法伤害（绕护甲）
-	private static double LASER_RANGE = 16.0;           // 最大射程
-	private static double LASER_RANGE_SQR = LASER_RANGE * LASER_RANGE;
-	private int laserChargeTicks = -1;  // -1 = 不在蓄力
-	private int laserCooldown = 0;      // 发射后冷却计数
+	public static int LASER_CHARGE_TICKS = 30;         // 蓄力前摇 1.5 秒（原 3 秒，缩短更跟手）——供 SeaDollTalent 读取
+	public static int LASER_COOLDOWN_TICKS = 20;       // 发射后冷却 1 秒（原 2 秒，呼应高频低伤法师）——供 SeaDollTalent 读取
+	public static float LASER_DAMAGE = 20.0f;          // 魔法伤害（绕护甲）——供 SeaDollTalent 读取
+	public static double LASER_RANGE = 16.0;           // 最大射程
+	public static double LASER_RANGE_SQR = LASER_RANGE * LASER_RANGE;  // 最大射程平方
 
 	/** 召回登记降频：每 100 tick 记录一次位置，减少 HashMap 写入开销。 */
 	private int recallRegistryCooldown = 0;
@@ -363,9 +360,6 @@ public class DollEntity extends Avatar {
 	// ---- 海洋人偶水中垂直跟随（SEA 专属，仅 isInWater 时生效） ----
 	private static double SEA_DIVE_SPEED = 0.18;        // 下潜竖直速度（注入 deltaMovement.y）
 	private static double SEA_VERTICAL_DEADZONE = 0.25; // 竖直跟随死区，避免抖动
-	// 水下速掘的急迫等级：水中（非地面）挖掘默认 ÷5，需 amp≥20 抵消；取 24（急迫XXV）
-	// → 游泳时 ≈1.16×陆地、站海底 ≈5.8×陆地，达成"水中≈陆地甚至更快"。
-	private static int SEA_HASTE_LEVEL = 24;            // HASTE amplifier（0=急迫I），即急迫 XXV
 
 	// ---- 近战模式（MELEE）：自主搜寻并攻击附近敌对生物 ----
 	// 搜寻半径刻意收紧：寻路是轻量网格 A*，过远目标（尤其隔墙）容易"干瞪眼"——
@@ -671,7 +665,6 @@ public class DollEntity extends Avatar {
 
 		// ---- 末影 ----
 		BREATH_COOLDOWN_TICKS = c.ender.breathCooldownTicks;
-		EXECUTE_COOLDOWN_TICKS = c.ender.executeCooldownTicks;
 		EXECUTE_HEALTH_THRESHOLD = c.ender.executeHealthThreshold;
 		EXECUTE_HEALTH_THRESHOLD_AXE = c.ender.executeHealthThresholdAxe;
 		ENDER_DODGE_CHANCE = c.ender.dodgeChance;
@@ -686,7 +679,6 @@ public class DollEntity extends Avatar {
 		LASER_RANGE_SQR = LASER_RANGE * LASER_RANGE;
 		SEA_DIVE_SPEED = c.sea.diveSpeed;
 		SEA_VERTICAL_DEADZONE = c.sea.verticalDeadzone;
-		SEA_HASTE_LEVEL = c.sea.hasteLevel;
 
 		// ---- 耕种 ----
 		FARM_SEARCH_RANGE = c.farm.searchRange;
@@ -853,7 +845,7 @@ public class DollEntity extends Avatar {
 				}
 			}
 			// 切换到近战模式时，检查物品栏是否有近战武器
-			// 幽匿/下界/末影人偶可无武器战斗（音波/烈焰弹/龙息兜底），跳过武器检查
+			// 幽匿/下界/末影人偶可无武器战斗（音波/烈焰弹/末影弹兜底），跳过武器检查
 			if (modeSlot08 == DollMode.MELEE.getIndex() && current != modeSlot08
 				&& !hasInnateCombatAbility()) {
 				int weaponSlot = findMeleeWeaponInHotbar();
@@ -868,7 +860,7 @@ public class DollEntity extends Avatar {
 				}
 			}
 			// 切换到射手模式时，检查物品栏是否有弓或弩
-			// 幽匿/下界/末影人偶可无武器战斗（音波/烈焰弹/龙息兜底），跳过武器检查
+			// 幽匿/下界/末影人偶可无武器战斗（音波/烈焰弹/末影弹兜底），跳过武器检查
 			if (modeSlot08 == DollMode.RANGED.getIndex() && current != modeSlot08
 				&& !hasInnateCombatAbility()) {
 				int weaponSlot = findRangedWeaponInHotbar();
@@ -1096,7 +1088,25 @@ public class DollEntity extends Avatar {
 		return null;
 	}
 
-	@Override
+	// ---- 变体天赋策略（常驻药效/光环钩子；按 DollVariant 惰性创建，每只人偶独立实例）----
+	private DollTalent cachedTalent;
+	private DollVariant cachedTalentVariant;
+
+	private DollTalent talent() {
+		DollVariant variant = getDollVariant();
+		if (cachedTalent == null || cachedTalentVariant != variant) {
+			cachedTalent = DollTalents.create(variant);
+			cachedTalentVariant = variant;
+		}
+		return cachedTalent;
+	}
+
+	/** 光环中心登记表维护（引擎职责）：pale/nether 变体每 tick 更新，其余变体移除自身条目。 */
+	private void tickAuraCenterRegistration() {
+		updatePaleAuraCenter();
+		updateNetherAuraCenter();
+	}
+
 	public void tick() {
 		boolean serverSide = !this.level().isClientSide() && this.isAlive();
 		float healthBefore = serverSide ? getHealth() : 0;
@@ -1127,12 +1137,13 @@ public class DollEntity extends Avatar {
 		if (serverSide) {
 			tickAutoJump();
 			tickIdleAndHealth(wasIdle, healthBefore);
-			tickPermanentEffects();
+			talent().tickPermanentEffects(this);
 			tryAutoEat();
 			int modeIdx = getActiveMode();
 			updateModeMinds(modeIdx);
 			tickSpecialAttacks(modeIdx);
-			tickVariantAuras();
+			tickAuraCenterRegistration();
+			talent().tickAura(this);
 			// 登记当前位置，供"刷怪蛋右键召回"在人偶区块未加载时定位（降频至每 100 tick）
 			if (recallRegistryCooldown-- <= 0) {
 				recallRegistryCooldown = 100;
@@ -1222,63 +1233,6 @@ public class DollEntity extends Avatar {
 	}
 
 	/**
-	 * 永久药效（每 tick 补漏，保证持久）：
-	 * 普通工人按阶缩放；特殊变体统一基线；驯服幽匿 apex。
-	 */
-	private void tickPermanentEffects() {
-		if (getDollVariant() == DollVariant.WARDEN) {
-			// 驯服幽匿：恢复VI + 抗性IV + 抗火（击退免疫由属性提供）
-			if (!hasEffect(MobEffects.REGENERATION))
-				addEffect(new MobEffectInstance(MobEffects.REGENERATION, -1, 5, false, false));
-			if (!hasEffect(MobEffects.RESISTANCE))
-				addEffect(new MobEffectInstance(MobEffects.RESISTANCE, -1, 3, false, false));
-			if (!hasEffect(MobEffects.FIRE_RESISTANCE))
-				addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, -1, 0, false, false));
-		} else if (getDollVariant() == DollVariant.GUIDE) {
-			// 向导：恢复IV + 抗性II；无抗火（与锁定 spec 一致）
-			if (!hasEffect(MobEffects.REGENERATION))
-				addEffect(new MobEffectInstance(MobEffects.REGENERATION, -1, 3, false, false));
-			if (!hasEffect(MobEffects.RESISTANCE))
-				addEffect(new MobEffectInstance(MobEffects.RESISTANCE, -1, 1, false, false));
-		} else if (getDollVariant() == DollVariant.PALE
-				|| getDollVariant() == DollVariant.NETHER
-				|| getDollVariant() == DollVariant.ENDER
-				|| getDollVariant() == DollVariant.SEA
-				|| getDollVariant() == DollVariant.FOREST) {
-			// 特殊变体统一基线：恢复IV + 抗性II；抗火仅下界/海洋
-			if (!hasEffect(MobEffects.REGENERATION))
-				addEffect(new MobEffectInstance(MobEffects.REGENERATION, -1, 3, false, false));
-			if (!hasEffect(MobEffects.RESISTANCE))
-				addEffect(new MobEffectInstance(MobEffects.RESISTANCE, -1, 1, false, false));
-			if (getDollVariant() == DollVariant.NETHER || getDollVariant() == DollVariant.SEA) {
-				if (!hasEffect(MobEffects.FIRE_RESISTANCE))
-					addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, -1, 0, false, false));
-			}
-		} else {
-			// 普通工人：按阶缩放（5 阶封顶 100HP / 恢复IV / 抗性II）
-			int level = getDollLevel();
-			if (level >= 5) {
-				if (!hasEffect(MobEffects.REGENERATION))
-					addEffect(new MobEffectInstance(MobEffects.REGENERATION, -1, 3, false, false));
-				if (!hasEffect(MobEffects.RESISTANCE))
-					addEffect(new MobEffectInstance(MobEffects.RESISTANCE, -1, 1, false, false));
-			} else if (level >= 4) {
-				if (!hasEffect(MobEffects.REGENERATION))
-					addEffect(new MobEffectInstance(MobEffects.REGENERATION, -1, 2, false, false));
-				if (!hasEffect(MobEffects.RESISTANCE))
-					addEffect(new MobEffectInstance(MobEffects.RESISTANCE, -1, 0, false, false));
-			} else if (level >= 3) {
-				if (!hasEffect(MobEffects.REGENERATION))
-					addEffect(new MobEffectInstance(MobEffects.REGENERATION, -1, 1, false, false));
-			} else if (level >= 2) {
-				if (!hasEffect(MobEffects.REGENERATION))
-					addEffect(new MobEffectInstance(MobEffects.REGENERATION, -1, 0, false, false));
-			}
-			// level 1（一阶）：不施加永久药水
-		}
-	}
-
-	/**
 	 * 决策逻辑：跟随和模式并存。跟随负责传送，模式负责攻击。
 	 */
 	private void updateModeMinds(int modeIdx) {
@@ -1305,8 +1259,19 @@ public class DollEntity extends Avatar {
 	}
 
 	/**
+	 * 当前战斗模式的目标（MELEE → meleeTarget，RANGED → rangedTarget）。
+	 * 供各变体天赋的战斗技能（tickCombat）读取；语义同原各 handleXxx 内的内联取目标。
+	 */
+	public LivingEntity getCombatTarget() {
+		return getActiveMode() == DollMode.MELEE.getIndex() ? meleeTarget : rangedTarget;
+	}
+
+	/**
 	 * 特殊攻击：箭矢追踪、掉落物拾取、变体专属攻击技能。
 	 * 近战/射手模式下锁定目标后自动释放。
+	 * <p>
+	 * 战斗技能全部经天赋分发到各自 *DollTalent.tickCombat：
+	 * WARDEN（音爆）/NETHER（烈焰弹）/ENDER（末影弹+处决）/SEA（激光）均已迁入对应天赋。
 	 */
 	private void tickSpecialAttacks(int modeIdx) {
 		trackArrows();
@@ -1314,46 +1279,8 @@ public class DollEntity extends Avatar {
 
 		boolean combatMode = modeIdx == DollMode.MELEE.getIndex() || modeIdx == DollMode.RANGED.getIndex();
 
-		if (getDollVariant() == DollVariant.WARDEN && combatMode) {
-			handleWardenSonicBoom();
-		}
-		if (getDollVariant() == DollVariant.NETHER && combatMode) {
-			handleNetherFireball();
-		}
-		if (getDollVariant() == DollVariant.ENDER && combatMode) {
-			handleEnderBreath();
-			handleEnderExecute();
-		}
-		if (getDollVariant() == DollVariant.SEA && combatMode) {
-			handleSeaLaser();
-		}
-	}
-
-	/**
-	 * 变体光环效果：苍白恐惧、下界安抚/灼烧、海洋安抚/玩家增益、森林藤蔓/动物/回血/标记、向导引导。
-	 */
-	private void tickVariantAuras() {
-		if (getDollVariant() == DollVariant.PALE) {
-			updatePaleAuraCenter();
-			applyFearAura();
-		}
-		if (getDollVariant() == DollVariant.NETHER) {
-				updateNetherAuraCenter();
-				applyNetherPacifyAura();
-				applyNetherBurnAura();
-			}
-		if (getDollVariant() == DollVariant.SEA) {
-			applySeaPacifyAura();
-			applySeaPlayerAura();
-		}
-		if (getDollVariant() == DollVariant.FOREST) {
-			applyForestVineAura();
-			applyForestAnimalAttract();
-			applyForestRegenAura();
-			applyForestMarkAura();
-		}
-		if (getDollVariant() == DollVariant.GUIDE) {
-			applyGuideAura();
+		if (combatMode) {
+			talent().tickCombat(this);
 		}
 	}
 
@@ -1517,7 +1444,7 @@ public class DollEntity extends Avatar {
 	 * 用于人偶看向玩家等场景——当玩家与人偶错开 Y 轴时，人偶会仰头/低头
 	 * 看向玩家，而不是只转动身体方向。
 	 */
-	protected void smoothLookAt(double x, double y, double z) {
+	public void smoothLookAt(double x, double y, double z) {
 		smoothFaceTowards(x, z);
 		double dx = x - this.getX();
 		double dz = z - this.getZ();
@@ -1836,7 +1763,7 @@ public class DollEntity extends Avatar {
 				applyOwnerGravity(owner);
 				return;
 			}
-			// 幽匿/下界/末影人偶无近战武器：跟随时也使用风筝移动，音波/烈焰弹/龙息负责伤害
+			// 幽匿/下界/末影人偶无近战武器：跟随时也使用风筝移动，音波/烈焰弹/末影弹负责伤害
 			if (mode == DollMode.MELEE.getIndex()
 				&& (isWardenDoll() || isNetherDoll() || isEnderDoll() || isSeaDoll()) && getItemBySlot(EquipmentSlot.MAINHAND).isEmpty()) {
 				applyWardenKitingInput(target);
@@ -2089,7 +2016,7 @@ public class DollEntity extends Avatar {
 		if (hit && this.getOwnerUuid() != null) {
 			target.setLastHurtByPlayer(this.getOwnerUuid(), 100);
 		}
-		// 下界人偶火焰附加：近战命中后点燃目标 8 秒；手持地狱剑翻倍 16 秒（灼烧伤害×2）
+		// 下界人偶火焰附加：近战命中后点燃目标 8 秒；手持下界剑翻倍 16 秒（灼烧伤害×2）
 			if (hit && getDollVariant() == DollVariant.NETHER) {
 				target.igniteForSeconds(hasNetherSwordEquipped() ? 16.0f : 8.0f);
 			}
@@ -2131,7 +2058,7 @@ public class DollEntity extends Avatar {
 			clearMovementInput();
 			return;
 		}
-		// 幽匿/下界/末影人偶无近战武器：使用风筝移动（与射手模式一致的拉扯），音波/烈焰弹/龙息负责伤害
+		// 幽匿/下界/末影人偶无近战武器：使用风筝移动（与射手模式一致的拉扯），音波/烈焰弹/末影弹负责伤害
 		if ((isWardenDoll() || isNetherDoll() || isEnderDoll() || isSeaDoll()) && getItemBySlot(EquipmentSlot.MAINHAND).isEmpty()) {
 			applyWardenKitingInput(meleeTarget);
 			return;
@@ -2180,7 +2107,7 @@ public class DollEntity extends Avatar {
 			}
 		}
 		if (meleeTarget != null && canStrikeNow(meleeTarget)) {
-			// 幽匿/下界/末影人偶无近战武器时不进行近战攻击，仅保留目标供音波/烈焰弹/龙息使用
+			// 幽匿/下界/末影人偶无近战武器时不进行近战攻击，仅保留目标供音波/烈焰弹/末影弹使用
 			if (!((isWardenDoll() || isNetherDoll() || isEnderDoll() || isSeaDoll()) && getItemBySlot(EquipmentSlot.MAINHAND).isEmpty())) {
 				attackTarget(meleeTarget);
 			}
@@ -2234,237 +2161,9 @@ public class DollEntity extends Avatar {
 	}
 
 	// ------------------------------------------------------------------
-	// 幽匿人偶音波攻击（WARDEN 变体被动）
+	// 幽匿人偶音波攻击（WARDEN 变体被动）：已迁入 WardenDollTalent.tickCombat
+	// （蓄力/冷却为天赋逐偶实例态；常量 SONIC_* 仍在 DollEntity，供 applyConfig 调节）
 	// ------------------------------------------------------------------
-
-	/**
-	 * 音波攻击决策：近战/射手模式下有目标时被动蓄力发射音波。
-	 * 无距离限制——只要锁定目标就蓄力，4 秒冷却期间不蓄力。
-	 * 蓄力 1.5 秒后发射：音爆音效 + 粒子 + 拉扯目标 + 5 点伤害。
-	 */
-	private void handleWardenSonicBoom() {
-		if (!(this.level() instanceof ServerLevel serverLevel)) return;
-
-		// 冷却中
-		if (sonicCooldown > 0) {
-			sonicCooldown--;
-			return;
-		}
-
-		// 获取当前模式的目标
-		LivingEntity target = getActiveMode() == DollMode.MELEE.getIndex() ? meleeTarget : rangedTarget;
-		if (target == null || !target.isAlive() || target.isRemoved()) {
-			sonicChargeTicks = -1;
-			return;
-		}
-
-		// 开始蓄力
-		if (sonicChargeTicks < 0) {
-			sonicChargeTicks = 0;
-			serverLevel.playSound(null, this.getX(), this.getY(), this.getZ(),
-				SoundEvents.WARDEN_SONIC_CHARGE, this.getSoundSource(), 3.0f, 1.0f);
-		}
-
-		// 蓄力中
-		sonicChargeTicks++;
-		if (sonicChargeTicks >= SONIC_CHARGE_TICKS) {
-			fireSonicBoom(target);
-			sonicChargeTicks = -1;
-			sonicCooldown = SONIC_COOLDOWN_TICKS;
-		}
-	}
-
-	/**
-	 * 发射音波攻击：粒子 + 拉扯目标 + 伤害。
-	 * 音效（蓄力阶段 WARDEN_SONIC_CHARGE）已在蓄力开始时播放，
-	 * 这里补发射瞬间的 WARDEN_SONIC_BOOM 音效。
-	 */
-	private void fireSonicBoom(LivingEntity target) {
-		if (!(this.level() instanceof ServerLevel serverLevel)) return;
-
-		double dx = this.getX() - target.getX();
-		double dz = this.getZ() - target.getZ();
-		double distance = Math.sqrt(dx * dx + dz * dz);
-		if (distance < 0.5) return;
-
-		// 音爆音效（发射瞬间，在目标位置播放）
-		serverLevel.playSound(null, target.getX(), target.getY(), target.getZ(),
-			SoundEvents.WARDEN_SONIC_BOOM, this.getSoundSource(), 3.0f, 1.0f);
-
-		// 粒子：从人偶到目标画一条音波线
-		double stepX = dx / 10.0;
-		double stepZ = dz / 10.0;
-		for (int i = 0; i < 10; i++) {
-			double px = target.getX() + stepX * i;
-			double pz = target.getZ() + stepZ * i;
-			serverLevel.sendParticles(
-				ParticleTypes.SONIC_BOOM,
-				px, target.getY() + 0.5, pz,
-				1, 0, 0, 0, 0);
-		}
-		// 目标位置额外爆一下
-		serverLevel.sendParticles(
-			ParticleTypes.SONIC_BOOM,
-			target.getX(), target.getY() + 0.5, target.getZ(),
-			5, 0.3, 0.3, 0.3, 0);
-
-		// 拉扯目标：向人偶方向拉近
-		double pull = distance * SONIC_PULL_STRENGTH;
-		target.setDeltaMovement(
-			dx / distance * pull,
-			0.3,
-			dz / distance * pull
-		);
-		target.hurtMarked = true;
-
-		// 造成伤害（穿甲音波，对标原版 Warden sonicBoom）
-		target.hurtServer(serverLevel, this.damageSources().sonicBoom(this), SONIC_BOOM_DAMAGE);
-
-		// 音波命中后同样补设 lastHurtByPlayer，使经验/稀有掉落正常
-		if (this.getOwnerUuid() != null) {
-			target.setLastHurtByPlayer(this.getOwnerUuid(), 100);
-		}
-
-		// 施加缓慢 V（100 tick = 5 秒，覆盖到下次音波冷却结束）
-		target.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 100, 4));
-	}
-
-	// ------------------------------------------------------------------
-	// 海洋人偶激光蓄力（SEA 变体被动）
-	// ------------------------------------------------------------------
-
-	/**
-	 * 激光蓄力决策：近战/射手模式下锁定目标后自动蓄力发射。
-	 * <p>
-	 * 对齐原版守卫者：蓄力期间需要维持视线，视线中断则重置蓄力。
-	 * 蓄力 1.5 秒 → 发射 hitscan 光束 → 魔法伤害（绕护甲）→ 1 秒冷却。
-	 * <p>
-	 * 与其他变体的差异：
-	 * <ul>
-	 *   <li>幽匿音波：hitscan，高伤(20) + 拉扯，无视线要求，4 秒冷却</li>
-	 *   <li>下界/末影：投射物，弹道可被遮挡</li>
-	 *   <li>海洋激光：hitscan，中伤(9) + 魔法绕甲，需视线，1 秒冷却 = 高频低伤法师</li>
-	 * </ul>
-	 */
-	private void handleSeaLaser() {
-		if (!(this.level() instanceof ServerLevel serverLevel)) return;
-
-		// 冷却中
-		if (laserCooldown > 0) {
-			laserCooldown--;
-			return;
-		}
-
-		// 获取当前模式的目标
-		LivingEntity target = getActiveMode() == DollMode.MELEE.getIndex() ? meleeTarget : rangedTarget;
-		if (target == null || !target.isAlive() || target.isRemoved()) {
-			laserChargeTicks = -1;
-			return;
-		}
-
-		// 射程检查
-		if (this.distanceToSqr(target) > LASER_RANGE_SQR) {
-			laserChargeTicks = -1;
-			return;
-		}
-
-		// 视线检查：蓄力期间必须维持视线，断了就重置（原版守卫者核心机制）
-		if (!hasLineOfSight(target)) {
-			laserChargeTicks = -1;
-			return;
-		}
-
-		// 开始蓄力
-		if (laserChargeTicks < 0) {
-			laserChargeTicks = 0;
-			// 蓄力开始：渐强压迫感音效（WARDEN_SONIC_CHARGE 音量 2.5），给玩家"正在蓄力"的张力预告
-			serverLevel.playSound(null, this.getX(), this.getY(), this.getZ(),
-				SoundEvents.WARDEN_SONIC_CHARGE, this.getSoundSource(), 2.5f, 1.0f);
-		}
-
-		// 蓄力中：每 2 tick 画一条 eye→target 瞄准线（鹦鹉螺粒子），并在目标处加大电火花迸发，
-		// 让玩家清晰看到"正在锁定"，补足原版守卫者蓄力阶段缺乏的视觉张力。
-		laserChargeTicks++;
-		if (laserChargeTicks % 2 == 0) {
-			double ex = this.getX();
-			double ey = this.getY() + this.getEyeHeight();
-			double ez = this.getZ();
-			double tx = target.getX();
-			double ty = target.getY() + target.getEyeHeight();
-			double tz = target.getZ();
-			int lineSteps = 12;
-			for (int i = 0; i <= lineSteps; i++) {
-				double t = i / (double) lineSteps;
-				serverLevel.sendParticles(ParticleTypes.NAUTILUS,
-					ex + (tx - ex) * t, ey + (ty - ey) * t, ez + (tz - ez) * t,
-					1, 0.04, 0.04, 0.04, 0.0);
-			}
-			serverLevel.sendParticles(ParticleTypes.ELECTRIC_SPARK,
-				tx, ty, tz, 6, 0.4, 0.4, 0.4, 0.08);
-		}
-
-		// 蓄力完成
-		if (laserChargeTicks >= LASER_CHARGE_TICKS) {
-			fireSeaLaser(serverLevel, target);
-			laserChargeTicks = -1;
-			laserCooldown = LASER_COOLDOWN_TICKS;
-		}
-	}
-
-	/**
-	 * 发射激光：粒子光束 + 魔法伤害。
-	 * <p>
-	 * hitscan 机制——无投射物，视线内必定命中（和幽匿音波一致）。
-	 * 伤害类型为 indirectMagic，绕过护甲（原版守卫者行为）。
-	 * 粒子用 NAUTILUS（海洋主题）画光束线，ELECTRIC_SPARK 在目标位置爆开。
-	 */
-	private void fireSeaLaser(ServerLevel serverLevel, LivingEntity target) {
-		double dx = target.getX() - this.getX();
-		double dy = (target.getY() + target.getEyeHeight()) - (this.getY() + this.getEyeHeight());
-		double dz = target.getZ() - this.getZ();
-		double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-		if (distance < 0.5) return;
-
-		// 光束粒子：从人偶眼睛到目标画一条 NAUTILUS 粒子线（每步 3 颗 + END_ROD 亮芯），
-		// 加密并加亮芯后肉眼清晰可见，给发射瞬间充足张力。
-		int steps = Math.max(8, (int) (distance * 1.5));
-		double stepX = dx / steps;
-		double stepY = dy / steps;
-		double stepZ = dz / steps;
-		for (int i = 0; i < steps; i++) {
-			double px = this.getX() + stepX * i;
-			double py = this.getY() + this.getEyeHeight() + stepY * i;
-			double pz = this.getZ() + stepZ * i;
-			serverLevel.sendParticles(ParticleTypes.NAUTILUS, px, py, pz, 3, 0.05, 0.05, 0.05, 0.0);
-			serverLevel.sendParticles(ParticleTypes.END_ROD, px, py, pz, 1, 0.0, 0.0, 0.0, 0.0);
-		}
-
-		// 目标位置电火花大迸发
-		serverLevel.sendParticles(ParticleTypes.ELECTRIC_SPARK,
-			target.getX(), target.getY() + target.getEyeHeight(), target.getZ(),
-			16, 0.5, 0.5, 0.5, 0.12);
-
-		// 发射瞬间补响亮音效（原版守卫者激光命中的"啪"一声，vol 3.0 给张力收束）
-		serverLevel.playSound(null, this.getX(), this.getY(), this.getZ(),
-			SoundEvents.GUARDIAN_ATTACK, this.getSoundSource(), 3.0f, 1.0f);
-
-		// 造成魔法伤害（绕护甲，对齐原版守卫者 indirectMagic）
-		// 海洋人偶甲——海洋人偶穿戴海洋甲时激光伤害按件数提升（每件 +10%，最高 +40%）；非海洋人偶不受影响
-		float laserDamage = LASER_DAMAGE;
-		if (this.isSeaDoll()) {
-			int pieces = SeaArmorItem.countSeaArmor(this);
-			if (pieces > 0) {
-				laserDamage = (float) (laserDamage * (1.0 + 0.10 * pieces));
-			}
-		}
-		target.hurtServer(serverLevel,
-			this.damageSources().indirectMagic(this, this), laserDamage);
-
-		// 补设 lastHurtByPlayer，使经验/稀有掉落正常
-		if (this.getOwnerUuid() != null) {
-			target.setLastHurtByPlayer(this.getOwnerUuid(), 100);
-		}
-	}
 
 	// ------------------------------------------------------------------
 	// 下界人偶烈焰弹（NETHER 变体被动）
@@ -2474,174 +2173,11 @@ public class DollEntity extends Avatar {
 	 * 烈焰弹决策：近战/射手模式下有目标时自动发射 WitherSkull（凋灵骷髅头颅弹）。
 	 * 无蓄力前摇（对齐原版烈焰人/凋灵行为），3 秒冷却。
 	 * 弹道投射物——可被方块遮挡，与音波的"必定命中"形成差异。
-	 * 命中后施加凋零效果（普通 10 秒 / 困难 40 秒 Wither I），伤害由 WitherSkullMixin 替换为 13。
+	 * 命中效果由 WitherSkullMixin 定制：直接命中伤害替换为 20（FIREBALL_DAMAGE）、
+	 * 命中点 3 格内范围伤害亦为 20、凋零效果替换为点燃 5 秒（持下界剑翻倍 10 秒）。
 	 */
-	private void handleNetherFireball() {
-		if (!(this.level() instanceof ServerLevel serverLevel)) return;
 
-		// 冷却中
-		if (fireballCooldown > 0) {
-			fireballCooldown--;
-			return;
-		}
-
-		// 获取当前模式的目标
-		LivingEntity target = getActiveMode() == DollMode.MELEE.getIndex() ? meleeTarget : rangedTarget;
-		if (target == null || !target.isAlive() || target.isRemoved()) {
-			return;
-		}
-
-		fireWitherSkull(serverLevel, target);
-		fireballCooldown = FIREBALL_COOLDOWN_TICKS;
-	}
-
-	/**
-	 * 发射凋灵骷髅头颅弹：创建 WitherSkull 并朝目标方向射出。
-	 * <p>
-	 * 使用 WitherSkull 而非 SmallFireball——WitherSkull 有专属渲染器（投射物尺寸），
-	 * 头颅模型在空中飞行视觉效果远优于 SmallFireball 的 item 级渲染。
-	 * <p>
-	 * 原版凋灵发射逻辑：normalize 方向向量 → WitherSkull 构造（内部 assignDirectionalMovement
-	 * 用 accelerationPower 缩放为速度）→ addFreshEntity。
-	 * <p>
-	 * WitherSkull 的 onHit 会产生爆炸破坏方块——由 WitherSkullMixin 的 @Redirect 禁用。
-	 * WitherSkull 的 onHitEntity 硬编码 8.0f 伤害——由 WitherSkullMixin 的 @Redirect 替换为 13。
-	 * 凋零效果（Wither I）由 WitherSkullMixin 的 @Redirect 替换为燃烧 5 秒，和下界主题契合。
-	 */
-	private void fireWitherSkull(ServerLevel serverLevel, LivingEntity target) {
-		// 方向向量：从人偶眼睛高度指向目标中心
-		double dx = target.getX() - this.getX();
-		double dy = (target.getY() + 0.5) - (this.getY() + this.getEyeHeight());
-		double dz = target.getZ() - this.getZ();
-		Vec3 direction = new Vec3(dx, dy, dz).normalize();
-
-		WitherSkull skull = new WitherSkull(serverLevel, this, direction);
-		skull.setPos(this.getX(), this.getY() + this.getEyeHeight(), this.getZ());
-
-		serverLevel.addFreshEntity(skull);
-
-		// 发射音效（烈焰人发射火球的音效，与下界主题一致）
-		serverLevel.playSound(null, this.getX(), this.getY(), this.getZ(),
-			SoundEvents.BLAZE_SHOOT, this.getSoundSource(), 1.0f, 1.0f);
-	}
-
-	// ------------------------------------------------------------------
-	// 末影人偶龙息喷吐 + 瞬移处决（ENDER 变体被动）
-	// ------------------------------------------------------------------
-
-	/**
-	 * 龙息喷吐决策：近战/射手模式下有目标时自动发射 WitherSkull（和下界人偶统一投射物）。
-	 * 命中后由 WitherSkullMixin 生成龙息云（AreaEffectCloud），对范围内实体造成持续即时伤害。
-	 * 3 秒冷却，弹道投射物可被遮挡。
-	 */
-	private void handleEnderBreath() {
-		if (!(this.level() instanceof ServerLevel serverLevel)) return;
-
-		if (breathCooldown > 0) {
-			breathCooldown--;
-			return;
-		}
-
-		LivingEntity target = getActiveMode() == DollMode.MELEE.getIndex() ? meleeTarget : rangedTarget;
-		if (target == null || !target.isAlive() || target.isRemoved()) {
-			return;
-		}
-
-		fireEnderSkull(serverLevel, target);
-		breathCooldown = BREATH_COOLDOWN_TICKS;
-	}
-
-	/**
-	 * 发射龙息头颅弹：创建 WitherSkull 并朝目标方向射出（和下界人偶 fireWitherSkull 统一）。
-	 * <p>
-	 * 使用 WitherSkull 而非 DragonFireball——统一投射物类型，复用 WitherSkullRenderer 渲染管线。
-	 * WitherSkullMixin 按 owner 变体区分命中效果：
-	 * <ul>
-	 *   <li>NETHER：伤害 20 + 燃烧 5 秒（原有行为）</li>
-	 *   <li>ENDER：直接命中 2 点伤害 + 在命中点生成龙息云（AreaEffectCloud 即时伤害 II，判定间隔 10 tick）</li>
-	 * </ul>
-	 * 渲染端按变体区分贴图：WitherSkullRendererMixin 中 NETHER→nether_doll.png，ENDER→ender_doll.png。
-	 */
-	private void fireEnderSkull(ServerLevel serverLevel, LivingEntity target) {
-		double dx = target.getX() - this.getX();
-		double dy = (target.getY() + 0.5) - (this.getY() + this.getEyeHeight());
-		double dz = target.getZ() - this.getZ();
-		Vec3 direction = new Vec3(dx, dy, dz).normalize();
-
-		WitherSkull skull = new WitherSkull(serverLevel, this, direction);
-		skull.setPos(this.getX(), this.getY() + this.getEyeHeight(), this.getZ());
-
-		serverLevel.addFreshEntity(skull);
-
-		// 烈焰人发射音效（和下界人偶统一）
-		serverLevel.playSound(null, this.getX(), this.getY(), this.getZ(),
-			SoundEvents.BLAZE_SHOOT, this.getSoundSource(), 1.0f, 1.0f);
-	}
-
-	/**
-	 * 瞬移处决决策：近战/射手模式下目标血量 ≤ 30% 时触发。
-	 * 瞬移到目标身边 → 直接斩杀 → 瞬移回原位。
-	 * 60 秒冷却。处决时有末影瞬移粒子和音效。
-	 */
-	private void handleEnderExecute() {
-		if (!(this.level() instanceof ServerLevel serverLevel)) return;
-
-		if (executeCooldown > 0) {
-			executeCooldown--;
-			return;
-		}
-
-		LivingEntity target = getActiveMode() == DollMode.MELEE.getIndex() ? meleeTarget : rangedTarget;
-		if (target == null || !target.isAlive() || target.isRemoved()) {
-			return;
-		}
-
-		// 血量阈值判定：持末影斧时 50%，否则 30%
-		ItemStack mainHand = getItemBySlot(EquipmentSlot.MAINHAND);
-		float threshold = mainHand.getItem() instanceof EnderAxeItem
-			? EXECUTE_HEALTH_THRESHOLD_AXE : EXECUTE_HEALTH_THRESHOLD;
-		float healthRatio = target.getHealth() / target.getMaxHealth();
-		if (healthRatio > threshold) {
-			return;
-		}
-
-		// 记住原位，处决后瞬移回来
-		double originX = this.getX();
-		double originY = this.getY();
-		double originZ = this.getZ();
-
-		// 瞬移到目标身边（偏移 1 格，避免卡在目标体内）
-		double tx = target.getX() + (this.random.nextDouble() - 0.5) * 2.0;
-		double ty = target.getY();
-		double tz = target.getZ() + (this.random.nextDouble() - 0.5) * 2.0;
-
-		// 发射瞬移粒子（离开位置）
-		serverLevel.sendParticles(ParticleTypes.PORTAL, this.getX(), this.getY() + 1.0, this.getZ(),
-			20, 0.5, 1.0, 0.5, 0.5);
-		// 瞬移音效
-		serverLevel.playSound(null, this.getX(), this.getY(), this.getZ(),
-			SoundEvents.ENDERMAN_TELEPORT, this.getSoundSource(), 1.0f, 1.0f);
-
-		// 执行瞬移
-		this.teleportTo(tx, ty, tz);
-
-		// 到达粒子（到达位置）
-		serverLevel.sendParticles(ParticleTypes.PORTAL, tx, ty + 1.0, tz,
-			20, 0.5, 1.0, 0.5, 0.5);
-
-		// 处决：直接对目标造成致命伤害
-		target.hurtServer(serverLevel, this.damageSources().mobAttack(this), Float.MAX_VALUE);
-
-		// 处决后短暂延迟再瞬移回原位（用标记 + tick 计数器实现非阻塞延迟）
-		// 简化方案：立即瞬移回去
-		this.teleportTo(originX, originY, originZ);
-		serverLevel.sendParticles(ParticleTypes.PORTAL, originX, originY + 1.0, originZ,
-			20, 0.5, 1.0, 0.5, 0.5);
-		serverLevel.playSound(null, originX, originY, originZ,
-			SoundEvents.ENDERMAN_TELEPORT, this.getSoundSource(), 1.0f, 1.0f);
-
-		executeCooldown = EXECUTE_COOLDOWN_TICKS;
-	}
+	// 末影人偶的末影弹与瞬移处决逻辑均已迁入 EnderDollTalent.tickCombat，此处不再内联。
 
 
 
@@ -3603,8 +3139,15 @@ public class DollEntity extends Avatar {
 							realTree = true;
 						}
 					}
-					if (!realTree || minY == null || isTreeBlacklisted(minY)) {
-						continue; // 建筑木头/孤立原木不砍；近期导航失败拉黑的树稍后再试
+					if (!realTree || minY == null) {
+						continue; // 建筑木头/孤立原木不砍
+					}
+					// 限制作业区时仅砍「树根（树干）」在区内的树，对齐找树根的判定
+					if (areaRestricted && !withinWorkAreaXZ(minY)) {
+						continue;
+					}
+					if (isTreeBlacklisted(minY)) {
+						continue; // 近期导航失败拉黑的树稍后再试
 					}
 					for (BlockPos log : tree) {
 						if (log.distSqr(center) >= bestDistSqr) {
@@ -3928,6 +3471,11 @@ public class DollEntity extends Avatar {
 					}
 					if (!hasLeaves) {
 						continue; // 建筑木头，不砍
+					}
+					// 工作区约束对齐正常砍伐：只有「树根（y 最低原木=树干）」在作业区内才整棵砍。
+					// 此前只校验扫描起点（可能是探入作业区的枝杈/树冠），导致树干在区外的邻近树被误砍。
+					if (!withinWorkAreaXZ(minY)) {
+						continue;
 					}
 					if (isTreeBlacklisted(minY)) {
 						continue; // 近期整棵够不着，暂时跳过
@@ -4982,8 +4530,8 @@ public class DollEntity extends Avatar {
 		if (!isFollowEnabled()) {
 			mineExcursionTicks = 0;
 		}
-		// 镐子耗尽时停止挖矿（与砍树模式斧头耗尽逻辑对齐）：
-		// 不能继续空手拆矿石（方块变成忽略掉落），清空目标待玩家补充镐子后自动恢复
+		// 镐头耗尽时停止挖矿（与砍树模式斧头耗尽逻辑对齐）：
+		// 不能继续空手拆矿石（方块变成忽略掉落），清空目标待玩家补充镐头后自动恢复
 		ItemStack minePickaxe = findPickaxeStack();
 		if (minePickaxe.isEmpty()) {
 			if (mineTargetPos != null) {
@@ -5063,7 +4611,7 @@ public class DollEntity extends Avatar {
 				mineBackpackFullNotified = false;
 				BlockState mineState = level().getBlockState(mineTargetPos);
 				if (!mineBlock(mineTargetPos)) {
-					// 镐子耗尽或等级不足挖不动：放弃该目标；重选时 selectMineTarget 会过滤挖不动的矿
+					// 镐头耗尽或等级不足挖不动：放弃该目标；重选时 selectMineTarget 会过滤挖不动的矿
 					mineTargetPos = null;
 					mineStandPos = null;
 					clearMovementInput();
@@ -5139,7 +4687,7 @@ public class DollEntity extends Avatar {
 		boolean following = isFollowEnabled();
 		List<BlockPos> candidates = scanOresBfs(center);
 		// 分级匹配（严格）：挖不动的矿（如木镐对钻石矿）直接不进候选，
-		// 人偶只挑自己镐子挖得动且会掉落的矿。统一走 canPickaxeMine，杜绝某处漏判。
+		// 人偶只挑自己镐头挖得动且会掉落的矿。统一走 canPickaxeMine，杜绝某处漏判。
 		BlockPos best = null;
 		double bestScore = Double.NEGATIVE_INFINITY;
 		for (BlockPos ore : candidates) {
@@ -5319,7 +4867,7 @@ public class DollEntity extends Avatar {
 	/**
 	 * 破坏矿石方块：用镐头作为工具计算掉落（保证钻石等需正确工具才掉落），
 	 * 掉落进人偶存储区，播放破坏粒子与音效，消耗镐头 1 点耐久。
-	 * 分级兜底：镐子为空或其等级不足以采掘该矿石时返回 false——不拆方块、不连锁
+	 * 分级兜底：镐头为空或其等级不足以采掘该矿石时返回 false——不拆方块、不连锁
 	 * （空手虽然能移除方块但矿石无掉落，等于破坏资源）；调用方放弃该目标重选。
 	 */
 	private boolean mineBlock(BlockPos pos) {
@@ -5419,7 +4967,7 @@ public class DollEntity extends Avatar {
 			if (pos.equals(mined)) {
 				continue; // 当前块已由 mineBlock 处理
 			}
-			// 连锁分级兜底：镐子为空或等级不足以采掘时停止连锁（剩余矿留待之后重选），
+			// 连锁分级兜底：镐头为空或等级不足以采掘时停止连锁（剩余矿留待之后重选），
 			// 避免第一把镐坏的瞬间、下一把低级镐把高级矿脉"空手拆掉"无掉落
 			BlockState state = serverLevel.getBlockState(pos);
 			if (!canPickaxeMine(state)) {
@@ -5739,7 +5287,7 @@ public class DollEntity extends Avatar {
 			updateEnderAxeThrowMind(mainHand);
 			return;
 		}
-		// 武器检查：下界人偶持地狱剑时走飞剑召唤分支（优先于弓/弩）
+		// 武器检查：下界人偶持下界剑时走飞剑召唤分支（优先于弓/弩）
 		if (isNetherDoll() && mainHand.getItem() instanceof NetherSwordItem) {
 			updateNetherFlyingSwordMind(mainHand);
 			return;
@@ -5762,9 +5310,9 @@ public class DollEntity extends Avatar {
 	/**
 	 * 末影人偶投掷末影斧逻辑（射手模式专属）：
 	 * 末影人偶在射手模式持末影斧时，不再使用弓/弩，而是像玩家一样投掷末影斧。
-	 * 投掷命中后附带 50% 斩杀线（由 handleEnderExecute 配合处理）。
+	 * 投掷命中后附带 30% 斩杀线（与近战一致；由 ThrownEnderAxe.onHitEntity 的斩杀判定处理）。
 	 * 忠诚附魔时投掷斧会飞回人偶背包（ThrownEnderAxe.tick 回收）。
-	 * 冷却 3 秒，与龙息喷吐冷却独立。
+	 * 冷却 3 秒，与末影弹发射冷却独立。
 	 */
 	private static final int AXE_THROW_COOLDOWN_TICKS = 60; // 投掷冷却 3 秒
 	private void updateEnderAxeThrowMind(ItemStack weapon) {
@@ -5797,7 +5345,7 @@ public class DollEntity extends Avatar {
 
 	/**
 	 * 下界人偶召唤飞剑逻辑（射手模式专属）：
-	 * 下界人偶在射手模式持地狱剑时，像玩家蓄力召唤一样在身边召唤一把飞行的地狱剑
+	 * 下界人偶在射手模式持下界剑时，像玩家蓄力召唤一样在身边召唤一把飞行的下界剑
 	 * （{@link NetherFlyingSwordEntity}），飞剑自动索敌攻击 16 格半径内的敌对生物。
 	 * 同一召唤者同时仅一把：已有归属自己的飞剑时跳过召唤。
 	 * 召唤冷却 60 tick（3 秒），避免每帧遍历检查。
@@ -6037,7 +5585,7 @@ public class DollEntity extends Avatar {
 		double dy = aim.y - arrow.getY();
 		double horizontalDist = Math.sqrt(dx * dx + dz * dz);
 		arrow.shoot(dx, dy + horizontalDist * 0.2, dz, speed, divergence);
-		// 下界人偶火焰箭：弓/弩箭矢点燃 8 秒，命中目标后自动引燃；手持地狱剑翻倍 16 秒
+		// 下界人偶火焰箭：弓/弩箭矢点燃 8 秒，命中目标后自动引燃；手持下界剑翻倍 16 秒
 		if (getDollVariant() == DollVariant.NETHER) {
 			arrow.igniteForSeconds(hasNetherSwordEquipped() ? 16.0f : 8.0f);
 		}
@@ -6143,7 +5691,7 @@ public class DollEntity extends Avatar {
 		if (isEnderDoll() && hand.getItem() instanceof EnderAxeItem) {
 			return hand;
 		}
-		// 下界人偶的地狱剑也作为远程武器识别（影响 canShoot 中的射程判定）
+		// 下界人偶的下界剑也作为远程武器识别（影响 canShoot 中的射程判定）
 		if (isNetherDoll() && hand.getItem() instanceof NetherSwordItem) {
 			return hand;
 		}
@@ -6630,7 +6178,7 @@ public class DollEntity extends Avatar {
 
 	// ---- 手持前置工具渲染：按模式从物品栏查找对应工具，不再按格子号硬映射 ----
 
-	/** 判断物品是否是镐子（26.2 无 PickaxeItem 类，用官方工具标签判定）。 */
+	/** 判断物品是否是镐头（26.2 无 PickaxeItem 类，用官方工具标签判定）。 */
 	private boolean isPickaxe(ItemStack stack) {
 		return !stack.isEmpty() && stack.is(ItemTags.PICKAXES);
 	}
@@ -6662,7 +6210,7 @@ public class DollEntity extends Avatar {
 				}
 			}
 		}
-		// 下界人偶在全背包查找地狱剑作为远程武器（投掷形式）
+		// 下界人偶在全背包查找下界剑作为远程武器（投掷形式）
 		if (isNetherDoll()) {
 			for (int i = 0; i < inventory.getContainerSize(); i++) {
 				if (i == OFFHAND_SLOT) {
@@ -6726,8 +6274,8 @@ public class DollEntity extends Avatar {
 		return ItemStack.EMPTY;
 	}
 
-	/** 查找镐子：先快捷栏（36-43），快捷栏没有再到存储区/其余格兜底；未找到返回空。
-	 *  镐子耗尽时按此顺序拿下一把可用镐子（存储区备件也能立即接上）。 */
+	/** 查找镐头：先快捷栏（36-43），快捷栏没有再到存储区/其余格兜底；未找到返回空。
+	 *  镐头耗尽时按此顺序拿下一把可用镐头（存储区备件也能立即接上）。 */
 	private ItemStack findPickaxeStack() {
 		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
 			ItemStack stack = inventory.getItem(i);
@@ -6807,7 +6355,7 @@ public class DollEntity extends Avatar {
 	}
 
 	/**
-	 * 镐子分级（不依赖内部 Tier 类，跨版本更稳）：用"能否正确采掘对应层级代表方块"定级。
+	 * 镐头分级（不依赖内部 Tier 类，跨版本更稳）：用"能否正确采掘对应层级代表方块"定级。
 	 * 参考方块取自确认的工具等级标签：铁矿石(NEEDS_STONE_TOOL)=石级、钻石矿(NEEDS_IRON_TOOL)=铁级、
 	 * 黑曜石(NEEDS_DIAMOND_TOOL)=钻石级。下界合金镐挖掘能力与钻石镐完全相同、但耐久更贵，单独记最高级，
 	 * 保证"刚好够用的最低级镐"永远优先选钻石镐而非下界合金镐。木/金镐连铁矿石都挖不动 → 记 0。
@@ -6886,7 +6434,7 @@ public class DollEntity extends Avatar {
 	 * stabAttack / 附魔 / 护甲减伤 / 装备渲染都会走本方法。
 	 * 护甲槽（1-4）参与减伤与渲染；
 	 * 主手：按当前模式从快捷栏查找对应前置工具（近战=剑、射手=弓/弩、
-	 * 砍树=斧头、挖矿=镐子、种植=锄头、钓鱼=钓鱼竿、插火把=火把），
+	 * 砍树=斧头、挖矿=镐头、种植=锄头、钓鱼=钓鱼竿、插火把=火把），
 	 * 只渲染该模式真正需要的工具；
 	 * 无模式（-1/空闲）时无手持物品（空手）。
 	 *
@@ -7003,7 +6551,7 @@ public class DollEntity extends Avatar {
 	}
 
 	/**
-	 * 是否手持地狱剑（主手或副手）——下界人偶专属增益开关：
+	 * 是否手持下界剑（主手或副手）——下界人偶专属增益开关：
 	 * 持剑时其全部灼烧效果（近战点燃/火焰箭/烈焰弹燃烧）时长翻倍，
 	 * 总灼烧伤害变为原本的两倍（MC 灼烧伤害固定 1 心/秒）。
 	 */
@@ -7024,7 +6572,7 @@ public class DollEntity extends Avatar {
 
 	/**
 	 * 是否具备天生战斗能力（无需武器即可攻击）：
-	 * 幽匿（音波）/下界（烈焰弹）/末影（龙息）/海洋（三叉戟）。
+	 * 幽匿（音波）/下界（烈焰弹）/末影（末影弹）/海洋（三叉戟）。
 	 * 这些变体在切换到近战或射手模式时跳过武器持有检查。
 	 */
 	public boolean hasInnateCombatAbility() {
@@ -7404,7 +6952,7 @@ public class DollEntity extends Avatar {
 				return;
 			}
 		}
-		// 停止条件 6：镐子用完了。必须在开挖前就停——深板岩这类 requiresCorrectToolForDrops
+		// 停止条件 6：镐头用完了。必须在开挖前就停——深板岩这类 requiresCorrectToolForDrops
 		// 的路障一旦无镐开挖就是"方块消失但零掉落"的静默损失，比停下来更糟。
 		if (pickaxe.isEmpty()) {
 			stopTunneling("mine_stop_no_pickaxe");
@@ -7645,11 +7193,6 @@ public class DollEntity extends Avatar {
 
 	// ---- Aura 辅助 ----
 
-	/** 创建以 center 为中心、XZ 和 Y 各延伸 radius 的 AABB。 */
-	private static AABB createAuraAABB(Vec3 center, double radius) {
-		return AABB.ofSize(center, radius * 2, radius * 2, radius * 2);
-	}
-
 	/**
 	 * 苍白人偶恐惧光环登记表（仅服务端内存态）。
 	 * <p>
@@ -7730,69 +7273,6 @@ public class DollEntity extends Avatar {
 		return entity != null && isInNetherAura(entity.position());
 	}
 
-	/**
-	 * 苍白人偶恐惧光环（软化版，无 NoAi 持久化）：每 20 tick 清除光环内敌对生物的遗留仇恨。
-	 * <p>
-	 * 半径 16 格，中心由 {@link #getAuraCenter()} 决定（跟随时为玩家，不跟随时为人偶自身）。
-	 * <ul>
-	 *   <li><b>统一软化</b>：所有光环内 {@link Enemy}（含史莱姆/岩浆怪等接触伤害单位）一律
-	 *       清空当前目标、打断进行中的攻击——不再对史莱姆特例 {@code setNoAi(true)}。</li>
-	 *   <li><b>索敌抑制</b>：由 {@code io.github.a10086ovo.doll.mixin.MobMixin#paleFearAura} 在
-	 *       {@code Mob.canAttack} HEAD 返回 false 实现（无法建立/维持任何目标）。</li>
-	 *   <li><b>移动抑制（非 NoAi）</b>：由 {@code io.github.a10086ovo.doll.mixin.MobMixin#paleFearImmobilize}
-	 *       在 {@code Mob.serverAiStep} HEAD 取消 AI 滴答实现——寻路/仇恨/随机游荡一并停止，
-	 *       但重力与击退仍生效（非"粗暴冻结"）。判定基于本登记表，人偶卸载即条目移除，生物自然恢复。</li>
-	 *   <li><b>跳跃抑制</b>：{@code AbstractCubeMob}（史莱姆/岩浆怪/硫磺立方体的父类）覆写
-	 *       {@code tick()} 且自带独立于 AI goal 的跳跃逻辑，serverAiStep 取消无法阻止。
-	 *       由 {@code io.github.a10086ovo.doll.mixin.LivingEntityFearAuraMixin#paleFearNoJump} 在
-	 *       {@code LivingEntity.jumpFromGround()} HEAD 拦截补完。</li>
-	 * </ul>
-	 * 30% 易伤由 {@link io.github.a10086ovo.doll.mixin.LivingEntityFearAuraMixin} 在伤害计算时按本登记表判定。
-	 */
-	private int fearAuraCooldown = 0;
-	private void applyFearAura() {
-		if (fearAuraCooldown-- > 0) {
-			return;
-		}
-		fearAuraCooldown = 20; // 每 20 tick（1 秒）清一次遗留仇恨
-		if (!(this.level() instanceof ServerLevel serverLevel)) {
-			return;
-		}
-		Vec3 center = getAuraCenter();
-		double radius = 16.0;
-		AABB box = createAuraAABB(center, radius);
-		List<Mob> enemies = serverLevel.getEntities(
-			EntityTypeTest.forClass(Mob.class),
-			box,
-			mob -> mob instanceof Enemy && mob.isAlive()
-		);
-		for (Mob mob : enemies) {
-			if (mob.position().distanceToSqr(center) > radius * radius) {
-				continue;
-			}
-			// 统一软化：清空当前目标打断进行中的攻击（含史莱姆等接触伤害单位）。
-			// 持续索敌抑制由 MobMixin.paleFearAura（canAttack→false）负责，
-			// 移动抑制由 MobMixin.paleFearImmobilize（serverAiStep 取消）负责——均不持久化 NoAi。
-			mob.setTarget(null);
-		}
-	}
-
-	/**
-	 * 下界人偶安抚光环——索敌层拦截 + 遗留仇恨清理。
-	 *
-	 * <p><b>核心机制（MobMixin 注入 Mob.canAttack）</b>：等价创造模式。
-	 * 创造模式玩家不被攻击的核心是 {@code Player.canBeSeenAsEnemy()} 返回 false，
-	 * 导致 {@code Mob.canAttack(player)} 返回 false，所有索敌路径无法将玩家设为目标：
-	 * <ul>
-	 *   <li>TargetGoal 调 canAttack → false → 不设 target</li>
-	 *   <li>StartAttacking（Piglin Brain）调 canAttack → false → 不设 ANGRY_AT</li>
-	 *   <li>NeutralMob.isAngryAt 调 canAttack → false → 仇恨检查失败</li>
-	 * </ul>
-	 * Mixin 生效后新索敌被阻止，仇恨无法重建。
-	 *
-	 * <p><b>本方法（遗留仇恨清理）</b>：清除在 Mixin 生效前 / 被 alertOthers 等非 canAttack
-	 * 路径设置的已有 target。Mixin 阻止新索敌后，本方法只需低频清理。
-	 */
 	public static final Set<String> NETHER_MOB_IDS = Set.of(
 		"zombified_piglin", "piglin", "piglin_brute", "hoglin", "zoglin",
 		"ghast", "magma_cube", "blaze", "wither_skeleton", "wither"
@@ -7839,6 +7319,23 @@ public class DollEntity extends Avatar {
 	public static boolean isForestMobType(EntityType<?> type) {
 		var id = BuiltInRegistries.ENTITY_TYPE.getKey(type);
 		return id != null && FOREST_MOB_IDS.contains(id.getPath());
+	}
+
+	/**
+	 * 末影人偶安抚光环的目标：末地敌对生物（末影人/末影螨/潜影贝）。
+	 * 与下界（NETHER_MOB_IDS）/海洋（SEA_MOB_IDS）同构——按主题维度划分；
+	 * 末影龙为 Boss 战保留，不在此列。
+	 */
+	public static final Set<String> ENDER_MOB_IDS = Set.of(
+		"enderman", "endermite", "shulker"
+	);
+
+	/**
+	 * 判断实体类型是否为末地敌对生物。
+	 */
+	public static boolean isEndMobType(EntityType<?> type) {
+		var id = BuiltInRegistries.ENTITY_TYPE.getKey(type);
+		return id != null && ENDER_MOB_IDS.contains(id.getPath());
 	}
 
 	/** 下界人偶主人保护缓存：Player UUID → 过期 tick（避免每次 canAttack 都搜索实体） */
@@ -7929,6 +7426,50 @@ public class DollEntity extends Avatar {
 		return false;
 	}
 
+	/** 末影人偶主人保护缓存：Player UUID → 过期 tick（避免每次 canAttack 都搜索实体） */
+	private static final Map<UUID, Long> enderProtectedCache = new HashMap<>();
+	private static final long ENDER_PROTECTED_CACHE_TTL = 60L; // 3 秒
+
+	/**
+	 * 判断实体是否被末影人偶保护（不被末地敌对生物索敌）。
+	 * 由 {@link io.github.a10086ovo.doll.mixin.MobMixin} 在 Mob.canAttack HEAD 注入时调用。
+	 *
+	 * @param target 被检查的实体（人偶本身或玩家主人）
+	 * @return true 表示该实体对末地生物"不可见为敌人"（canAttack 返回 false）
+	 */
+	public static boolean isEnderDollProtected(LivingEntity target) {
+		// ENDER variant 的 DollEntity 本身
+		if (target instanceof DollEntity doll) {
+			return doll.getDollVariant() == DollVariant.ENDER;
+		}
+		// 主人：附近 32 格内有活跃的 ENDER DollEntity
+		if (target instanceof Player player) {
+			UUID uuid = player.getUUID();
+			Level level = target.level();
+			long tick = level.getGameTime();
+			// 缓存命中
+			Long expiry = enderProtectedCache.get(uuid);
+			if (expiry != null && tick < expiry) {
+				return true;
+			}
+			// 缓存过期：搜索附近 ENDER DollEntity
+			if (level instanceof ServerLevel serverLevel) {
+				List<DollEntity> dolls = serverLevel.getEntities(
+					EntityTypeTest.forClass(DollEntity.class),
+					AABB.ofSize(target.position(), 32, 32, 32),
+					d -> d.getDollVariant() == DollVariant.ENDER && d.isAlive()
+						&& uuid.equals(d.getOwnerUuid())
+				);
+				if (!dolls.isEmpty()) {
+					enderProtectedCache.put(uuid, tick + ENDER_PROTECTED_CACHE_TTL);
+					return true;
+				}
+			}
+			return false;
+		}
+		return false;
+	}
+
 	/**
 	 * 低开销判断：位置是否落在任意活跃苍白人偶的 16 格恐惧光环内。
 	 * <p>
@@ -7953,193 +7494,6 @@ public class DollEntity extends Avatar {
 		return mob != null && isInPaleFearAura(mob.position());
 	}
 
-	private int netherPacifyCooldown = 0;
-	private void applyNetherPacifyAura() {
-		if (netherPacifyCooldown-- > 0) {
-			return;
-		}
-		netherPacifyCooldown = 20; // 每 20 tick（1 秒）清理遗留仇恨
-		if (!(this.level() instanceof ServerLevel serverLevel)) {
-			return;
-		}
-		Vec3 center = getAuraCenter();
-		double radius = 16.0;
-		AABB box = createAuraAABB(center, radius);
-		Player owner = getOwnerPlayer();
-		List<Mob> mobs = serverLevel.getEntities(
-			EntityTypeTest.forClass(Mob.class),
-			box,
-			mob -> mob.isAlive() && mob.getTarget() != null
-		);
-		for (Mob mob : mobs) {
-			if (mob.position().distanceToSqr(center) > radius * radius) {
-				continue;
-			}
-			if (!isNetherMobType(mob.getType())) {
-				continue;
-			}
-			LivingEntity target = mob.getTarget();
-			if (target == this || (owner != null && target == owner)) {
-				// NeutralMob（僵尸猪灵）：清除持久仇恨
-				if (mob instanceof NeutralMob neutralMob) {
-					neutralMob.stopBeingAngry();
-				}
-				// Piglin/PiglinBrute：清除 Brain 愤怒记忆
-				mob.getBrain().eraseMemory(MemoryModuleType.ANGRY_AT);
-				mob.getBrain().eraseMemory(MemoryModuleType.UNIVERSAL_ANGER);
-				// 兜底
-				mob.setTarget(null);
-			}
-		}
-	}
-
-	// 灼烧光环冷却（下界人偶：给范围内主人抗火）
-	private int netherBurnCooldown = 0;
-
-	/**
-	 * 下界人偶灼烧光环（每 20 tick，半径 16 格）：
-	 * 主人在光环内时持续获得抗火，契合下界主题——跟随下界人偶即免疫火焰。
-	 */
-	private void applyNetherBurnAura() {
-		if (netherBurnCooldown-- > 0) {
-			return;
-		}
-		netherBurnCooldown = 20;
-		if (this.level().isClientSide()) {
-			return;
-		}
-		Player owner = getOwnerPlayer();
-		if (owner == null || owner.isSpectator()) {
-			return;
-		}
-		Vec3 center = getAuraCenter();
-		double radius = 16.0;
-		if (owner.position().distanceToSqr(center) > radius * radius) {
-			return;
-		}
-		owner.addEffect(new MobEffectInstance(MobEffects.FIRE_RESISTANCE, 200, 0, false, false));
-	}
-
-	private int seaPacifyCooldown = 0;
-	private int seaPlayerAuraCooldown = 0;
-	private void applySeaPacifyAura() {
-		if (seaPacifyCooldown-- > 0) {
-			return;
-		}
-		seaPacifyCooldown = 20; // 每 20 tick（1 秒）清理遗留仇恨
-		if (!(this.level() instanceof ServerLevel serverLevel)) {
-			return;
-		}
-		Vec3 center = getAuraCenter();
-		double radius = 16.0;
-		AABB box = createAuraAABB(center, radius);
-		Player owner = getOwnerPlayer();
-		List<Mob> mobs = serverLevel.getEntities(
-			EntityTypeTest.forClass(Mob.class),
-			box,
-			mob -> mob.isAlive() && mob.getTarget() != null
-		);
-		for (Mob mob : mobs) {
-			if (mob.position().distanceToSqr(center) > radius * radius) {
-				continue;
-			}
-			if (!isSeaMobType(mob.getType())) {
-				continue;
-			}
-			LivingEntity target = mob.getTarget();
-			if (target == this || (owner != null && target == owner)) {
-				mob.setTarget(null);
-			}
-		}
-	}
-
-	private int forestVineCooldown = 0;
-
-	/**
-	 * 森林人偶藤蔓缠绕光环（每 20 tick，半径 16 格）：
-	 * <p>
-	 * 对光环内所有主世界陆地敌对生物持续施加缓慢（Slowness II），
-	 * 不区分是否在索敌——入侵者踏入森林即被藤蔓牵制。离开光环后效果自然过期。
-	 * <p>
-	 * 注意：原"敌怪安抚（仇恨豁免）"天赋已移除，故本方法不再清除仇恨，
-	 * 也不再由 {@link io.github.a10086ovo.doll.mixin.MobMixin} 拦截 canAttack。
-	 * 主世界敌对生物仍会正常仇恨主人，只是靠近人偶时会被减速牵制。
-	 */
-	private void applyForestVineAura() {
-		if (forestVineCooldown-- > 0) {
-			return;
-		}
-		forestVineCooldown = 20; // 每 20 tick（1 秒）刷新
-		if (!(this.level() instanceof ServerLevel serverLevel)) {
-			return;
-		}
-		Vec3 center = getAuraCenter();
-		double radius = 16.0;
-		AABB box = createAuraAABB(center, radius);
-		// 重平衡：藤蔓缠绕覆盖范围内所有敌方生物（Enemy）AoE，不再限于森林列表；
-		// 缓慢 IV（amp3）。原「中毒」已移除——毒伤移交副手荆棘盾的反伤（ThornsShieldMixin 单独处理），
-		// 常态藤蔓不再附加中毒。
-		List<Mob> mobs = serverLevel.getEntities(
-			EntityTypeTest.forClass(Mob.class),
-			box,
-			mob -> mob.isAlive() && mob instanceof Enemy
-		);
-		for (Mob mob : mobs) {
-			if (mob.position().distanceToSqr(center) > radius * radius) {
-				continue;
-			}
-			mob.addEffect(new MobEffectInstance(MobEffects.SLOWNESS, 40, 3, false, false)); // 缓慢 IV
-		}
-	}
-
-	// ------------------------------------------------------------------
-	// 森林人偶天赋：敌方生物高亮（半径 32 格，光灵箭式 GLOWING 描边）
-	// ------------------------------------------------------------------
-
-	private int forestMarkCooldown = 0;
-
-	/**
-	 * 森林人偶威胁标记（每 20 tick，以光环为中心半径 32 格）：
-	 * 对范围内的陆地敌对生物施加 {@link MobEffects#GLOWING}（光灵箭同款白色描边高亮），
-	 * 持续刷新使其稳定可见，方便主人看清贴脸威胁。离开范围或人偶不在场即自然过期。
-	 * 仅 FOREST 变体触发，且仅主人在线时生效（联机时其他玩家不享受该圈）。
-	 */
-	private void applyForestMarkAura() {
-		if (forestMarkCooldown-- > 0) {
-			return;
-		}
-		forestMarkCooldown = 20; // 每 20 tick 刷新一次高亮
-		if (!(this.level() instanceof ServerLevel serverLevel)) {
-			return;
-		}
-		Player owner = getOwnerPlayer();
-		if (owner == null || !owner.isAlive()) {
-			return;
-		}
-		double radius = 32.0;
-		Vec3 center = getAuraCenter();
-		AABB box = createAuraAABB(center, radius);
-		List<Mob> mobs = serverLevel.getEntities(
-			EntityTypeTest.forClass(Mob.class),
-			box,
-			mob -> mob.isAlive()
-		);
-		for (Mob mob : mobs) {
-			if (mob.position().distanceToSqr(center) > radius * radius) {
-				continue;
-			}
-			if (!isForestMobType(mob.getType())) {
-				continue;
-			}
-			// 光灵箭式高亮：白色描边（持续 3 秒，每 20 tick 重刷，离开范围自然过期）
-			mob.addEffect(new MobEffectInstance(MobEffects.GLOWING, 60, 0, false, false));
-		}
-	}
-
-	// ------------------------------------------------------------------
-	// 森林人偶天赋 2：友善生物吸引（半径 8 格，朝人偶移动）
-	// ------------------------------------------------------------------
-
 	/** 森林人偶吸引的友善动物：主世界常见被动/中立动物（不含已驯服宠物，见 isAnimalType 内处理）。 */
 	public static final Set<String> FOREST_ANIMAL_IDS = Set.of(
 		"pig", "sheep", "cow", "chicken", "rabbit", "mooshroom",
@@ -8151,168 +7505,6 @@ public class DollEntity extends Avatar {
 	public static boolean isForestAnimalType(EntityType<?> type) {
 		var id = BuiltInRegistries.ENTITY_TYPE.getKey(type);
 		return id != null && FOREST_ANIMAL_IDS.contains(id.getPath());
-	}
-
-	private int forestAttractCooldown = 0;
-
-	/**
-	 * 森林人偶友善生物吸引（每 10 tick，半径 8 格）：
-	 * 对范围内、属于 {@link #FOREST_ANIMAL_IDS} 且<b>未驯服</b>的动物施加"朝人偶移动"的导航力，
-	 * 模拟"手持小麦吸引"的效果。离开范围后导航目标不再刷新，动物自然恢复自身 AI。
-	 * 纯移动吸引，不繁殖、不喂食、不强制跟随（已驯服宠物如狼/猫会被排除，避免跟主人走丢）。
-	 */
-	private void applyForestAnimalAttract() {
-		if (forestAttractCooldown-- > 0) {
-			return;
-		}
-		forestAttractCooldown = 10; // 每 10 tick 刷新一次导航目标（足够顺滑且低开销）
-		if (!(this.level() instanceof ServerLevel serverLevel)) {
-			return;
-		}
-		Vec3 center = getAuraCenter();
-		double radius = 8.0;
-		AABB box = createAuraAABB(center, radius);
-		List<Mob> animals = serverLevel.getEntities(
-			EntityTypeTest.forClass(Mob.class),
-			box,
-			mob -> mob.isAlive() && isForestAnimalType(mob.getType())
-		);
-		Vec3 target = this.position();
-		for (Mob animal : animals) {
-			if (animal.position().distanceToSqr(center) > radius * radius) {
-				continue;
-			}
-			// 排除已驯服宠物（狼/猫/鹦鹉等），避免它们脱离主人
-			if (animal instanceof TamableAnimal tamable && tamable.isTame()) {
-				continue;
-			}
-			// 朝人偶移动：对齐原版 TemptGoal（手持小麦吸引）的满速行为（speed=1.0）。
-		// 不额外加速——避免动物永远黏着人偶甩不掉（那反成负面天赋）。
-		animal.getNavigation().moveTo(target.x, target.y, target.z, 1.0);
-		}
-	}
-
-	// ------------------------------------------------------------------
-	// 森林人偶天赋 3：主人回血 I（半径 16 格，仅主人）
-	// ------------------------------------------------------------------
-
-	private int forestRegenCooldown = 0;
-
-	/**
-	 * 森林人偶主人回血光环（每 20 tick，半径 16 格）：
-	 * 主人在人偶 16 格范围内时持续获得生命恢复 I（Regen I，amplifier 0）。
-	 * 效果 duration≈10s，每 20 tick 重刷；主人离开范围后不再刷新，效果自然过期。
-	 * 仅主人受益（联机时朋友不享受），且仅 FOREST 变体触发。
-	 */
-	private void applyForestRegenAura() {
-		if (forestRegenCooldown-- > 0) {
-			return;
-		}
-		forestRegenCooldown = 20; // 每 20 tick 给范围内主人刷新增益
-		if (this.level().isClientSide()) {
-			return;
-		}
-		Player owner = getOwnerPlayer();
-		if (owner == null || owner.isSpectator()) {
-			return;
-		}
-		Vec3 center = getAuraCenter();
-		double radius = 16.0;
-		if (owner.position().distanceToSqr(center) > radius * radius) {
-			return; // 主人不在光环内，不刷新（已有效果将自然过期）
-		}
-		// 生命恢复 I（amplifier 0 = 等级 I），持续时间 200 tick（10 秒），每 20 tick 重刷
-		owner.addEffect(new MobEffectInstance(MobEffects.REGENERATION, 200, 0, false, false));
-	}
-
-	/**
-	 * 海洋人偶玩家增益光环：主人位于人偶 16 格半径内时获得增益。
-	 * <ul>
-	 *   <li>水下呼吸（WATER_BREATHING）：只要在主人的范围内就持续给予。</li>
-	 *   <li>水下速掘（HASTE）：仅当主人<b>身处水中</b>时才给予；离开水不加速，
-	 *       严格贴合"水下"二字，避免影响陆地挖掘节奏。</li>
-	 * </ul>
-	 * 效果 duration≈10s，每 20 tick 重刷；主人离开范围后不再刷新，效果自然过期，
-	 * 无需主动移除。仅主人受益（联机时朋友不享受），且仅 SEA 变体触发。
-	 */
-	private void applySeaPlayerAura() {
-		if (seaPlayerAuraCooldown-- > 0) {
-			return;
-		}
-		seaPlayerAuraCooldown = 20; // 每 20 tick 给范围内主人刷新增益
-		if (this.level().isClientSide()) {
-			return;
-		}
-		Player owner = getOwnerPlayer();
-		if (owner == null || owner.isSpectator()) {
-			return;
-		}
-		Vec3 center = getAuraCenter();
-		double radius = 16.0;
-		if (owner.position().distanceToSqr(center) > radius * radius) {
-			return; // 主人不在光环内，不刷新（已有效果将自然过期）
-		}
-		// 水下呼吸：只要在主人的 16 格内就持续给予
-		owner.addEffect(new MobEffectInstance(MobEffects.WATER_BREATHING, 200, 0, false, false));
-		// 清除主人身上的挖掘疲劳（MINING_FATIGUE）——海洋人偶庇护主人，避免减速/虚弱采集带来的手感拖沓
-		if (owner.hasEffect(MobEffects.MINING_FATIGUE)) {
-			owner.removeEffect(MobEffects.MINING_FATIGUE);
-		}
-		// 水下速掘：仅当主人身处水中时给予急迫(HASTE)，离开水不加速。
-		// 高等级抵消水中(非地面)挖掘 ÷5 惩罚：游泳时≈1.16×陆地、站海底≈5.8×陆地。
-		if (owner.isInWater()) {
-			owner.addEffect(new MobEffectInstance(MobEffects.HASTE, 200, SEA_HASTE_LEVEL, false, false));
-		}
-	}
-
-	// ------------------------------------------------------------------
-	// 向导人偶引导光环：主人 速度II + 跳跃II + 护甲+4（半径 32 格，仅主人）
-	// ------------------------------------------------------------------
-
-	// 护甲 +4 的 transient 修饰符（不写盘），主人离开光环范围时移除
-	private static final Identifier GUIDE_ARMOR_MOD_ID =
-		Identifier.fromNamespaceAndPath(DollModConstants.MOD_ID, "guide_armor_bonus");
-	private static final AttributeModifier GUIDE_ARMOR_MOD =
-		new AttributeModifier(GUIDE_ARMOR_MOD_ID, 4.0, AttributeModifier.Operation.ADD_VALUE);
-
-	private int guideAuraCooldown = 0;
-
-	/**
-	 * 向导人偶引导光环（每 20 tick，半径 32 格）：
-	 * 主人在人偶 32 格范围内时持续获得 速度 II（SPEED amp1）+ 跳跃 II（JUMP_BOOST amp1）+ 护甲 +4，
-	 * 效果 duration≈10s，每 20 tick 重刷；主人离开范围后不再刷新（效果自然过期、护甲修饰符移除）。
-	 * 仅主人受益（联机时朋友不享受），且仅 GUIDE 变体触发。
-	 */
-	private void applyGuideAura() {
-		if (guideAuraCooldown-- > 0) {
-			return;
-		}
-		guideAuraCooldown = 20; // 每 20 tick 给范围内主人刷新增益
-		if (this.level().isClientSide()) {
-			return;
-		}
-		Player owner = getOwnerPlayer();
-		if (owner == null || owner.isSpectator()) {
-			return;
-		}
-		Vec3 center = getAuraCenter();
-		double radius = 32.0;
-		if (owner.position().distanceToSqr(center) > radius * radius) {
-			// 主人不在光环内：若身上残留护甲修饰符则移除，其余效果（速度/跳跃）自然过期
-			AttributeInstance armorAttr = owner.getAttribute(Attributes.ARMOR);
-			if (armorAttr != null && armorAttr.hasModifier(GUIDE_ARMOR_MOD_ID)) {
-				armorAttr.removeModifier(GUIDE_ARMOR_MOD_ID);
-			}
-			return;
-		}
-		// 速度 II（SPEED amp1）+ 跳跃 II（JUMP_BOOST amp1），持续 200 tick（10 秒）
-		owner.addEffect(new MobEffectInstance(MobEffects.SPEED, 200, 1, false, false));
-		owner.addEffect(new MobEffectInstance(MobEffects.JUMP_BOOST, 200, 1, false, false));
-		// 护甲 +4：transient 修饰符，范围内持续提供
-		AttributeInstance armorAttr = owner.getAttribute(Attributes.ARMOR);
-		if (armorAttr != null && !armorAttr.hasModifier(GUIDE_ARMOR_MOD_ID)) {
-			armorAttr.addTransientModifier(GUIDE_ARMOR_MOD);
-		}
 	}
 
 	/**

@@ -27,14 +27,14 @@ import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.level.Level;
 
 /**
- * 地狱剑 —— 下界主题近战武器（数值对标下界合金剑，注册见 DollMod.NETHER_SWORD_ITEM）。
+ * 下界剑 —— 下界主题近战武器（数值对标下界合金剑，注册见 DollMod.NETHER_SWORD_ITEM）。
  * <p>
  * 玩家专属能力（与末影斧同模式，人偶不触发——人偶另有自身常驻抗火逻辑，见 DollEntity）：
  * <ul>
  *   <li>手持（主手或副手）时持续获得抗火效果，放下后 2 秒内自然消退</li>
  *   <li>手持时获得 6 颗金色血量（吸收 amp=2，12 点，{@code NetherSwordHealthMixin} 维护，放下消退）</li>
  *   <li>攻击命中点燃目标 4 秒（与原版火焰附加 I 时长一致，可与火焰附加附魔叠加）</li>
- *   <li>长按右键蓄力 1 秒：召唤一把飞行的地狱剑（{@link NetherFlyingSwordEntity}），
+ *   <li>长按右键蓄力 1 秒：召唤一把飞行的下界剑（{@link NetherFlyingSwordEntity}），
  *       自动攻击 16 格半径内最近的敌对生物；同时仅一把，重复召唤顶替旧剑</li>
  * </ul>
  */
@@ -55,8 +55,8 @@ public class NetherSwordItem extends Item {
 	 * <ul>
 	 *   <li><b>TOOL 组件</b>：蜘蛛网挖掘速度 15.0 + sword_instantly_mines 秒挖 + sword_efficient 1.5 倍速
 	 *       ——「剑挖蜘蛛网快」的能力就来自这里；手动构造属性时漏掉它会挖蜘蛛网很慢</li>
-	 *   <li><b>攻击属性</b>：ATTACK_DAMAGE amount = attackDamageBonus + 材质加成、ATTACK_SPEED amount = attackSpeed，
-	 *       且用原版标准 ID（minecraft:base_attack_*），tooltip 自动显示最终值（+8 攻击伤害 / 1.6 攻击速度）</li>
+ *   <li><b>攻击属性</b>：ATTACK_DAMAGE amount = attackDamageBonus + 材质加成、ATTACK_SPEED amount = attackSpeed，
+ *       且用原版标准 ID（minecraft:base_attack_*），tooltip 自动显示最终值（本剑：+8 攻击伤害 / 2.0 攻击速度）</li>
 	 *   <li><b>WEAPON 组件</b>：横扫等剑专属特性</li>
 	 * </ul>
 	 * 因此不再需要手动 ItemAttributeModifiers.builder()（那会漏掉 TOOL/WEAPON 组件）。
@@ -66,8 +66,8 @@ public class NetherSwordItem extends Item {
 	 * 工具提示上下文里 player 为 null，基础值不会加回，于是攻击伤害误显示为「+7」而不是「+8」。
 	 * 这里在 sword() 之后用 attributes() 覆盖一份 ItemAttributeModifiers：修饰符数值保持不变（战斗实际伤害不变），
 	 * 仅把攻击伤害的 display 改成 {@link ItemAttributeModifiers.Display#override} 的固定文本
-	 * （复刻玩家手持时看到的最终值 +8 攻击伤害）。攻击速度保持默认显示——JADE 下掉落物显示负值
-	 * （如 -2.4）是原版剑的普遍表现，不属于本 bug，不做覆盖。
+	 * （复刻玩家手持时看到的最终值 +8 攻击伤害）。攻击速度保持默认显示——JADE 下掉落物显示修饰符原值
+	 * （本剑攻击速度修饰符为 -2.0，对应玩家手持时的 2.0），此属物品脱离玩家上下文时的普遍表现，不属于本 bug，不做覆盖。
 	 */
 	public NetherSwordItem(ToolMaterial material, float attackDamageBonus, float attackSpeed, Properties properties) {
 		super(properties.sword(material, attackDamageBonus, attackSpeed)

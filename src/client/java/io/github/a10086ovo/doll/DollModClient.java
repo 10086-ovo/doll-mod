@@ -34,7 +34,7 @@ public class DollModClient implements ClientModInitializer {
 			EnderAxeModel::createLayer);
 		EntityRenderers.register(DollMod.THROWN_ENDER_AXE_ENTITY,
 			ThrownEnderAxeRenderer::new);
-		// 飞行地狱剑：自定义 3D 剑模型渲染器（脑后左悬浮 / 空闲 3D 翻滚 / 锁定剑刃直指+直线穿刺）
+		// 飞行下界剑：自定义 3D 剑模型渲染器（脑后左悬浮 / 空闲 3D 翻滚 / 锁定剑刃直指+直线穿刺）
 		ModelLayerRegistry.registerModelLayer(NetherFlyingSwordRenderer.NETHER_FLYING_SWORD_LAYER,
 			NetherFlyingSwordModel::createLayer);
 		EntityRenderers.register(DollMod.NETHER_FLYING_SWORD_ENTITY,

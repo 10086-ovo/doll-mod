@@ -91,19 +91,31 @@ public class SeaArmorItem extends Item {
 	}
 
 	/** 靴子：行水如履 —— 水面承载（真行走/跑/跳）由
-	 * {@link io.github.a10086ovo.doll.mixin.LiquidBlockWaterWalkMixin} 于水块碰撞处落实；
-	 * 此处仅清摔落兜底。 */
+	 * {@link io.github.a10086ovo.doll.mixin.LiquidBlockWaterWalkMixin} 于水块碰撞处落实。
+	 * <p>
+	 * 免摔仅限"水面情境"：入水或正落向水面（足下为水）时清零摔落距离，
+	 * 使高速坠入水面不受伤；<b>陆地坠落不免疫</b>——陆地防摔由潮汐护腿的
+	 * "落地水"（下蹲 + 坠距超阈）负责，避免无脑全时段免伤。 */
 	private void tickBoots(LivingEntity entity) {
-		entity.fallDistance = 0.0f;
+		if (entity.isInWater()) {
+			entity.fallDistance = 0.0f;
+			return;
+		}
+		// 未入水：仅当脚下即将接触的方块是水（行水表面 / 正落向水面）时清零
+		BlockPos below = entity.blockPosition().below();
+		BlockState belowState = entity.level().getBlockState(below);
+		if (belowState.getFluidState().is(Fluids.WATER)) {
+			entity.fallDistance = 0.0f;
+		}
 	}
 
 	/** 护腿（落地水）：正在下蹲且坠速将损血时，于足下一格续生水源为垫，落之既愈即澈。
-	 * 仅当 FET 槽未着潮汐甲（着靴之防摔已由 tickBoots 全免）时生效；每番触动耗耐一点。 */
+	 * 无论是否穿着浪花靴子均可触发（靴子只保水面免摔，陆地防摔即此主动技）；
+	 * 每番触动耗耐一点。 */
 	private void tickLegs(ServerLevel level, LivingEntity entity) {
 		if (!(entity instanceof ServerPlayer sp)) return;
 		ItemStack legs = sp.getItemBySlot(EquipmentSlot.LEGS);
 		if (!(legs.getItem() instanceof SeaArmorItem)) { drain(sp); return; }
-		if (sp.getItemBySlot(EquipmentSlot.FEET).getItem() instanceof SeaArmorItem) { drain(sp); return; }
 		if (sp.isRemoved() || sp.getHealth() <= 0.0f) { drain(sp); return; }
 
 		boolean crouching = sp.isCrouching();

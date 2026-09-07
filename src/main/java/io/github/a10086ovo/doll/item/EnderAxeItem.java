@@ -21,15 +21,15 @@ import net.minecraft.world.level.block.state.BlockState;
 /**
  * 末影斧 —— 兼具斧头近战与三叉戟投掷的混合武器。
  * <p>
- * 近战：伤害 9（对标下界合金斧），可剥皮原木。
- * 投掷：长按右键蓄力，松手扔出 {@link ThrownEnderAxe}，带忠诚附魔时可回归。
+ * 近战：伤害 10（对标原版下界合金斧），可剥皮原木。
+ * 投掷：长按右键蓄力，松手扔出 {@link ThrownEnderAxe}（命中基础伤害 10），带忠诚附魔时可回归。
  * <p>
  * 玩家专属能力（人偶不触发）：
  * <ul>
- *   <li>持有时 80% 闪避（主手/副手均生效，由 LivingEntityHurtMixin 处理）</li>
+ *   <li>持有时 80% 闪避（主手/副手均生效，由 LivingEntityDodgeMixin 处理）</li>
  *   <li>斩杀 30% 血以下怪物（postHurtEnemy 中判定）</li>
  * </ul>
- * 末影人偶持有时：闪避/斩杀不叠加（人偶保留自身效果），但斩杀线提升至 50%（由 DollEntity 处理）。
+ * 末影人偶持有时：闪避/斩杀不叠加（人偶保留自身效果）；持斧时斩杀线取人偶基础 25% 与斧 30% 之较大者，即 30%（由 DollEntity 处理）。
  */
 public class EnderAxeItem extends net.minecraft.world.item.AxeItem {
 

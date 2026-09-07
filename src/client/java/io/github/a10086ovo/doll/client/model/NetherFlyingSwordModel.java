@@ -11,7 +11,7 @@ import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.util.Unit;
 
 /**
- * 飞行地狱剑 3D 模型 —— 用户 Blockbench 建模（nether_flying_sword.java + nether_flying_sword.png）。
+ * 飞行下界剑 3D 模型 —— 用户 Blockbench 建模（nether_flying_sword.java + nether_flying_sword.png）。
  * <p>
  * 由 Blockbench 5.1.6 导出（Yarn 1.17+ EntityModel 格式），已转换为 mojmap 26.2
  * {@code LayerDefinition}/{@code MeshDefinition}/{@code CubeListBuilder} 范式。

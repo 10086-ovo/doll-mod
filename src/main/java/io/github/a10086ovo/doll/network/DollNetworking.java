@@ -403,8 +403,9 @@ public final class DollNetworking {
 	}
 
 	/**
-	 * 执行任务的一片：分片 0 为中心 100 区块内最近结构，分片 1..8 为距中心 70 区块处、
-	 * 各 30 区块半径的八个方向（合起来覆盖 40~100 区块环带），收集更多实例。
+	 * 执行任务的一片：分片 0 为中心 100 区块内最近结构，分片 1..8 为距中心 60 区块处、
+	 * 各 40 区块半径的八个方向（中心点弧向间距约 45°，半径 40 区块使相邻圆形搜索区间充分重叠），
+	 * 无缝铺满 20~100 区块环带，收集更多实例且消除斜向方向的结构检测缺口。
 	 */
 	private static void runSlice(StructureSearchJob job, int slice) {
 		if (job.player.connection == null || job.player.isRemoved()) {
@@ -416,9 +417,9 @@ public final class DollNetworking {
 		} else {
 			int i = slice - 1;
 			double angle = 2 * Math.PI * (i + 0.5) / 8;
-			int cx = job.centerX + (int) (Math.cos(angle) * 70 * 16);
-			int cz = job.centerZ + (int) (Math.sin(angle) * 70 * 16);
-			addStructureHit(job.candidates, job.level, job.set, new BlockPos(cx, job.centerY, cz), 30);
+			int cx = job.centerX + (int) (Math.cos(angle) * 60 * 16);
+			int cz = job.centerZ + (int) (Math.sin(angle) * 60 * 16);
+			addStructureHit(job.candidates, job.level, job.set, new BlockPos(cx, job.centerY, cz), 40);
 		}
 	}
 
@@ -515,13 +516,16 @@ public final class DollNetworking {
 		if (source.getNoiseBiome(px >> 2, quartY, pz >> 2, sampler).is(biomeKey)) {
 			candidates.add(new int[] { px, pz });
 		}
-		int step = 128;
+		// 步长 128 时相邻采样点的径向/弧向间距可达 ~128 格，小型/狭长群系常整块落在采样空隙里被漏检。
+		// 改为 48 格步长并提高每环采样数下限，使相邻采样点间距 ≤ ~48 格，保证 1600 格半径内群系不再漏检
+		//（纯噪声采样在后台线程执行，~3500 次采样开销可忽略）。
+		int step = 48;
 		for (int r = step; r <= SEARCH_RADIUS_BLOCKS; r += step) {
 			// 命中足够多即提前结束，控制耗时
 			if (candidates.size() >= SearchResultsPayload.MAX_RESULTS * 4) {
 				break;
 			}
-			int checks = Math.max(8, (int) (2 * Math.PI * r / step));
+			int checks = Math.max(12, (int) (2 * Math.PI * r / step));
 			for (int i = 0; i < checks; i++) {
 				double angle = 2 * Math.PI * i / checks;
 				int x = px + (int) (Math.cos(angle) * r);

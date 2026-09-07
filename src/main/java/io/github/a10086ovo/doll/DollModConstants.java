@@ -51,7 +51,7 @@ public class DollModConstants {
 	public static final String THROWN_ENDER_AXE_ID = "thrown_ender_axe";
 	public static final String THORNS_SHIELD_ID = "thorns_shield";
 	public static final String NETHER_SWORD_ID = "nether_sword";
-	/** 飞行地狱剑实体 ID（玩家蓄力召唤的守护飞剑） */
+	/** 飞行下界剑实体 ID（玩家蓄力召唤的守护飞剑） */
 	public static final String NETHER_FLYING_SWORD_ID = "nether_flying_sword";
 	public static final String GUIDE_BOOK_ID = "guide_book";
 	public static final String GUIDE_BOOK_GIVEN_TAG = "guide_book_given";

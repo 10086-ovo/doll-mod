@@ -1,5 +1,5 @@
 {
-  "name": "Wild Warden Doll",
+  "name": "Wild Sculk Doll",
   "icon": "doll-mod:warden_doll_head",
   "category": "endgame",
   "sortnum": 1,
@@ -7,17 +7,17 @@
     {
       "type": "text",
       "title": "Base Stats",
-      "text": "Hostile boss summoned by the Sculk Shrine.\n\n• HP: 300, Attack: 10 (melee)\n• Speed: 0.3 (mimics Warden)\n• Weak Regen I, full knockback resistance\n• Immune to fire, lava, and all projectile damage\n\nAttacks all non-Creative/non-Spectator mobs. Retaliates when hit."
+      "text": "The Wild Sculk Doll is a hostile boss summoned from the Sculk Shrine. Its stats are higher than those of ordinary mobs:\n\n• HP: 300\n• Attack: 10 (melee)\n• Move speed: 0.3\n• Slow regeneration\n• Full knockback resistance, cannot be knocked back\n• Immune to fire and lava damage\n• Immune to all projectile damage (arrows, tridents, wither skulls, etc.)\n\nIt attacks every creature that is not in Creative or Spectator mode, and counter-attacks immediately after being hit."
     },
     {
       "type": "text",
-      "title": "Sonic Boom Attack",
-      "text": "When target is out of melee range, charges and fires a sonic boom:\n\n• Damage: 6 (armor-piercing)\n• Charge: 1.5s (audio cue plays)\n• Cooldown: 7s\n• Range: 32 blocks, pulls target toward boss"
+      "title": "Sonic Attack",
+      "text": "When the player is outside melee range, the Wild Sculk Doll charges and fires a sonic attack:\n\n• Sonic damage: 6 (armor-piercing)\n• Charge-up: 1.5s (with a sound cue)\n• Fire cooldown: 7s\n• Range: 32 blocks\n• Pull: drags the player 15% closer to it"
     },
     {
       "type": "text",
-      "title": "Emergence & Drops",
-      "text": "Rises from the Shrine over 5 seconds (smoke + soul fire particles). Invulnerable during animation. Roars when ready.\n\n60% chance to drop a Warden Doll Head (+10% per Looting). Craft with 8 Sculk blocks for the Warden Doll Egg."
+      "title": "Spawn Sequence & Drops",
+      "text": "When summoned, the Wild Sculk Doll slowly rises from the shrine (about 5 seconds) with smoke and soul-flame particles, and is invulnerable during this time.\n\nDefeating it has a 60% chance to drop a Sculk Doll Head (+10% per level of Looting). Use the head to craft the Sculk Doll Egg and tame it."
     }
   ]
 }

@@ -63,7 +63,7 @@
   - `LivingEntityDodgeMixin` — 末影斧 80% 玩家闪避（注入 `Player.hurtServer` HEAD）。
   - `LivingEntityVulnerabilityMixin` — 苍白弓/恐惧光环的易伤伤害乘算。
   - `LivingEntityFearAuraMixin`、`MobMixin` — 苍白人偶恐惧光环（16 格内敌对生物失去攻击 AI）。
-  - `NetherSwordHealthMixin` — 地狱剑手持生命上限 +10。
+  - `NetherSwordHealthMixin` — 下界剑手持生命上限 +10。
   - `WitherSkullMixin` — 下界人偶烈焰弹（凋灵骷髅头颅弹）。
   - `ThornsShieldMixin`、`AnvilBlockMixin`、`AnvilMenuMixin`、`ItemCombinerMenuAccessor`、`EnchantmentHelperMixin`、`AreaEffectCloudMixin`/`Accessor`、`PlayerGuideBookMixin` — 各功能适配。
 
@@ -96,7 +96,7 @@
 - **唯一真相源 `canPickaxeMine(BlockState)`**（→ `entity/DollEntity.java`）：所有挖矿入口必须调用它，**不要各写一份 `requiresTieredTool + isCorrectToolForDrops` 判断**。
   五个入口：选目标 `selectMineTarget` / 单块挖 `mineBlock` / 连锁 `chainMineOres` / 盾构机掘进 `updateTunnelDrill` / 盾构机侧向探矿 `scanNearbyOre`。
   历史教训：侧向探矿那段曾漏判，导致木镐把钻石矿"拆掉但零掉落"——方块消失、资源白丢，且表现极隐蔽。
-- **镐子选择"最聪明"策略（已与作者确认）**：
+- **镐头选择"最聪明"策略（已与作者确认）**：
   - 能力判定用 `findBestPickaxeStack()`（背包里 Tier 最高的镐）。**修复缺陷**：旧 `findPickaxeStack()` 只按格子顺序返回第一把镐（石镐在前、钻石镐在后时，人偶误判"挖不动钻石矿"而绕开它）。
   - 实际挖掘用 `findPickaxeForState(state)`（在 `isCorrectToolForDrops(state)` 为真的镐里挑 Tier 最低的一把），把钻石 / 下界合金镐留给真正需要的矿，省耐久。
   - 分级 `pickaxeTierLevel()`：26.2 已移除 `TieredItem`，改为测 `isCorrectToolForDrops` 在参考方块上的结果定级——铁矿石（`NEEDS_STONE_TOOL`）=石级、钻石矿（`NEEDS_IRON_TOOL`）=铁级、黑曜石（`NEEDS_DIAMOND_TOOL`）=钻石级；下界合金镐单独记最高级，保证优先用钻石镐省耐久；木/金镐连铁矿石都挖不动 → 0 级。**正确性始终由 `isCorrectToolForDrops` 兜底，分级只用于"够用的镐里挑最弱"的排序**，即便分级偏差也绝不会选到不够用的镐。
@@ -105,6 +105,12 @@
 - 26.2 已将挖掘疲劳从 `MobEffects.DIG_SLOWDOWN` 改名为 **`MobEffects.MINING_FATIGUE`**（`DIG_SLOWDOWN` 编译直接报"找不到符号"）。凡涉及清除/施加挖掘疲劳（如海洋人偶清主人挖掘疲劳）务必用新名。
 - 其余常用常量名在 26.2 保持：`SLOWNESS`、`SPEED`、`JUMP_BOOST`、`HASTE`、`POISON`、`WITHER`、`ABSORPTION`、`WATER_BREATHING` 等。若要核查任何效果常量，用 `javap -cp <minecraft-client.jar> net.minecraft.world.effect.MobEffects` 列全量字段。
 - **吸收（金心）**：`ABSORPTION` 等级对应血量 = `4×(amp+1)`，无法精确表达"5 颗"（10 点）——amp=2 → 12 点（6 颗）。做"额外金色血量"类能力时按此换算并明确数值。
+
+### 水下挖掘惩罚（26.2 已将 ÷5 属性化，勿用高等级急迫 hack）
+- 26.2 "水中挖掘 ÷5"不再是硬编码，而是**原版属性 `Attributes.SUBMERGED_MINING_SPEED`（默认 base=0.2）**：`Player.getDestroySpeed` 中 `if (isEyeInFluid(WATER)) f *= getAttributeValue(SUBMERGED_MINING_SPEED)`。（`BlockState.getDestroyProgress` → `Player.getDestroySpeed` 即为方块破坏速度唯一链路。）
+- 要"真正移除水中惩罚"（而非叠急迫）→ 给目标玩家 `SUBMERGED_MINING_SPEED = 1.0`：`AttributeModifier(id, +0.8, ADD_VALUE)`（0.2→1.0 恰好无惩罚）。属性自动服务端权威 + 同步客户端、天然"仅该玩家生效"。
+- 推荐模式照抄 `GuideDollTalent` 的主护甲修饰：网格范围给 owner `addTransientModifier`、范围外 `removeModifier(id)`（powered 幂等，`AttributeInstance.hasModifier(id)`/`removeModifier(id)`）。
+- **空中(悬浮)挖掘 ÷5** 是另一条硬编码 → 26.2 无对应属性，需注入 `getDestroySpeed` 才可破，风险更高，通常不做。
 
 ### 自定义头颅（Custom Head）——MC 26.2 全栈配方（重点）
 > **本项目 7 种人偶头颅（warden / pale / forest / nether / sea / ender / guide）的实现是多次踩坑总结出来的全栈方案**，不是"加个纹理"那么简单。26.2 的自定义头颅涉及**方块 / 方块实体 / 方块实体渲染器 / 物品特殊模型 / 两个 SkullBlockRenderer Mixin** 五层，缺一环就紫黑块或根本不渲染。记录如下，新增头颅照着抄。
@@ -204,7 +210,7 @@
 - `ThrownEnderAxe` 忠诚附魔回归须加超时 / 超距保护：`tickCount > 200 || distSqr > 64.0 * 64.0` 时 `discard()`，防止人偶跨维度 / 死亡后斧头无限追逐成为孤儿实体。→ `entity/ThrownEnderAxe.java:97-102`。
 - 须同步 `loyalty` 到 `EntityDataAccessor`，避免重载后 `loyalty=0` 导致忠诚 III 末影斧不再飞回。→ `ThrownEnderAxe.java:270`。
 
-### 飞行地狱剑（NetherFlyingSwordEntity）——继承 ItemEntity 做守护飞剑
+### 飞行下界剑（NetherFlyingSwordEntity）——继承 ItemEntity 做守护飞剑
 - 复用原版物品载体基建（`setPickUpDelay(32767)` + `setUnlimitedLifetime()` 关拾取 / 合并 / 老化 / 重力），但渲染改由自定义 3D 剑模型负责，tick 走 super 链保住位置插值。
 - **姿态同步用 `EntityDataAccessor`**（yaw/pitch/roll 三个 FLOAT），服务端计算、客户端渲染读取，避免每 tick 发包。
 - 状态机：HOVER（贴背悬停）→ THRUST（先升空避让再直刺）→ RETURN（归位）。召唤者死亡 / 移除 / 跨维度时 `discard()`；同一召唤者同时仅一把（`replaceExisting` 顶替）。
@@ -265,7 +271,7 @@
 - **边框后绘**：Screen 背景槽位先绘、边框后绘，否则边框被槽位盖住。
 - **init 内重算布局**：窗口缩放会触发 Screen 重新 `init`，布局坐标须在 `init()` 内重算而非构造期固定。
 - **两阶段 extract**：`extract(...)` 分两步防覆盖（先解析子区域再处理边距 / 裁剪），避免内容相互覆盖。
-- **自定义实体渲染**：投掷物（末影斧 / 飞行剑）须自定义 `RenderState` + `Renderer`，用 `EntityDataAccessor` 同步姿态供渲染读取（见 §4 飞行地狱剑）。
+- **自定义实体渲染**：投掷物（末影斧 / 飞行剑）须自定义 `RenderState` + `Renderer`，用 `EntityDataAccessor` 同步姿态供渲染读取（见 §4 飞行下界剑）。
 
 ## 9. 性能与优化模组兼容性
 

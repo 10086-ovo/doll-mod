@@ -1,56 +1,51 @@
 {
-	"name": "Sea Doll",
-	"icon": "doll-mod:sea_doll_egg",
-	"category": "special",
-	"sortnum": 3,
-	"pages": [
-		{
-			"type": "text",
-			"title": "Base Stats",
-			"text": "Aquatic doll. Good for underwater exploration and laser attacks.\n\nHP: 120. Regen IV + Resistance II + Fire Resistance. Free water movement."
-		},
-		{
-			"type": "text",
-			"title": "Aura & Abilities",
-			"text": "Melee/Archer mode fires a laser (20 magic damage, armor-piercing, 1.5s charge, 1s cooldown).\n\nAura (16 blocks): hostile aquatic mobs cannot target doll or owner. Owner gets Water Breathing + Aqua Affinity + Mining Fatigue removal."
-		},
-		{
-			"type": "text",
-			"title": "Fishing Mode",
-			"text": "Uses standard loot table. Bite time halved, double catch. Enchantments on the rod (Luck of the Sea, Lure) are recognized and applied."
-		},
-		{
-			"type": "text",
-			"title": "How to Obtain",
-			"text": "Craft the Sea Doll Head, then the Sea Doll Egg. Name the egg on an anvil to summon."
-		},
-		{
-			"type": "crafting",
-			"title": "Crafting Recipe",
-			"pattern": [
-				"PP",
-				"PP"
-			],
-			"keys": {
-				"P": "minecraft:prismarine"
-			},
-			"result": "doll-mod:sea_doll_head",
-			"text": "4 prismarine in a 2x2 grid."
-		},
-		{
-			"type": "crafting",
-			"title": "Crafting Recipe",
-			"pattern": [
-				"KKK",
-				"KHK",
-				"KKK"
-			],
-			"keys": {
-				"K": "minecraft:kelp",
-				"H": "doll-mod:sea_doll_head"
-			},
-			"result": "doll-mod:sea_doll_egg",
-			"text": "8 kelp surround the head."
-		}
-	]
+  "name": "Sea Doll",
+  "icon": "doll-mod:sea_doll_egg",
+  "category": "special",
+  "sortnum": 3,
+  "pages": [
+    {
+      "type": "text",
+      "title": "Base Stats",
+      "text": "The Sea Doll is fully adapted to underwater environments, ideal for exploring ocean monuments and deep waters.\n\n• HP: 120\n• Regen IV + Resistance II + Fire Resistance\n• Fully adapted underwater (free movement, water pathfinding)"
+    },
+    {
+      "type": "text",
+      "title": "Aura & Abilities",
+      "text": "Combat\n• Melee/Archer mode auto-fires a laser (magic damage 20, 1.5s charge-up, 1s cooldown)\n\nAura\n• Sea-mob pacify: sea mobs within 16 blocks cannot build aggro on the doll or its owner\n• The owner gains Water Breathing while nearby (16-block range), underwater mining speed is not reduced, and Mining Fatigue is removed"
+    },
+    {
+      "type": "text",
+      "title": "Fishing Mode",
+      "text": "In Fishing mode the Sea Doll fishes automatically, hooks twice as fast, and yields double on reeling in.\n\nEnchantments on the fishing rod (such as Luck of the Sea and Lure) are recognized and applied correctly by the Sea Doll."
+    },
+    {
+      "type": "crafting",
+      "title": "Crafting Recipe",
+      "pattern": [
+        "PP",
+        "PP"
+      ],
+      "keys": {
+        "P": "minecraft:prismarine"
+      },
+      "result": "doll-mod:sea_doll_head",
+      "text": "4 prismarine in a 2x2 grid."
+    },
+    {
+      "type": "crafting",
+      "title": "Crafting Recipe",
+      "pattern": [
+        "KKK",
+        "KHK",
+        "KKK"
+      ],
+      "keys": {
+        "K": "minecraft:kelp",
+        "H": "doll-mod:sea_doll_head"
+      },
+      "result": "doll-mod:sea_doll_egg",
+      "text": "Surround the center with 8 kelp to craft the Sea Doll Egg.\n\nName the egg on an anvil, then right-click the ground while holding it to summon the doll."
+    }
+  ]
 }

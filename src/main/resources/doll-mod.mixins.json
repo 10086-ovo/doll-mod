@@ -6,8 +6,6 @@
 		"AbstractArrowMixin",
 		"AnvilBlockMixin",
 		"AnvilMenuMixin",
-		"AreaEffectCloudAccessor",
-		"AreaEffectCloudMixin",
 		"EnchantmentHelperMixin",
 		"ItemCombinerMenuAccessor",
 		"LivingEntityDodgeMixin",

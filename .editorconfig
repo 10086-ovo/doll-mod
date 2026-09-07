@@ -1,0 +1,25 @@
+# 人偶模组统一编辑器/工具风格，防止低级格式漂移。
+# 摘要：UTF-8 无 BOM、LF、末行换行、无尾随空白；Java 用 Tab 缩进。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.java]
+indent_style = tab
+tab_width = 4
+
+[*.json]
+indent_style = space
+indent_size = 2
+
+# 指南书手写条目沿用 Tab 缩进（历史风格，datagen 生成的 lang 仍为 2 空格）
+[src/main/resources/assets/doll-mod/guide_book/**]
+indent_style = tab
+tab_width = 4
+
+[*.md]
+trim_trailing_whitespace = false

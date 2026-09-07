@@ -1,51 +1,46 @@
 {
-	"name": "Forest Doll",
-	"icon": "doll-mod:forest_doll_egg",
-	"category": "special",
-	"sortnum": 1,
-	"pages": [
-		{
-			"type": "text",
-			"title": "Base Stats",
-			"text": "Controls hostile mobs with vines and provides sustained regen. Good for outdoor adventures.\n\nHP: 120. Regen IV + Resistance II."
-		},
-		{
-			"type": "text",
-			"title": "Aura & Abilities",
-			"text": "Auras (radius 16 blocks each):\n• Slowness IV on hostile mobs (expires on leaving range)\n• Threat Marking: hostile land mobs within 32 blocks highlighted (spectral-arrow outline)\n• Owner: continuous Regen I within range\n• Attracts nearby untamed animals\n\nOffhand Thorns Shield: reflects the full damage taken."
-		},
-		{
-			"type": "text",
-			"title": "How to Obtain",
-			"text": "Craft the Forest Doll Head, then the Forest Doll Egg. Name the egg on an anvil to summon."
-		},
-		{
-			"type": "crafting",
-			"title": "Crafting Recipe",
-			"pattern": [
-				"MM",
-				"MM"
-			],
-			"keys": {
-				"M": "minecraft:mossy_cobblestone"
-			},
-			"result": "doll-mod:forest_doll_head",
-			"text": "4 mossy cobblestone in a 2x2 grid."
-		},
-		{
-			"type": "crafting",
-			"title": "Crafting Recipe",
-			"pattern": [
-				"OOO",
-				"OHO",
-				"OOO"
-			],
-			"keys": {
-				"O": "minecraft:oak_log",
-				"H": "doll-mod:forest_doll_head"
-			},
-			"result": "doll-mod:forest_doll_egg",
-			"text": "8 oak logs surround the head."
-		}
-	]
+  "name": "Forest Doll",
+  "icon": "doll-mod:forest_doll_egg",
+  "category": "special",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "text",
+      "title": "Base Stats",
+      "text": "The Forest Doll slows nearby hostile mobs and provides the owner with ongoing recovery.\n\n• HP: 120\n• Regen IV + Resistance II (no Fire Resistance)"
+    },
+    {
+      "type": "text",
+      "title": "Aura & Abilities",
+      "text": "Aura\n• Slowness: hostile mobs within 16 blocks slow down (Slowness IV, expires naturally when they leave)\n• Threat marking: hostile land mobs within 32 blocks are highlighted (spectral-arrow outline)\n• Owner recovery: the owner within 16 blocks gains constant Regen I\n• Friendly-mob attraction: draws nearby untamed animals closer\n\nOffhand shield\nWhen the doll holds a shield in its offhand, it reflects 100% of incoming damage."
+    },
+    {
+      "type": "crafting",
+      "title": "Crafting Recipe",
+      "pattern": [
+        "MM",
+        "MM"
+      ],
+      "keys": {
+        "M": "minecraft:mossy_cobblestone"
+      },
+      "result": "doll-mod:forest_doll_head",
+      "text": "4 mossy cobblestone in a 2x2 grid."
+    },
+    {
+      "type": "crafting",
+      "title": "Crafting Recipe",
+      "pattern": [
+        "OOO",
+        "OHO",
+        "OOO"
+      ],
+      "keys": {
+        "O": "minecraft:oak_log",
+        "H": "doll-mod:forest_doll_head"
+      },
+      "result": "doll-mod:forest_doll_egg",
+      "text": "Surround the center with 8 oak logs to craft the Forest Doll Egg.\n\nName the egg on an anvil, then right-click the ground while holding it to summon the doll."
+    }
+  ]
 }

@@ -12,7 +12,7 @@
 		{
 			"type": "text",
 			"title": "Doll Variants",
-			"text": "Two categories:\n\nNormal: Tier 1 to 5. Higher tiers = more health and better regen. Max health: 100.\n\nSpecial: Pale, Nether, Ender, Sea, Forest, Guide. Each has a unique aura and ability. Unified health: 120.\n\nWarden Doll: the highest-stat variant (200 HP). Obtained via shrine ritual. See \"Endgame\" category.\n\nAll variants can use all 8 work modes. Differences are stats and auras only."
+			"text": "Two categories:\n\nNormal: Tier 1 to 5. Higher tiers = more health and better regen. Max health: 100.\n\nSpecial: Pale, Nether, Ender, Sea, Forest, Guide. Each has a unique aura and ability. Unified health: 120.\n\nWarden Doll: the highest-stat variant (200 HP). Obtained via shrine ritual.\n\nAll variants can use all 8 work modes. Differences are stats and auras only."
 		}
 	]
 }

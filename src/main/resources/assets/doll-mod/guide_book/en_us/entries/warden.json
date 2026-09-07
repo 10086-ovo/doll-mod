@@ -1,33 +1,33 @@
 {
-	"name": "Warden Doll",
-	"icon": "doll-mod:warden_doll_egg",
-	"category": "endgame",
-	"sortnum": 2,
-	"pages": [
-		{
-			"type": "text",
-			"title": "Base Stats",
-			"text": "The doll with the highest stats in the mod. HP: 200.\n\n• Regen VI + Resistance IV + Fire Resistance\n• Full knockback resistance\n• Immune to fire, lava, and all projectile damage (arrows, tridents, wither skulls, etc.)\n\nCombat: Melee/Archer mode fires sonic booms (30 damage, armor-piercing, 1.5s charge, 4s cooldown). Looter: 3x XP + innate Looting III."
-		},
-		{
-			"type": "text",
-			"title": "How to Obtain",
-			"text": "1. Use Echo Shard on Sculk Shrine to summon Wild Warden Doll\n2. Defeat it — 60% chance to drop Warden Doll Head (+10% per Looting)\n3. Craft the head with 8 Sculk blocks into Warden Doll Egg\n\nEach shrine requires the previous boss to be dead before summoning again."
-		},
-		{
-			"type": "crafting",
-			"title": "Crafting Recipe",
-			"pattern": [
-				"SSS",
-				"SHS",
-				"SSS"
-			],
-			"keys": {
-				"S": "minecraft:sculk",
-				"H": "doll-mod:warden_doll_head"
-			},
-			"result": "doll-mod:warden_doll_egg",
-			"text": "Head in center, 8 Sculk blocks surrounding."
-		}
-	]
+  "name": "Sculk Doll",
+  "icon": "doll-mod:warden_doll_egg",
+  "category": "endgame",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "text",
+      "title": "Base Stats",
+      "text": "• HP: 200\n• Regen VI + Resistance IV + Fire Resistance\n• Full knockback resistance, cannot be knocked back by anything\n• Immune to fire and lava damage\n• Immune to all projectile damage (arrows, tridents, wither skulls, etc.)\n\nCombat\n• Melee/Archer mode auto-fires sonic attacks (30 damage, armor-piercing, 1.5s charge-up, 4s cooldown)\n• Kill XP x3, attacks carry Looting III"
+    },
+    {
+      "type": "text",
+      "title": "How to Obtain",
+      "text": "1. Use Echo Shards at the Sculk Shrine to summon a Wild Sculk Doll\n2. Defeat the Wild Sculk Doll for a 60% chance to drop a Sculk Doll Head (+10% per level of Looting)\n3. Put the head in the center of a crafting table and surround it with 8 sculk blocks to craft the Sculk Doll Egg"
+    },
+    {
+      "type": "crafting",
+      "title": "Crafting Recipe",
+      "pattern": [
+        "SSS",
+        "SHS",
+        "SSS"
+      ],
+      "keys": {
+        "S": "minecraft:sculk",
+        "H": "doll-mod:warden_doll_head"
+      },
+      "result": "doll-mod:warden_doll_egg",
+      "text": "Put the Sculk Doll Head in the center and surround it with 8 sculk blocks to craft the Sculk Doll Egg."
+    }
+  ]
 }

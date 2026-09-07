@@ -1,18 +1,18 @@
 {
-	"name": "Work Modes",
-	"icon": "doll-mod:doll_baton",
-	"category": "basics",
-	"sortnum": 1,
-	"pages": [
-		{
-			"type": "text",
-			"title": "Eight Modes",
-			"text": "Combat: Melee (attacks hostile mobs, needs sword/axe) / Archer (uses bow/crossbow, auto-draws)\n\nGathering: Woodcutting (chainsaw-fells whole trees) / Mining (BFS ore scan + tunnel boring) / Fishing (auto-fish near water, excludes Follow)\n\nSupport: Farming (tills 9x9, plants, harvests) / Feeding (throws food to owner when hungry) / Torch Placing (places torches where light < 8)"
-		},
-		{
-			"type": "text",
-			"title": "Switching Modes",
-			"text": "Right-click with the Remote to open the control panel. Lists all living dolls. Click a button to switch modes. Click the active mode again to deselect.\n\n• Follow toggle is independent of the 8 modes\n• Fishing and Follow are mutually exclusive\n• Changes take effect immediately\n• Required tool must be in the doll's inventory"
-		}
-	]
+  "name": "Work Modes",
+  "icon": "doll-mod:doll_baton",
+  "category": "basics",
+  "sortnum": 1,
+  "pages": [
+    {
+      "type": "text",
+      "title": "Eight Modes",
+      "text": "Dolls have 8 work modes, switched via the Remote panel:\n\nCombat\n• Melee: actively attacks hostile mobs within 8 blocks; needs a sword or axe in its inventory\n• Archer: shoots with a bow or crossbow, auto-draws and reloads\n\nGathering\n• Woodcutting: finds trees and fells the whole tree; needs an axe in its inventory\n• Mining: automatically finds and chain-mines connected ores, and tunnels forward; needs a pickaxe in its inventory\n• Fishing: auto-fishes near water; mutually exclusive with Follow\n\nSupport\n• Farming: tills a 9x9 field, plants, harvests, replants; needs a hoe in its inventory\n• Feeding: throws food to the owner when hungry or injured\n• Torch Placing: places torches in areas with light level below 8"
+    },
+    {
+      "type": "text",
+      "title": "Switching Modes",
+      "text": "Right-click with the Remote to open the control panel, which lists all living dolls. Click a button to switch a mode; the highlighted button is the active mode.\n\n• Clicking an already-active mode button deselects it and returns to idle\n• The Follow toggle is independent of the 8 modes and can be toggled separately\n• Fishing and Follow are mutually exclusive: enabling one auto-disables the other\n• Mode changes take effect immediately, no need to resummon the doll\n• The required tool must be in the doll's inventory, otherwise gathering modes cannot work"
+    }
+  ]
 }

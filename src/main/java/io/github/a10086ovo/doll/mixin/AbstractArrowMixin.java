@@ -16,10 +16,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * 苍白弓箭矢命中效果 -- 注入 {@link AbstractArrow#onHitEntity} 尾部。
  * <p>
  * 当箭矢命中生物时，检查射击者（{@code getOwner()}）主手或副手是否持有
- * {@link PaleBowItem}。若持有则对目标施加易伤（受伤 +15%，持续 5 秒）。
+ * {@link PaleBowItem}。若持有则对目标施加易伤（受伤 +50%，持续 5 秒）。
  * <p>
  * 易伤由 {@link PaleVulnerabilityTracker} 服务端追踪，在
- * {@link LivingEntityVulnerabilityMixin} 的 {@code hurtServer} 中乘算生效。
+ * {@link LivingEntityVulnerabilityMixin} 的 {@code hurtServer} 中加算生效（×1.5 = +50%；
+ * 与苍白人偶恐惧光环的 +50% 同处触发时总计 +100%）。
  * 重复命中只刷新持续时间，不叠加倍率。玩家和人偶射箭均生效。
  */
 @Mixin(AbstractArrow.class)

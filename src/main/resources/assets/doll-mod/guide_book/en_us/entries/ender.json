@@ -1,51 +1,46 @@
 {
-	"name": "Ender Doll",
-	"icon": "doll-mod:ender_doll_egg",
-	"category": "special",
-	"sortnum": 5,
-	"pages": [
-		{
-			"type": "text",
-			"title": "Base Stats",
-			"text": "Skilled at dodging and finishing off targets with teleport-strikes. Has an edge in the End.\n\nHP: 120. Regen IV + Resistance II."
-		},
-		{
-			"type": "text",
-			"title": "Aura & Abilities",
-			"text": "67% melee dodge, 100% projectile dodge (teleport-evades).\n\nMelee/Archer mode fires dragon's breath (lingering cloud, 3s cooldown). Does not harm owner or allies.\n\nExecute: teleport-strikes targets below 25% HP (60s cooldown). With Ender Axe: threshold rises to 55%."
-		},
-		{
-			"type": "text",
-			"title": "How to Obtain",
-			"text": "Craft the Ender Doll Head, then the Ender Doll Egg. Name the egg on an anvil to summon."
-		},
-		{
-			"type": "crafting",
-			"title": "Crafting Recipe",
-			"pattern": [
-				"PP",
-				"PP"
-			],
-			"keys": {
-				"P": "minecraft:purpur_block"
-			},
-			"result": "doll-mod:ender_doll_head",
-			"text": "4 purpur blocks in a 2x2 grid."
-		},
-		{
-			"type": "crafting",
-			"title": "Crafting Recipe",
-			"pattern": [
-				"EEE",
-				"EHE",
-				"EEE"
-			],
-			"keys": {
-				"E": "minecraft:end_stone",
-				"H": "doll-mod:ender_doll_head"
-			},
-			"result": "doll-mod:ender_doll_egg",
-			"text": "8 end stone surround the head."
-		}
-	]
+  "name": "Ender Doll",
+  "icon": "doll-mod:ender_doll_egg",
+  "category": "special",
+  "sortnum": 5,
+  "pages": [
+    {
+      "type": "text",
+      "title": "Base Stats",
+      "text": "The Ender Doll dodges incoming attacks and can execute enemies at low HP.\n\n• HP: 120\n• Regen IV + Resistance II (no Fire Resistance)"
+    },
+    {
+      "type": "text",
+      "title": "Aura & Abilities",
+      "text": "Combat\n• Dodge: 67% chance vs melee, 100% vs projectiles to take no damage and teleport away\n• Melee/Archer mode auto-fires Ender Bolts (20 damage on direct hit and in a 3-block radius, does not ignite, 3s cooldown)\n• Execute: instantly kills targets below 25% HP, no cooldown (cannot execute the Wild Sculk Doll boss)\n• With Ender Axe: execute threshold is 30%\n\nAura\n• End-mob pacify: endermen / endermites / shulkers cannot build aggro on you or the doll; leftover aggro is cleared automatically (the Ender Dragon is excluded)"
+    },
+    {
+      "type": "crafting",
+      "title": "Crafting Recipe",
+      "pattern": [
+        "PP",
+        "PP"
+      ],
+      "keys": {
+        "P": "minecraft:purpur_block"
+      },
+      "result": "doll-mod:ender_doll_head",
+      "text": "4 purpur blocks in a 2x2 grid."
+    },
+    {
+      "type": "crafting",
+      "title": "Crafting Recipe",
+      "pattern": [
+        "EEE",
+        "EHE",
+        "EEE"
+      ],
+      "keys": {
+        "E": "minecraft:end_stone",
+        "H": "doll-mod:ender_doll_head"
+      },
+      "result": "doll-mod:ender_doll_egg",
+      "text": "Surround the center with 8 end stone to craft the Ender Doll Egg.\n\nName the egg on an anvil, then right-click the ground while holding it to summon the doll."
+    }
+  ]
 }

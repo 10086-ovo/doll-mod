@@ -196,7 +196,7 @@ public class DollMod implements ModInitializer {
 			.build(ResourceKey.create(Registries.ENTITY_TYPE, THROWN_ENDER_AXE_ENTITY_KEY))
 	);
 
-	// ---- 飞行地狱剑实体 ----
+	// ---- 飞行下界剑实体 ----
 	public static final EntityType<NetherFlyingSwordEntity> NETHER_FLYING_SWORD_ENTITY = Registry.register(
 		BuiltInRegistries.ENTITY_TYPE,
 		id(DollModConstants.NETHER_FLYING_SWORD_ID),
@@ -216,11 +216,11 @@ public class DollMod implements ModInitializer {
 	public static Item GUIDE_BOOK_ITEM;
 	public static PaleBowItem PALE_BOW_ITEM;
 	public static ArmorMaterial SEA_ARMOR_MATERIAL;
-		public static TagKey<Item> SEA_ARMOR_REPAIR_TAG;
-			public static TagKey<Item> ENDER_AXE_REPAIR_TAG;
-			public static TagKey<Item> NETHER_SWORD_REPAIR_TAG;
-			public static TagKey<Item> PALE_BOW_REPAIR_TAG;
-			public static TagKey<Item> THORNS_SHIELD_REPAIR_TAG;
+	public static TagKey<Item> SEA_ARMOR_REPAIR_TAG;
+	public static TagKey<Item> ENDER_AXE_REPAIR_TAG;
+	public static TagKey<Item> NETHER_SWORD_REPAIR_TAG;
+	public static TagKey<Item> PALE_BOW_REPAIR_TAG;
+	public static TagKey<Item> THORNS_SHIELD_REPAIR_TAG;
 	public static SeaArmorItem SEA_HELMET;
 	public static SeaArmorItem SEA_CHESTPLATE;
 	public static SeaArmorItem SEA_LEGGINGS;
@@ -489,36 +489,36 @@ public class DollMod implements ModInitializer {
 
 		// ========== 1. 注册所有物品 ==========
 
-			ENDER_AXE_REPAIR_TAG = TagKey.create(Registries.ITEM, id("ender_axe_repair"));
-				NETHER_SWORD_REPAIR_TAG = TagKey.create(Registries.ITEM, id("nether_sword_repair"));
-				PALE_BOW_REPAIR_TAG = TagKey.create(Registries.ITEM, id("pale_bow_repair"));
-				THORNS_SHIELD_REPAIR_TAG = TagKey.create(Registries.ITEM, id("thorns_shield_repair"));
+		ENDER_AXE_REPAIR_TAG = TagKey.create(Registries.ITEM, id("ender_axe_repair"));
+		NETHER_SWORD_REPAIR_TAG = TagKey.create(Registries.ITEM, id("nether_sword_repair"));
+		PALE_BOW_REPAIR_TAG = TagKey.create(Registries.ITEM, id("pale_bow_repair"));
+		THORNS_SHIELD_REPAIR_TAG = TagKey.create(Registries.ITEM, id("thorns_shield_repair"));
 
-			ENDER_AXE_ITEM = Registry.register(
-				BuiltInRegistries.ITEM,
-				ENDER_AXE_KEY,
-				new EnderAxeItem(ToolMaterial.NETHERITE, 5.0f, -2.4f,
-					new Item.Properties().durability(2031)
-						.repairable(ENDER_AXE_REPAIR_TAG)
-						.setId(ResourceKey.create(Registries.ITEM, ENDER_AXE_KEY)))
-			);
+		ENDER_AXE_ITEM = Registry.register(
+			BuiltInRegistries.ITEM,
+			ENDER_AXE_KEY,
+			new EnderAxeItem(ToolMaterial.NETHERITE, 5.0f, -2.4f,
+				new Item.Properties().durability(2031)
+					.repairable(ENDER_AXE_REPAIR_TAG)
+					.setId(ResourceKey.create(Registries.ITEM, ENDER_AXE_KEY)))
+		);
 
 		THORNS_SHIELD_ITEM = Registry.register(
 			BuiltInRegistries.ITEM,
 			THORNS_SHIELD_KEY,
 			new ThornsShieldItem(new Item.Properties().durability(672)
-						.repairable(THORNS_SHIELD_REPAIR_TAG)
-						.setId(ResourceKey.create(Registries.ITEM, THORNS_SHIELD_KEY)))
+				.repairable(THORNS_SHIELD_REPAIR_TAG)
+				.setId(ResourceKey.create(Registries.ITEM, THORNS_SHIELD_KEY)))
 		);
 
 		NETHER_SWORD_ITEM = Registry.register(
-				BuiltInRegistries.ITEM,
-				NETHER_SWORD_KEY,
-				new NetherSwordItem(ToolMaterial.NETHERITE, 3.0f, -2.0f,
-					new Item.Properties()
-						.repairable(NETHER_SWORD_REPAIR_TAG)
-						.setId(ResourceKey.create(Registries.ITEM, NETHER_SWORD_KEY)))
-			);
+			BuiltInRegistries.ITEM,
+			NETHER_SWORD_KEY,
+			new NetherSwordItem(ToolMaterial.NETHERITE, 3.0f, -2.0f,
+				new Item.Properties()
+					.repairable(NETHER_SWORD_REPAIR_TAG)
+					.setId(ResourceKey.create(Registries.ITEM, NETHER_SWORD_KEY)))
+		);
 
 		GUIDE_BOOK_ITEM = Registry.register(
 			BuiltInRegistries.ITEM,
@@ -528,15 +528,15 @@ public class DollMod implements ModInitializer {
 		);
 
 		PALE_BOW_ITEM = Registry.register(
-						BuiltInRegistries.ITEM,
-						PALE_BOW_KEY,
-						new PaleBowItem(new Item.Properties().durability(1536)
-								.enchantable(1)
-								.repairable(PALE_BOW_REPAIR_TAG)
-								.setId(ResourceKey.create(Registries.ITEM, PALE_BOW_KEY)))
-				);
+			BuiltInRegistries.ITEM,
+			PALE_BOW_KEY,
+			new PaleBowItem(new Item.Properties().durability(1536)
+				.enchantable(1)
+				.repairable(PALE_BOW_REPAIR_TAG)
+				.setId(ResourceKey.create(Registries.ITEM, PALE_BOW_KEY)))
+		);
 
-				DOLL_BATON = Registry.register(
+		DOLL_BATON = Registry.register(
 			BuiltInRegistries.ITEM,
 			DOLL_BATON_KEY,
 			new DollBatonItem(new Item.Properties().stacksTo(1)

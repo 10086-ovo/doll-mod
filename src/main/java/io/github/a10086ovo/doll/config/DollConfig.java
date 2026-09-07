@@ -63,7 +63,7 @@ public class DollConfig {
 	public Sonic sonic = new Sonic();
 	/** 下界人偶烈焰弹（冷却/伤害）。 */
 	public Fireball fireball = new Fireball();
-	/** 末影人偶：龙息/瞬移处决/闪避。 */
+	/** 末影人偶：末影弹/瞬移处决/闪避。 */
 	public Ender ender = new Ender();
 	/** 海洋人偶：激光/水中垂直跟随/急迫。 */
 	public Sea sea = new Sea();
@@ -151,9 +151,9 @@ public class DollConfig {
 	}
 	public static class Ender {
 		public int breathCooldownTicks = 60;
-		public int executeCooldownTicks = 1200;
+		public int executeCooldownTicks = 60;
 		public float executeHealthThreshold = 0.25f;
-		public float executeHealthThresholdAxe = 0.55f;
+		public float executeHealthThresholdAxe = 0.30f;
 		public float dodgeChance = 0.67f;
 		public float dodgeChanceProjectile = 1.0f;
 		public int dodgeRadius = 4;
@@ -165,7 +165,6 @@ public class DollConfig {
 		public double laserRange = 16.0;
 		public double diveSpeed = 0.18;
 		public double verticalDeadzone = 0.25;
-		public int hasteLevel = 24;
 	}
 	public static class Farm {
 		public double searchRange = 12.0;
@@ -438,15 +437,15 @@ public class DollConfig {
     "_c_dmg": "烈焰弹伤害"
   },
   "ender": {
-    "_comment": "末影人偶(龙息/处决/闪避)",
+    "_comment": "末影人偶(末影弹/处决/闪避)",
     "breath_cooldown_ticks": 60,
-    "_c_bcd": "龙息喷吐冷却3s",
+    "_c_bcd": "末影弹发射冷却3s",
     "execute_cooldown_ticks": 1200,
     "_c_ecd": "瞬移处决冷却60s",
     "execute_health_threshold": 0.25,
     "_c_e1": "基础斩杀线(25%)",
-    "execute_health_threshold_axe": 0.55,
-    "_c_e2": "持末影斧斩杀线(55%)",
+    "execute_health_threshold_axe": 0.30,
+    "_c_e2": "持末影斧斩杀线取大值(30%)",
     "dodge_chance": 0.67,
     "_c_dc": "近战受击无伤瞬移概率",
     "dodge_chance_projectile": 1.0,

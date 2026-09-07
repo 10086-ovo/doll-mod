@@ -7,12 +7,12 @@
     {
       "type": "text",
       "title": "Overview",
-      "text": "Forest-themed shield. Functions like a vanilla shield: right-click to block, negates damage, consumes durability.\n\n• Durability: 672 (2x vanilla shield). Enchantable.\n• Blocking reflects 2 thorns damage to attackers within 3 blocks (ignores armor)\n• Player use: reflected attacker receives infinite Poison"
+      "text": "A Forest-themed defensive tool that works like a vanilla shield: right-click to block, negates all damage while consuming durability.\n\n• Durability: 672 (twice the vanilla shield). Enchantable: Unbreaking, Mending, Thorns, etc. (enchantability same as vanilla)\n• Blocking reflects 2 thorns damage to attackers within 3 blocks (ignores armor)\n• Player use: the damaged enemy gets infinite Poison"
     },
     {
       "type": "text",
-      "title": "Forest Doll Synergy",
-      "text": "Forest Doll offhand: 100% damage reflection.\n\nRepair: oak logs."
+      "title": "Doll Use",
+      "text": "When a doll holds the shield in its offhand, it reflects 100% of incoming damage."
     },
     {
       "type": "crafting",
@@ -27,7 +27,7 @@
         "I": "minecraft:iron_block"
       },
       "result": "doll-mod:thorns_shield",
-      "text": "Oak logs surround an iron block."
+      "text": "Oak logs surround a central iron block."
     }
   ]
 }

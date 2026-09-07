@@ -1,56 +1,51 @@
 {
-	"name": "Pale Doll",
-	"icon": "doll-mod:pale_doll_egg",
-	"category": "special",
-	"sortnum": 2,
-	"pages": [
-		{
-			"type": "text",
-			"title": "Base Stats",
-			"text": "Freezes hostile mobs with a fear aura, and can take a fatal hit for the owner.\n\nHP: 120. Regen IV + Resistance II."
-		},
-		{
-			"type": "text",
-			"title": "Fear Aura",
-			"text": "Radius: 16 blocks.\n• Hostile mobs lose targeting — cannot attack, pathfind, or jump\n• Mobs take +50% extra damage (x1.5 vulnerability)\n• Physics still apply (gravity, knockback)"
-		},
-		{
-			"type": "text",
-			"title": "Sacrifice Mechanic",
-			"text": "When the owner takes fatal damage:\n• Priority 1: deployed Pale Doll within 16 blocks → killed\n• Priority 2: named Pale Doll Egg in inventory → becomes invalid\n• Effect: Totem sound + visual + 100 temp HP (60s)\n\nDoes not trigger on /kill or void damage."
-		},
-		{
-			"type": "text",
-			"title": "How to Obtain",
-			"text": "Craft the Pale Doll Head, then the Pale Doll Egg. Name the egg on an anvil to summon."
-		},
-		{
-			"type": "crafting",
-			"title": "Crafting Recipe",
-			"pattern": [
-				"RR",
-				"RR"
-			],
-			"keys": {
-				"R": "minecraft:resin_brick"
-			},
-			"result": "doll-mod:pale_doll_head",
-			"text": "4 resin bricks in a 2x2 grid."
-		},
-		{
-			"type": "crafting",
-			"title": "Crafting Recipe",
-			"pattern": [
-				"PPP",
-				"PHP",
-				"PPP"
-			],
-			"keys": {
-				"P": "minecraft:pale_oak_log",
-				"H": "doll-mod:pale_doll_head"
-			},
-			"result": "doll-mod:pale_doll_egg",
-			"text": "8 pale oak logs surround the head."
-		}
-	]
+  "name": "Pale Doll",
+  "icon": "doll-mod:pale_doll_egg",
+  "category": "special",
+  "sortnum": 2,
+  "pages": [
+    {
+      "type": "text",
+      "title": "Base Stats",
+      "text": "The Pale Doll freezes nearby hostile mobs with its Fear Aura, and can shield its owner from a lethal hit in a pinch.\n\n• HP: 120\n• Regen IV + Resistance II (no Fire Resistance)"
+    },
+    {
+      "type": "text",
+      "title": "Fear Aura",
+      "text": "Aura radius 16 blocks:\n• Hostile mobs inside cannot target, move, attack, or jump\n• Enemies in the aura take +50% damage (x1.5 vulnerability)\n• The effect ends when the doll dies or leaves the range"
+    },
+    {
+      "type": "text",
+      "title": "Sacrifice Mechanic",
+      "text": "When the owner would take fatal damage, the Pale Doll sacrifices itself on the owner's behalf:\n\n• Priority 1: a deployed Pale Doll entity within 16 blocks is killed\n• Priority 2: a named Pale Doll Egg in the inventory is invalidated\n• Trigger effect: totem-of-undying sound + visuals + temporary 100 HP (lasts 60s)\n• Damage that bypasses invulnerability (e.g. /kill, void) does not trigger this"
+    },
+    {
+      "type": "crafting",
+      "title": "Crafting Recipe",
+      "pattern": [
+        "RR",
+        "RR"
+      ],
+      "keys": {
+        "R": "minecraft:resin_brick"
+      },
+      "result": "doll-mod:pale_doll_head",
+      "text": "4 resin bricks in a 2x2 grid."
+    },
+    {
+      "type": "crafting",
+      "title": "Crafting Recipe",
+      "pattern": [
+        "PPP",
+        "PHP",
+        "PPP"
+      ],
+      "keys": {
+        "P": "minecraft:pale_oak_log",
+        "H": "doll-mod:pale_doll_head"
+      },
+      "result": "doll-mod:pale_doll_egg",
+      "text": "Surround the center with 8 pale oak logs to craft the Pale Doll Egg.\n\nName the egg on an anvil, then right-click the ground while holding it to summon the doll."
+    }
+  ]
 }

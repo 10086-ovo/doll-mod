@@ -25,7 +25,7 @@ import net.minecraft.world.level.Level;
  * {@link io.github.a10086ovo.doll.mixin.ThornsShieldMixin} 在 hurtServer HEAD 注入实现。
  * <p>
  * 设计定位：森林人偶的主题配套装备，也可供玩家使用。
- * 耐久 672（×2，等同铁剑两倍），可附魔（enchantability=9，等同原版盾牌，可附魔耐久/经验修补/荆棘）。
+ * 耐久 672（原版盾牌 336 的两倍），可附魔（enchantability=9，等同原版盾牌，可附魔耐久/经验修补/荆棘）。
  */
 public class ThornsShieldItem extends ShieldItem {
 

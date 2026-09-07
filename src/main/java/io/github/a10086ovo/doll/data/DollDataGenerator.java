@@ -95,8 +95,8 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 				.pattern("S  ")
 				.define('S', Items.STICK)
 				.unlockedBy("has_stick", has(Items.STICK))
-                    .save(output, ResourceKey.create(Registries.RECIPE,
-                        Identifier.fromNamespaceAndPath(MOD_ID, DOLL_BATON_ID)));
+					.save(output, ResourceKey.create(Registries.RECIPE,
+						Identifier.fromNamespaceAndPath(MOD_ID, DOLL_BATON_ID)));
 
 			// 人偶遥控器：铁 + 红石 + 铁（控制面板造型）
 			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
@@ -107,8 +107,8 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 				.define('I', Items.IRON_INGOT)
 				.define('R', Items.REDSTONE)
 				.unlockedBy("has_redstone", has(Items.REDSTONE))
-                    .save(output, ResourceKey.create(Registries.RECIPE,
-                        Identifier.fromNamespaceAndPath(MOD_ID, DOLL_CONTROL_PANEL_ID)));
+					.save(output, ResourceKey.create(Registries.RECIPE,
+						Identifier.fromNamespaceAndPath(MOD_ID, DOLL_CONTROL_PANEL_ID)));
 
 			// 一阶蛋：上下左右四个工作台 + 中间箱子（十字形）
 			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
@@ -119,8 +119,8 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 						.define('C', Items.CHEST)
 						.define('W', Items.CRAFTING_TABLE)
 						.unlockedBy("has_chest", has(Items.CHEST))
-                    .save(output, ResourceKey.create(Registries.RECIPE,
-                        Identifier.fromNamespaceAndPath(MOD_ID, DOLL_TIER1_EGG_ID)));
+					.save(output, ResourceKey.create(Registries.RECIPE,
+						Identifier.fromNamespaceAndPath(MOD_ID, DOLL_TIER1_EGG_ID)));
 
 				// 幽匿人偶蛋：8 幽匿块围一圈，中间幽匿人偶头颅
 			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
@@ -143,8 +143,8 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 				.define('D', Items.DEEPSLATE_BRICKS)
 				.define('S', Items.SOUL_SAND)
 				.unlockedBy("has_deepslate_bricks", has(Items.DEEPSLATE_BRICKS))
-                .save(output, ResourceKey.create(Registries.RECIPE,
-                    Identifier.fromNamespaceAndPath(MOD_ID, SCULK_SHRINE_ID)));
+				.save(output, ResourceKey.create(Registries.RECIPE,
+					Identifier.fromNamespaceAndPath(MOD_ID, SCULK_SHRINE_ID)));
 
 			// 苍白人偶头颅：4 树脂砖 2×2 合成
 			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
@@ -289,8 +289,8 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 				.define('C', Items.COBBLESTONE)
 				.define('S', Items.COBBLESTONE_SLAB)
 				.unlockedBy("has_cobblestone", has(Items.COBBLESTONE))
-                .save(output, ResourceKey.create(Registries.RECIPE,
-                    Identifier.fromNamespaceAndPath(MOD_ID, ROCK_ANVIL_ID)));
+				.save(output, ResourceKey.create(Registries.RECIPE,
+					Identifier.fromNamespaceAndPath(MOD_ID, ROCK_ANVIL_ID)));
 
 			// 进阶/附魔蛋升级配方不是普通合成配方：原版合成会丢蛋的 NBT
 				// （名字、回收携带的物品栏/作业区/盾构机配置）。它们改为特殊配方，
@@ -328,7 +328,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 				.save(output, ResourceKey.create(Registries.RECIPE,
 					Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.THORNS_SHIELD_ID)));
 
-			// 地狱剑：中间一列竖排——烈焰棒×2 + 木棍×1（下界主题近战武器，
+			// 下界剑：中间一列竖排——烈焰棒×2 + 木棍×1（下界主题近战武器，
 			// 数值对标下界合金剑）
 			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
 					RecipeCategory.TOOLS, item(NETHER_SWORD_ID))
@@ -568,11 +568,11 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 		addMsg(b, "mine_stop_cliff", en, "%s reached a cliff, tunnelling stopped",
 			"%s 前方是悬崖，盾构机停止");
 		addMsg(b, "mine_stop_no_pickaxe", en, "%s ran out of pickaxes, tunnelling stopped",
-			"%s 镐子用完了，盾构机停止");
+			"%s 镐头用完了，盾构机停止");
 		addMsg(b, "mine_stop_bedrock", en, "%s hit bedrock, tunnelling stopped",
 			"%s 前方是基岩，盾构机停止");
 		addMsg(b, "mine_no_pickaxe", en, "%s ran out of pickaxes, mining stopped (add another pickaxe to resume)",
-			"%s 镐子用完了，挖矿模式停止（补充镐子后自动恢复）");
+			"%s 镐头用完了，挖矿模式停止（补充镐头后自动恢复）");
 		addMsg(b, "mine_stop_water", en, "%s found water ahead, tunnelling stopped",
 			"%s 前方有水，盾构机停止");
 		addMsg(b, "mine_stop_blocked", en, "%s cannot dig ahead, tunnelling stopped",
@@ -580,7 +580,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 		addMsg(b, "mine_backpack_full", en, "%s backpack is full, mining paused (resumes when cleared)",
 			"%s 背包已满，暂缓挖矿（清理背包后自动恢复）");
 		addMsg(b, "no_pickaxe", en, "No pickaxe in the inventory, cannot enable Mining mode",
-			"物品栏中没有镐子，无法开启挖矿模式");
+			"物品栏中没有镐头，无法开启挖矿模式");
 		addMsg(b, "not_owner", en, "This spawn egg is not bound to the target doll",
 			"此刷怪蛋绑定的人偶不是目标人偶，无法回收");
 		addMsg(b, "invalidated", en, "The doll for this spawn egg has died",

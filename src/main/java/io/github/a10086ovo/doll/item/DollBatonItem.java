@@ -354,7 +354,10 @@ public class DollBatonItem extends Item {
 				t -> t.putIntArray(SELECTION_CORNER_NBT_KEY, new int[] { clicked.getX(), clicked.getY(), clicked.getZ() }));
 			serverLevel.sendParticles(ParticleTypes.END_ROD,
 				clicked.getX() + 0.5, clicked.getY() + 0.5, clicked.getZ() + 0.5,
-				16, 0.2, 0.2, 0.2, 0.02);
+				32, 0.25, 0.25, 0.25, 0.03);
+			serverLevel.sendParticles(ParticleTypes.ELECTRIC_SPARK,
+				clicked.getX() + 0.5, clicked.getY() + 0.5, clicked.getZ() + 0.5,
+				12, 0.2, 0.2, 0.2, 0.05);
 			player.sendSystemMessage(Component.translatable("message." + DollModConstants.MOD_ID + ".corner_a_set"));
 			return InteractionResult.SUCCESS_SERVER;
 		}
@@ -463,29 +466,51 @@ public class DollBatonItem extends Item {
 	}
 
 	/**
-	 * 沿作业区 AABB 的 12 条边撒末影棒粒子，生成后一次性边框反馈（约 5 秒消散）。
+	 * 沿作业区 AABB 绘制超明显边框反馈：12 条棱加粗（每格 3 粒子）、立方体内稀疏网格填充、
+	 * 8 个角电火一闪。粒子持续约 5 秒，足以一眼辨识作业区范围。
 	 */
 	private static void spawnAreaFrameParticles(ServerLevel level, BlockPos min, BlockPos max) {
 		int x0 = min.getX(), y0 = min.getY(), z0 = min.getZ();
 		int x1 = max.getX(), y1 = max.getY(), z1 = max.getZ();
+		// 12 条棱：每格 3 个粒子略作错落，比原版单粒子粗亮 3 倍
 		for (int z : new int[] { z0, z1 }) {
 			for (int y : new int[] { y0, y1 }) {
 				for (int x = x0; x <= x1; x++) {
-					level.sendParticles(ParticleTypes.END_ROD, x + 0.5, y + 0.5, z + 0.5, 1, 0, 0, 0, 0);
+					level.sendParticles(ParticleTypes.END_ROD, x + 0.5, y + 0.5, z + 0.5, 3, 0.14, 0.14, 0.14, 0.02);
 				}
 			}
 		}
 		for (int z : new int[] { z0, z1 }) {
 			for (int x : new int[] { x0, x1 }) {
 				for (int y = y0; y <= y1; y++) {
-					level.sendParticles(ParticleTypes.END_ROD, x + 0.5, y + 0.5, z + 0.5, 1, 0, 0, 0, 0);
+					level.sendParticles(ParticleTypes.END_ROD, x + 0.5, y + 0.5, z + 0.5, 3, 0.14, 0.14, 0.14, 0.02);
 				}
 			}
 		}
 		for (int x : new int[] { x0, x1 }) {
 			for (int y : new int[] { y0, y1 }) {
 				for (int z = z0; z <= z1; z++) {
-					level.sendParticles(ParticleTypes.END_ROD, x + 0.5, y + 0.5, z + 0.5, 1, 0, 0, 0, 0);
+					level.sendParticles(ParticleTypes.END_ROD, x + 0.5, y + 0.5, z + 0.5, 3, 0.14, 0.14, 0.14, 0.02);
+				}
+			}
+		}
+		// 立方体内稀疏网格填充（间隔 Q=6 格），把「线框」衬成「立体区域」，肉眼一眼认出
+		int gx0 = Math.min(x0, x1), gy0 = Math.min(y0, y1), gz0 = Math.min(z0, z1);
+		int gx1 = Math.max(x0, x1), gy1 = Math.max(y0, y1), gz1 = Math.max(z0, z1);
+		int Q = 6;
+		for (int fx = gx0; fx <= gx1; fx += Q) {
+			for (int fy = gy0; fy <= gy1; fy += Q) {
+				for (int fz = gz0; fz <= gz1; fz += Q) {
+					level.sendParticles(ParticleTypes.END_ROD, fx + 0.5, fy + 0.5, fz + 0.5, 1, 0.1, 0.1, 0.1, 0.01);
+				}
+			}
+		}
+		// 8 个角电火一闪，作为区域顶点的醒目锚点
+		for (int cx : new int[] { x0, x1 }) {
+			for (int cy : new int[] { y0, y1 }) {
+				for (int cz : new int[] { z0, z1 }) {
+					level.sendParticles(ParticleTypes.ELECTRIC_SPARK, cx + 0.5, cy + 0.5, cz + 0.5,
+						8, 0.3, 0.3, 0.3, 0.05);
 				}
 			}
 		}
