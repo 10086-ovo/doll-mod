@@ -260,7 +260,7 @@ public class DollControlScreen extends Screen {
 		g.centeredText(this.font, LIST_TITLE, leftPos + PANEL_W / 2, topPos + 12, COLOR_NAME);
 
 		if (dolls.isEmpty()) {
-			g.centeredText(this.font, "没有存活的人偶", leftPos + PANEL_W / 2, topPos + PANEL_H / 2, COLOR_HINT);
+			g.centeredText(this.font, t("control_empty"), leftPos + PANEL_W / 2, topPos + PANEL_H / 2, COLOR_HINT);
 			return;
 		}
 
@@ -302,14 +302,14 @@ public class DollControlScreen extends Screen {
 				g.fill(recallX, rowY + 21, recallX + 20, rowY + 22, 0xFF0A090D);
 				g.item(RECALL_ICON, recallX + 2, rowY + 4);
 				if (recallHover) {
-					g.setTooltipForNextFrame(this.font, Component.literal("召回"), (int) lastMouseX, (int) lastMouseY);
+					g.setTooltipForNextFrame(this.font, Component.translatable("gui." + DollModConstants.MOD_ID + ".control_recall"), (int) lastMouseX, (int) lastMouseY);
 				}
 			}
 
 			// 距离（同维度，离线人偶不显示距离）
 			// 若按钮已占空间较大，距离显示自动右移避免重叠
 			if (d.inSameDimension() && d.entityId() >= 0) {
-				String dist = (int) Math.sqrt(d.distanceSqr()) + "格";
+				String dist = Component.translatable("gui." + DollModConstants.MOD_ID + ".control_dist", (int) Math.sqrt(d.distanceSqr())).getString();
 				int distWidth = this.font.width(dist);
 				int distRight = leftPos + PANEL_W - 8;
 				int distLeft = distRight - distWidth;
@@ -335,22 +335,27 @@ public class DollControlScreen extends Screen {
 	}
 
 	private static String statusText(DollSnapshot d) {
-		if (d.entityId() < 0) return "离线";
+		if (d.entityId() < 0) return t("control_offline");
 		if (!d.inSameDimension()) return dimensionDisplayName(d.dimensionName());
-		if (d.isTunneling()) return "掘进中";
-		if (d.followEnabled()) return "跟随";
-		if (d.activeMode() < 0) return "空闲";
-		return DollMode.byIndex(d.activeMode()).getName();
+		if (d.isTunneling()) return t("control_tunneling");
+		if (d.followEnabled()) return t("control_following");
+		if (d.activeMode() < 0) return t("control_idle");
+		return DollMode.byIndex(d.activeMode()).getNormalName().getString();
 	}
 
-	/** 维度 ResourceLocation path → 中文显示名（未知维度原样返回）。 */
+	/** 维度 ResourceLocation path → 本地化显示名（未知维度原样返回）。 */
 	private static String dimensionDisplayName(String dimPath) {
 		return switch (dimPath) {
-			case "overworld" -> "主世界";
-			case "the_nether" -> "下界";
-			case "the_end" -> "末地";
+			case "overworld" -> t("dim_overworld");
+			case "the_nether" -> t("dim_nether");
+			case "the_end" -> t("dim_end");
 			default -> dimPath;
 		};
+	}
+
+	/** 控制面板 GUI 文案翻译键（前缀 gui.doll-mod.）。 */
+	private static String t(String key) {
+		return Component.translatable("gui." + DollModConstants.MOD_ID + "." + key).getString();
 	}
 
 	private static int statusColor(DollSnapshot d) {
@@ -397,7 +402,7 @@ public class DollControlScreen extends Screen {
 		}
 
 		// 底部提示（挪到模式图标下方空白处，留在面板内）
-		g.centeredText(this.font, "点击图标切换模式", leftPos + PANEL_W / 2, topPos + 116, COLOR_HINT);
+		g.centeredText(this.font, t("control_click_mode"), leftPos + PANEL_W / 2, topPos + 116, COLOR_HINT);
 	}
 
 	private int iconX(int col) {

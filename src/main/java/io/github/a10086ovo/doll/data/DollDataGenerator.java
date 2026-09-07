@@ -627,6 +627,19 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 		b.add("gui." + MOD_ID + ".barrier_slot", en ? "Decorative slot" : "装饰栏位");
 		b.add("gui." + MOD_ID + ".offhand_slot", en ? "Offhand slot" : "副手栏");
 
+		// 人偶控制面板（DollControlScreen 状态/提示文案）
+		b.add("gui." + MOD_ID + ".control_offline", en ? "Offline" : "离线");
+		b.add("gui." + MOD_ID + ".control_tunneling", en ? "Tunneling" : "掘进中");
+		b.add("gui." + MOD_ID + ".control_following", en ? "Following" : "跟随");
+		b.add("gui." + MOD_ID + ".control_idle", en ? "Idle" : "空闲");
+		b.add("gui." + MOD_ID + ".control_empty", en ? "No living dolls" : "没有存活的人偶");
+		b.add("gui." + MOD_ID + ".control_recall", en ? "Recall" : "召回");
+		b.add("gui." + MOD_ID + ".control_click_mode", en ? "Click an icon to switch mode" : "点击图标切换模式");
+		b.add("gui." + MOD_ID + ".control_dist", en ? "%s blocks" : "%s 格");
+		b.add("gui." + MOD_ID + ".dim_overworld", en ? "Overworld" : "主世界");
+		b.add("gui." + MOD_ID + ".dim_nether", en ? "Nether" : "下界");
+		b.add("gui." + MOD_ID + ".dim_end", en ? "The End" : "末地");
+
 		// 盾构机掘进方向（mine_tunnel_set 的 %s 参数）
 		b.add("direction." + MOD_ID + ".north", en ? "North" : "北");
 		b.add("direction." + MOD_ID + ".south", en ? "South" : "南");
