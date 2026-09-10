@@ -16,6 +16,7 @@ import io.github.a10086ovo.doll.item.DollBatonItem;
 import io.github.a10086ovo.doll.item.DollControlPanelItem;
 import io.github.a10086ovo.doll.item.DollSpawnEggItem;
 import io.github.a10086ovo.doll.item.EnderAxeItem;
+import io.github.a10086ovo.doll.item.GuidePickaxeItem;
 import io.github.a10086ovo.doll.item.PaleBowItem;
 import io.github.a10086ovo.doll.item.WardenDollHeadItem;
 import io.github.a10086ovo.doll.item.PaleDollHeadItem;
@@ -63,6 +64,7 @@ import io.github.a10086ovo.doll.item.ThornsShieldItem;
 import net.minecraft.core.Holder;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.equipment.ArmorMaterial;
 import net.minecraft.world.item.equipment.ArmorType;
@@ -163,6 +165,8 @@ public class DollMod implements ModInitializer {
 		id(DollModConstants.NETHER_SWORD_ID);
 	private static final Identifier GUIDE_BOOK_KEY =
 		id(DollModConstants.GUIDE_BOOK_ID);
+	private static final Identifier GUIDE_PICKAXE_KEY =
+		id(DollModConstants.GUIDE_PICKAXE_ID);
 	private static final Identifier SEA_HELMET_KEY =
 		id(DollModConstants.SEA_HELMET_ID);
 	private static final Identifier SEA_CHESTPLATE_KEY =
@@ -214,6 +218,7 @@ public class DollMod implements ModInitializer {
 	public static ThornsShieldItem THORNS_SHIELD_ITEM;
 	public static NetherSwordItem NETHER_SWORD_ITEM;
 	public static Item GUIDE_BOOK_ITEM;
+	public static GuidePickaxeItem GUIDE_PICKAXE_ITEM;
 	public static PaleBowItem PALE_BOW_ITEM;
 	public static ArmorMaterial SEA_ARMOR_MATERIAL;
 	public static TagKey<Item> SEA_ARMOR_REPAIR_TAG;
@@ -221,6 +226,16 @@ public class DollMod implements ModInitializer {
 	public static TagKey<Item> NETHER_SWORD_REPAIR_TAG;
 	public static TagKey<Item> PALE_BOW_REPAIR_TAG;
 	public static TagKey<Item> THORNS_SHIELD_REPAIR_TAG;
+	public static TagKey<Item> GUIDE_PICKAXE_REPAIR_TAG;
+	/**
+	 * 地狱剑/末影斧的专属工具材质（数值完全照抄下界合金）：
+	 * 26.2 中 sword()/axe() 会在构造末尾用 ToolMaterial.repairItems 覆盖 Properties 里预先设置的
+	 * REPAIRABLE 组件（见 ToolMaterial.applyCommonProperties），导致注册链上的 .repairable(tag) 全部失效、
+	 * 实际修复材料变成下界合金。让材质自身携带目标 tag（烈焰棒/末影珍珠）才是唯一有效途径。
+	 */
+	public static ToolMaterial NETHER_SWORD_MATERIAL;
+	public static ToolMaterial ENDER_AXE_MATERIAL;
+	public static ToolMaterial GUIDE_PICKAXE_MATERIAL;
 	public static SeaArmorItem SEA_HELMET;
 	public static SeaArmorItem SEA_CHESTPLATE;
 	public static SeaArmorItem SEA_LEGGINGS;
@@ -493,11 +508,25 @@ public class DollMod implements ModInitializer {
 		NETHER_SWORD_REPAIR_TAG = TagKey.create(Registries.ITEM, id("nether_sword_repair"));
 		PALE_BOW_REPAIR_TAG = TagKey.create(Registries.ITEM, id("pale_bow_repair"));
 		THORNS_SHIELD_REPAIR_TAG = TagKey.create(Registries.ITEM, id("thorns_shield_repair"));
+		GUIDE_PICKAXE_REPAIR_TAG = TagKey.create(Registries.ITEM, id("guide_pickaxe_repair"));
+
+		// 自定义工具材质：数值照抄 NETHERITE（incorrect_for_netherite_tool, 2031, 9.0, +4.0, 15），
+		// 仅把 repairItems 换成各自的修复 tag —— 这是让「修复材料=烈焰棒/末影珍珠」真正生效的唯一途径
+		//（26.2 的 sword()/axe() 会在构造末尾用 ToolMaterial.repairItems 覆盖 Properties 里预设的
+		//  REPAIRABLE 组件，见 ToolMaterial.applyCommonProperties，故注册链上的 .repairable(tag) 无效）。
+		NETHER_SWORD_MATERIAL = new ToolMaterial(
+			BlockTags.INCORRECT_FOR_NETHERITE_TOOL, 2031, 9.0F, 4.0F, 15, NETHER_SWORD_REPAIR_TAG);
+		ENDER_AXE_MATERIAL = new ToolMaterial(
+			BlockTags.INCORRECT_FOR_NETHERITE_TOOL, 2031, 9.0F, 4.0F, 15, ENDER_AXE_REPAIR_TAG);
+		// 向导的登山镐：耐久 2031、挖掘速度 9.0、攻击加成 4.0、附魔能力 15，
+		// 修复走专属 tag（铁锭，data/doll-mod/tags/item/guide_pickaxe_repair.json）
+		GUIDE_PICKAXE_MATERIAL = new ToolMaterial(
+			BlockTags.INCORRECT_FOR_NETHERITE_TOOL, 2031, 9.0F, 4.0F, 15, GUIDE_PICKAXE_REPAIR_TAG);
 
 		ENDER_AXE_ITEM = Registry.register(
 			BuiltInRegistries.ITEM,
 			ENDER_AXE_KEY,
-			new EnderAxeItem(ToolMaterial.NETHERITE, 5.0f, -2.4f,
+			new EnderAxeItem(ENDER_AXE_MATERIAL, 5.0f, -2.4f,
 				new Item.Properties().durability(2031)
 					.repairable(ENDER_AXE_REPAIR_TAG)
 					.setId(ResourceKey.create(Registries.ITEM, ENDER_AXE_KEY)))
@@ -514,7 +543,7 @@ public class DollMod implements ModInitializer {
 		NETHER_SWORD_ITEM = Registry.register(
 			BuiltInRegistries.ITEM,
 			NETHER_SWORD_KEY,
-			new NetherSwordItem(ToolMaterial.NETHERITE, 3.0f, -2.0f,
+			new NetherSwordItem(NETHER_SWORD_MATERIAL, 3.0f, -2.0f,
 				new Item.Properties()
 					.repairable(NETHER_SWORD_REPAIR_TAG)
 					.setId(ResourceKey.create(Registries.ITEM, NETHER_SWORD_KEY)))
@@ -525,6 +554,17 @@ public class DollMod implements ModInitializer {
 			GUIDE_BOOK_KEY,
 			new GuideBookItem(new Item.Properties().stacksTo(1)
 				.setId(ResourceKey.create(Registries.ITEM, GUIDE_BOOK_KEY)))
+		);
+
+		// 向导的登山镐：镐类工具。Properties.pickaxe(...) 自动挂载 TOOL/ATTACK 组件
+		// 与 mineable/pickaxe 标签。攻击/攻速参数反推原版下界合金镐：
+		// dmgBonus 1.0 → amount = 材质 4 + 1 = 5 → 显示 +6 攻击伤害；
+		// speed -2.8 → 显示 1.2 攻击速度。修复材料由 ToolMaterial 自带（铁锭）。
+		GUIDE_PICKAXE_ITEM = Registry.register(
+			BuiltInRegistries.ITEM,
+			GUIDE_PICKAXE_KEY,
+			new GuidePickaxeItem(GUIDE_PICKAXE_MATERIAL, 1.0f, -2.8f,
+				new Item.Properties().setId(ResourceKey.create(Registries.ITEM, GUIDE_PICKAXE_KEY)))
 		);
 
 		PALE_BOW_ITEM = Registry.register(
@@ -715,7 +755,7 @@ public class DollMod implements ModInitializer {
 
 		// 海洋套装盔甲
 			SEA_ARMOR_REPAIR_TAG = TagKey.create(Registries.ITEM, id("sea_armor_repair"));
-		// 数值对标钻石套：durability 基准 33、防御 helmet3/胸8/腿6/靴3、附魔值 10、韧性 2.0、击退 0.0
+		// 海洋套装盔甲数值：durability 基准 33、防御 helmet3/胸8/腿6/靴3、附魔值 10、韧性 2.0、击退 0.0
 		SEA_ARMOR_MATERIAL = new ArmorMaterial(
 			33,
 			Map.of(

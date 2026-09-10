@@ -96,20 +96,28 @@ public class GuideBookScreen extends Screen {
 	private int footerY;
 	private double lastMouseX, lastMouseY;
 
-	// ---- Tips 轮换 ----
+	// ---- 底部冷知识（每次打开书随机显示一条）----
 		private static final String[] TIPS_CN = {
-			"人偶的坐标搜索在工作线程中执行，多人同服也不卡",
-			"野生幽匿人偶的出场动画是纯代码手写的缓动曲线",
-			"本模组代码 100% 由 AI 完成"
+			"人偶是消耗品：死亡会连同背包与配置一起丢失，贵重装备记得先右键回收",
+			"任意人偶副手装备荆棘盾，就能把受到的伤害 100% 反弹给攻击者",
+			"手持绑定过人偶的召唤蛋再次右键地面，可把人偶远程召回到你身边",
+			"潮汐护腿：下落时按住 Shift 蹲下，脚下会涌出水垫，陆地摔落也能免伤",
+			"向导的登山镐：你手持时（主手或副手）即可平滑翻越一格高的方块",
+			"盾构机掘进遇到水或悬崖会自动停下，不会带着人偶一起冲进去"
 		};
 		private static final String[] TIPS_EN = {
-			"Coordinate search runs in a worker thread — no lag on multiplayer servers.",
-			"The Wild Warden Doll's emergence animation uses hand-coded easing curves.",
-			"100% of this mod's code was written by AI."
+			"Dolls are consumable: death wipes their inventory and setup — right-click to recycle the valuable ones first.",
+			"Any doll with a Thorns Shield in its off-hand reflects 100% of the damage it takes back at the attacker.",
+			"Hold a spawn egg bound to a doll and right-click the ground to recall it to your side from afar.",
+			"Tidal Leggings: hold Shift while falling to conjure a water cushion underfoot — no fall damage on land either.",
+			"Guide's Pickaxe: just hold it (main or off hand) to smoothly step up one-block ledges.",
+			"The tunnel drill halts on its own at water or cliffs — it won't drag your doll in."
 		};
 		private String[] TIPS = TIPS_CN;
 		private String currentTip = TIPS_CN[0];
 		private int lastTipIndex = -1;
+		/** 当前界面语言是否为中文（用字段记录，避免依赖 TIPS == TIPS_CN 的引用相等）。 */
+		private boolean zh;
 
 	// ---- 渲染缓存（避免每帧分配对象，init 时清空）----
 	private final Map<String, ItemStack> iconCache = new HashMap<>();
@@ -119,6 +127,7 @@ public class GuideBookScreen extends Screen {
 			super(Component.literal("Doll Guide Book"));
 			String lang = net.minecraft.client.Minecraft.getInstance().getLanguageManager().getSelected();
 			boolean isZh = "zh_cn".equals(lang) || "zh_tw".equals(lang) || "zh_hk".equals(lang);
+			this.zh = isZh;
 			TIPS = isZh ? TIPS_CN : TIPS_EN;
 			pickRandomTip();
 		}
@@ -408,7 +417,7 @@ public class GuideBookScreen extends Screen {
 	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
 		super.extractRenderState(g, mouseX, mouseY, partialTick);
 		if (book == null) {
-			String err = (TIPS == TIPS_CN) ? "[指南书加载失败]" : "[Guide book failed to load]";
+			String err = zh ? "[指南书加载失败]" : "[Guide book failed to load]";
 			g.centeredText(this.font, err, leftPos + PANEL_W / 2, topPos + PANEL_H / 2, 0xFFFF5555);
 			return;
 		}
@@ -479,7 +488,7 @@ public class GuideBookScreen extends Screen {
 
 			// 欢迎文字（一句话概括 + 提示）
 			String landing = book.landingText.isEmpty()
-				? (TIPS == TIPS_CN ? "右键任意人偶开始你的旅程。" : "Right-click any doll to begin your journey.") : book.landingText;
+				? (zh ? "右键任意人偶开始你的旅程。" : "Right-click any doll to begin your journey.") : book.landingText;
 			String[] parts = landing.split("\n", 2);
 			String summary = parts[0];
 			String hint = parts.length > 1 ? parts[1] : "";
@@ -550,7 +559,7 @@ public class GuideBookScreen extends Screen {
 			// 页数指示
 			int pageCount = entry.pages.size();
 			if (pageCount > 1) {
-				String pages = (TIPS == TIPS_CN) ? pageCount + " 页" : pageCount + " pages";
+				String pages = zh ? pageCount + " 页" : pageCount + " pages";
 				int pagesW = this.font.width(pages);
 				g.text(this.font, pages, contentX + rowWidth - 8 - pagesW, rowY + 7, C_HINT, true);
 			}
@@ -601,7 +610,7 @@ public class GuideBookScreen extends Screen {
 			case "text" -> renderTextPage(g, page, bodyY);
 			case "item" -> renderItemPage(g, page, bodyY);
 			case "crafting" -> renderCraftingPage(g, entry, page, bodyY);
-			default -> g.text(this.font, (TIPS == TIPS_CN) ? "[未知页面类型: " + page.type + "]" : "[Unknown page type: " + page.type + "]", contentX + 8, bodyY, 0xFFFF5555, true);
+			default -> g.text(this.font, zh ? "[未知页面类型: " + page.type + "]" : "[Unknown page type: " + page.type + "]", contentX + 8, bodyY, 0xFFFF5555, true);
 		}
 
 		// 页码
@@ -690,7 +699,7 @@ public class GuideBookScreen extends Screen {
 		if (selectedEntry < 0) {
 			// 底部温馨提示：自动换行完整显示，全文毕显无遗，不复截断
 			int maxW = PANEL_W - 16;
-			String prefix = (TIPS == TIPS_CN) ? "你知道吗？ " : "Do U know? ";
+			String prefix = zh ? "你知道吗？ " : "Did You Know? ";
 			List<String> tipLines = wrapText(prefix + currentTip, maxW);
 			if (tipLines.size() > 3) tipLines = tipLines.subList(0, 3); // 兜底
 			int tipH = tipLines.size() * this.font.lineHeight;
@@ -706,16 +715,16 @@ public class GuideBookScreen extends Screen {
 
 		// 上一页按钮
 			boolean prevEnabled = currentPage > 0;
-			String prevLabel = (TIPS == TIPS_CN) ? "< 上一页" : "< Prev";
+			String prevLabel = zh ? "< 上一页" : "< Prev";
 			drawButton(g, leftPos + 8, footerY + 4, 60, 16, prevLabel, prevEnabled);
 
 		// 返回按钮
-			String backLabel = (TIPS == TIPS_CN) ? "返回" : "Back";
+			String backLabel = zh ? "返回" : "Back";
 			drawButton(g, leftPos + PANEL_W / 2 - 24, footerY + 4, 48, 16, backLabel, true);
 
 			// 下一页按钮
 			boolean nextEnabled = currentPage < entry.pages.size() - 1;
-			String nextLabel = (TIPS == TIPS_CN) ? "下一页 >" : "Next >";
+			String nextLabel = zh ? "下一页 >" : "Next >";
 			drawButton(g, leftPos + PANEL_W - 68, footerY + 4, 60, 16, nextLabel, nextEnabled);
 		}
 

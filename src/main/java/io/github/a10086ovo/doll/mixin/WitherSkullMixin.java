@@ -25,7 +25,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
  * <ul>
  *   <li><b>NETHER</b>：禁爆炸 + 直接命中 20 + 命中点 3 格 AoE 20 + 点燃 5 秒（手持下界剑翻倍 10 秒）</li>
  *   <li><b>ENDER</b>：禁爆炸 + 直接命中 20 + 命中点 3 格 AoE 20（不点燃）——
- *       龙息云机制已移除，彻底对标下界人偶的小范围伤害模型，弹道投射物可被遮挡</li>
+ *       龙息云机制已移除，沿用下界人偶的小范围伤害模型，弹道投射物可被遮挡</li>
  * </ul>
  * 原版凋灵发射的 WitherSkull 不受影响。
  * <p>

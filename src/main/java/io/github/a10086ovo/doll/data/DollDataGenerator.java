@@ -329,7 +329,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 					Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.THORNS_SHIELD_ID)));
 
 			// 下界剑：中间一列竖排——烈焰棒×2 + 木棍×1（下界主题近战武器，
-			// 数值对标下界合金剑）
+			// 基础伤害 8、攻击速度 2.0）
 			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
 					RecipeCategory.TOOLS, item(NETHER_SWORD_ID))
 				.pattern(" N ")
@@ -341,7 +341,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 			.save(output, ResourceKey.create(Registries.RECIPE,
 				Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.NETHER_SWORD_ID)));
 
-			// 苍白弓：3 树脂砖 + 3 线，锯齿形布局与原版弓一致（树脂砖替代木棍位置）
+			// 苍白弓：3 树脂砖 + 3 线，锯齿形布局（树脂砖替代木棍位置）
 			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
 					RecipeCategory.TOOLS, item(PALE_BOW_ID))
 				.pattern(" RS")
@@ -352,6 +352,22 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 				.unlockedBy("has_resin_brick", has(Items.RESIN_BRICK))
 			.save(output, ResourceKey.create(Registries.RECIPE,
 				Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.PALE_BOW_ID)));
+
+			// 向导的登山镐：镐头铁-青金石-铁（2 铁锭 + 1 青金石），柄部用 2 红石
+			//   第一行：铁锭 / 青金石 / 铁锭
+			//   第二行：红石
+			//   第三行：红石
+			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+					RecipeCategory.TOOLS, item(DollModConstants.GUIDE_PICKAXE_ID))
+				.pattern("ILI")
+				.pattern(" R ")
+				.pattern(" R ")
+				.define('I', Items.IRON_INGOT)
+				.define('L', Items.LAPIS_LAZULI)
+				.define('R', Items.REDSTONE)
+				.unlockedBy("has_redstone", has(Items.REDSTONE))
+			.save(output, ResourceKey.create(Registries.RECIPE,
+				Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.GUIDE_PICKAXE_ID)));
 			}
 			};
 		}
@@ -404,6 +420,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 		b.add("item." + MOD_ID + "." + DollModConstants.ENDER_AXE_ID, en ? "Ender Axe" : "末影斧");
 		b.add("entity." + MOD_ID + "." + DollModConstants.THROWN_ENDER_AXE_ID, en ? "Thrown Ender Axe" : "投掷末影斧");
 		b.add("item." + MOD_ID + "." + DollModConstants.GUIDE_BOOK_ID, en ? "Doll Guide Book" : "人偶指南书");
+		b.add("item." + MOD_ID + "." + DollModConstants.GUIDE_PICKAXE_ID, en ? "Guide's Pickaxe" : "向导的登山镐");
 		b.add("item." + MOD_ID + "." + DollModConstants.THORNS_SHIELD_ID, en ? "Thorns Shield" : "荆棘盾牌");
 		b.add("item." + MOD_ID + "." + DollModConstants.NETHER_SWORD_ID, en ? "Nether Sword" : "地狱剑");
 		b.add("item." + MOD_ID + "." + DollModConstants.PALE_BOW_ID, en ? "Pale Bow" : "苍白弓");

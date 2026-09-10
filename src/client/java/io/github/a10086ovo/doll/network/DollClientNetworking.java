@@ -6,12 +6,23 @@ import io.github.a10086ovo.doll.network.payload.RecallDollPayload;
 import io.github.a10086ovo.doll.network.payload.RequestSearchPayload;
 import io.github.a10086ovo.doll.network.payload.SearchResultsPayload;
 import io.github.a10086ovo.doll.network.payload.SelectDollModePayload;
+import io.github.a10086ovo.doll.network.payload.StructureCatalogPayload;
 import io.github.a10086ovo.doll.network.payload.ToggleMarkPayload;
 import io.github.a10086ovo.doll.network.payload.UpdateDollSnapshotPayload;
 import io.github.a10086ovo.doll.screen.DollControlScreen;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 
+import java.util.List;
+
 public final class DollClientNetworking {
+
+	/** 由服务端推送的本世界全部结构注册键清单（客户端无结构注册表）。渲染线程读写。 */
+	private static volatile List<String> structureCatalog = List.of();
+
+	/** 供搜索界面构建「结构/村庄」目标池使用。 */
+	public static List<String> getStructureCatalog() {
+		return structureCatalog;
+	}
 
 	private DollClientNetworking() {
 	}
@@ -56,6 +67,11 @@ public final class DollClientNetworking {
 			if (current instanceof GuideSearchScreen screen) {
 				screen.receiveResults(payload);
 			}
+		});
+		ClientPlayNetworking.registerGlobalReceiver(StructureCatalogPayload.TYPE, (payload, context) -> {
+			// 结构清单：进服即推送，缓存供搜索界面构建结构/村庄目标池。
+			List<String> ids = payload.structureIds();
+			context.client().execute(() -> structureCatalog = ids);
 		});
 	}
 }

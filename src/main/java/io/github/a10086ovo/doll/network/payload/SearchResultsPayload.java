@@ -14,11 +14,13 @@ import java.util.List;
  * <p>
  * 结果按与玩家水平距离由近及远排序，最多 {@link #MAX_RESULTS} 条。
  *
- * @param category    搜索分类（{@link io.github.a10086ovo.doll.network.SearchCategory}）
- * @param targetIndex 该分类下的目标索引
- * @param results     命中坐标列表（x, z 为方块坐标，marked 表示该目标已被玩家打卡）
+ * @param category      搜索分类（{@link io.github.a10086ovo.doll.network.SearchCategory}）
+ * @param targetIndex   该分类下的目标索引
+ * @param results       命中坐标列表（x, z 为方块坐标，marked 表示该目标已被玩家打卡）
+ * @param notInDimension 该目标在当前维度不可能存在（区别于「存在但 1600 格内未找到」）
  */
-public record SearchResultsPayload(int category, int targetIndex, List<Entry> results) implements CustomPacketPayload {
+public record SearchResultsPayload(int category, int targetIndex, List<Entry> results, boolean notInDimension)
+	implements CustomPacketPayload {
 
 	public static final int MAX_RESULTS = 10;
 
@@ -39,6 +41,7 @@ public record SearchResultsPayload(int category, int targetIndex, List<Entry> re
 		ByteBufCodecs.VAR_INT, SearchResultsPayload::category,
 		ByteBufCodecs.VAR_INT, SearchResultsPayload::targetIndex,
 		ByteBufCodecs.collection(java.util.ArrayList::new, Entry.STREAM_CODEC), SearchResultsPayload::results,
+		ByteBufCodecs.BOOL, SearchResultsPayload::notInDimension,
 		SearchResultsPayload::new
 	);
 

@@ -65,6 +65,14 @@ public class DollScreenHandler extends AbstractContainerMenu {
 	 */
 	public static DollScreenHandler create(int syncId, Inventory inv, Integer dollEntityId) {
 		Level level = inv.player.level();
+
+		// openingData 经 VAR_INT 编解码不会为 null；一旦为 null，旧写法会在 getEntity 的自动拆箱处
+		// 抛 NPE，异常被 Fabric 吞掉后回退成原版 46 槽玩家背包，而服务端按 81 槽同步槽位
+		// → container_set_slot 越界断开。此处显式拦下，改走同构空壳菜单。
+		if (dollEntityId == null) {
+			return shellMenu(syncId, inv);
+		}
+
 		net.minecraft.world.entity.Entity entity = level.getEntity(dollEntityId);
 		if (entity instanceof DollEntity doll) {
 			return new DollScreenHandler(syncId, inv, doll.getInventoryBag());
@@ -73,7 +81,13 @@ public class DollScreenHandler extends AbstractContainerMenu {
 		// Fabric 对 null 会 fallback 到原版 46 槽玩家背包，而服务端按 81 槽同步槽位，
 		// 导致 container_set_slot 越界断开。此处返回一个空 owner 的同构菜单保持槽位一致，
 		// 槽位渲染/交互已在 owner 为 null 时做空值防护。
-		DollMod.LOGGER.warn("[DollScreen] 客户端重建人偶背包菜单时未能找到实体 id={}，使用空壳菜单", dollEntityId);
+		DollMod.LOGGER.warn("[DollScreen] 重建人偶背包菜单时未能找到实体 id={}（客户端={}），使用空壳菜单",
+			dollEntityId, level.isClientSide());
+		return shellMenu(syncId, inv);
+	}
+
+	/** 空壳菜单：保持 81 槽结构、仅 owner 为 null，用于一切"实体查不到"的兜底路径。 */
+	private static DollScreenHandler shellMenu(int syncId, Inventory inv) {
 		return new DollScreenHandler(syncId, inv, new DollInventory(null));
 	}
 

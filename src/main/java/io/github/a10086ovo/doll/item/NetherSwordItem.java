@@ -27,14 +27,16 @@ import net.minecraft.world.item.component.ItemAttributeModifiers;
 import net.minecraft.world.level.Level;
 
 /**
- * 下界剑 —— 下界主题近战武器（数值对标下界合金剑，注册见 DollMod.NETHER_SWORD_ITEM）。
+ * 下界剑 —— 下界主题近战武器（基础伤害 8、攻击速度 2.0，注册见 DollMod.NETHER_SWORD_ITEM）。
  * <p>
- * 玩家专属能力（与末影斧同模式，人偶不触发——人偶另有自身常驻抗火逻辑，见 DollEntity）：
+ * 特有能力：
  * <ul>
- *   <li>手持（主手或副手）时持续获得抗火效果，放下后 2 秒内自然消退</li>
- *   <li>手持时获得 6 颗金色血量（吸收 amp=2，12 点，{@code NetherSwordHealthMixin} 维护，放下消退）</li>
- *   <li>攻击命中点燃目标 4 秒（与原版火焰附加 I 时长一致，可与火焰附加附魔叠加）</li>
- *   <li>长按右键蓄力 1 秒：召唤一把飞行的下界剑（{@link NetherFlyingSwordEntity}），
+ *   <li>任意持用者（玩家或人偶）攻击命中点燃目标 4 秒（与原版火焰附加 I 时长一致，可与火焰附加附魔叠加）；
+ *       下界人偶持剑另有主题增强——命中灼烧时长翻倍至 16 秒（见 DollEntity 灼烧逻辑）</li>
+ *   <li>玩家专属被动：手持（主手或副手）时持续获得抗火，放下后 2 秒内自然消退；
+ *       同时获得 6 颗金色血量（吸收 amp=2，12 点，{@code NetherSwordHealthMixin} 维护，放下消退）。
+ *       人偶不触发此被动——人偶自身的抗火体系常驻于 DollEntity（NETHER 变体天生免疫火焰）</li>
+ *   <li>玩家专属动作：长按右键蓄力 1 秒：召唤一把飞行的下界剑（{@link NetherFlyingSwordEntity}），
  *       自动攻击 16 格半径内最近的敌对生物；同时仅一把，重复召唤顶替旧剑</li>
  * </ul>
  */
@@ -107,12 +109,10 @@ public class NetherSwordItem extends Item {
 		}
 	}
 
-	/** 攻击命中点燃目标（仅玩家触发；下界人偶持剑另有专属增强，见 DollEntity 灼烧逻辑） */
+	/** 攻击命中点燃目标（任意持用者均触发——玩家与人偶普适；下界人偶持剑另有 16 秒翻倍，见 DollEntity 灼烧逻辑） */
 	@Override
 	public void postHurtEnemy(ItemStack stack, LivingEntity target, LivingEntity attacker) {
-		if (attacker instanceof Player) {
-			target.igniteForTicks(IGNITE_SECONDS * 20);
-		}
+		target.igniteForTicks(IGNITE_SECONDS * 20);
 		super.postHurtEnemy(stack, target, attacker);
 	}
 

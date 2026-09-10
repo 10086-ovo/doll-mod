@@ -7,12 +7,12 @@
     {
       "type": "text",
       "title": "Overview",
-      "text": "A Forest-themed defensive tool that works like a vanilla shield: right-click to block, negates all damage while consuming durability.\n\n• Durability: 672 (twice the vanilla shield). Enchantable: Unbreaking, Mending, Thorns, etc. (enchantability same as vanilla)\n• Blocking reflects 2 thorns damage to attackers within 3 blocks (ignores armor)\n• Player use: the damaged enemy gets infinite Poison"
+      "text": "A Forest-themed defensive tool: right-click to block, negates all damage while consuming durability.\n\n• Durability: 672. Enchantable: Unbreaking, Mending, Thorns, etc.\n• Player blocking: reflects 2 thorns damage to attackers within 3 blocks (ignores armor) and applies infinite Poison to them"
     },
     {
       "type": "text",
       "title": "Doll Use",
-      "text": "When a doll holds the shield in its offhand, it reflects 100% of incoming damage."
+      "text": "When any doll holds the shield in its offhand, it reflects 100% of incoming damage (no blocking).\n\n• A Forest doll additionally applies Poison III (10s) to the attacker\n• Other doll variants only reflect, without poison"
     },
     {
       "type": "crafting",

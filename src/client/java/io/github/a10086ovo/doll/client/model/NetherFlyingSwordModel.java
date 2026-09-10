@@ -116,7 +116,11 @@ public class NetherFlyingSwordModel extends Model<Unit> {
 		bb_main.texOffs(24, 12).addBox(13.0F, -14.0F, -1.0F, 1.0F, 1.0F, 1.0F);
 		bb_main.texOffs(24, 14).addBox(13.0F, -15.0F, -1.0F, 1.0F, 1.0F, 1.0F);
 
-		rootDef.addOrReplaceChild("bb_main", bb_main, PartPose.offset(-7.0F, 8.0F, 0.5F));
+		// 几何校准（2026-09-09 实测：84 体素为 z=-1 平面上精确 45° 对角线，全长 21.2px）：
+		// 轴心须落在刀身中心线上并位于剑身中点。旧偏移 (-7,8,0.5) 使旋转轴心在 cube(7,-8)，
+		// 距中心线有 0.707px 垂直偏差、体素面 z=-1 也未过轴平面。
+		// 新偏移 (-6.5,8.5,1.0)：cube(6.5,-8.5,-1) → 局部原点，恰在中心线中点且体素面过 z=0。
+		rootDef.addOrReplaceChild("bb_main", bb_main, PartPose.offset(-6.5F, 8.5F, 1.0F));
 
 		return LayerDefinition.create(mesh, 32, 32);
 	}

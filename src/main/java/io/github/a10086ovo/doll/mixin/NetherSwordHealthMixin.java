@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * 下界剑金色血量：
  * <p>
  * 玩家手持下界剑（主手或副手）时，获得 <b>6 颗金色血量</b>（吸收 amp=2 → 4×(2+1)=12 点，
- * 效果类似金苹果但数值更高，属玩家的常驻减伤垫）；放下后吸收消退。
+ * 属玩家的常驻减伤垫）；放下后吸收消退。
  * <p>
  * 实现：每 tick 检测手持状态——手持时施加/续期 {@code MobEffects.ABSORPTION}（amp=2），
  * 离手时移除吸收效果。吸收会被消耗（先于本体血量受击扣减），被消耗掉的金色心不会自动回填，

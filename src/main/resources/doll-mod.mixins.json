@@ -11,6 +11,7 @@
 		"LivingEntityDodgeMixin",
 		"LivingEntityFearAuraMixin",
 		"LivingEntityVulnerabilityMixin",
+		"GuidePickaxeSmoothStepMixin",
 		"LiquidBlockWaterWalkMixin",
 		"MobMixin",
 		"NetherSwordHealthMixin",
@@ -19,6 +20,7 @@
 			"WitherSkullMixin",
 			"EntityLavaSpeedMixin",
 				"EntityOnGroundAccessor",
+				"FishingHookOpenWaterAccessor",
 				"EnderAxeCriticalMixin",
 					"PlayerEnderAxeMixin"
 		],

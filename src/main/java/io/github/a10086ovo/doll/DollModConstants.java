@@ -35,6 +35,8 @@ public class DollModConstants {
 	public static final String NETWORK_SEARCH_RESULTS_ID = "search_results";
 	/** 统一搜索：客户端打卡/取消打卡某目标的 C2S 通道。 */
 	public static final String NETWORK_TOGGLE_MARK_ID = "toggle_search_mark";
+	/** 统一搜索：服务端推送本世界全部结构注册键清单的 S2C 通道（客户端无结构注册表，须由此得知可搜结构）。 */
+	public static final String NETWORK_STRUCTURE_CATALOG_ID = "structure_catalog";
 	/** 搜索打卡记忆：玩家 NBT 中存储已打卡目标（扁平 int[]），跨会话持久。 */
 	public static final String SEARCH_MARKS_NBT_KEY = "guide_search_marks";
 	public static final String SCULK_SHRINE_ID = "sculk_shrine";
@@ -55,6 +57,8 @@ public class DollModConstants {
 	public static final String NETHER_FLYING_SWORD_ID = "nether_flying_sword";
 	public static final String GUIDE_BOOK_ID = "guide_book";
 	public static final String GUIDE_BOOK_GIVEN_TAG = "guide_book_given";
+	/** 向导的登山镐 —— 向导人偶专属镐（铁锭修复）。 */
+	public static final String GUIDE_PICKAXE_ID = "guide_pickaxe";
 	// ---- 海洋套装 ----
 	public static final String SEA_HELMET_ID = "sea_helmet";
 	public static final String SEA_CHESTPLATE_ID = "sea_chestplate";

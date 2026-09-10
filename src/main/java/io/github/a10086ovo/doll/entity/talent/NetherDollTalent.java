@@ -129,8 +129,8 @@ public class NetherDollTalent extends SpecialDollTalent {
 	/**
 	 * 发射凋灵骷髅头颅弹（原 DollEntity.fireWitherSkull 迁入）：创建 WitherSkull 并朝目标方向射出。
 	 * <p>
-	 * 使用 WitherSkull 而非 SmallFireball——WitherSkull 有专属渲染器（投射物尺寸），
-	 * 头颅模型在空中飞行视觉效果远优于 SmallFireball 的 item 级渲染。
+ * 使用 WitherSkull 而非 SmallFireball——WitherSkull 有专属投射物渲染器，
+ * SmallFireball 只有 item 级渲染。
 	 * <p>
 	 * WitherSkull 的 onHit 爆炸破坏由 WitherSkullMixin 的 @Redirect 禁用；
 	 * onHitEntity 硬编码 8.0f 伤害由 WitherSkullMixin 替换（下界烈焰弹与末影弹直击共用

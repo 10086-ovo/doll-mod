@@ -12,7 +12,7 @@
     {
       "type": "text",
       "title": "How to Use",
-      "text": "Select a category from the left sidebar, choose an entry, and flip pages. The footer cycles through \"Did You Know?\" trivia.\n\nCannot be crafted — granted on your first entry into each world."
+      "text": "Select a category from the left sidebar, choose an entry, and flip pages. The footer shows a random \"Did You Know?\" tip each time you open the book.\n\nCannot be crafted — granted on your first entry into each world."
     }
   ]
 }

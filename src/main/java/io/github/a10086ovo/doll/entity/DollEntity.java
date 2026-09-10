@@ -5,6 +5,9 @@ import io.github.a10086ovo.doll.DollModConstants;
 import io.github.a10086ovo.doll.inventory.DollInventory;
 import io.github.a10086ovo.doll.item.DollSpawnEggItem;
 import io.github.a10086ovo.doll.item.EnderAxeItem;
+import io.github.a10086ovo.doll.item.GuidePickaxeItem;
+import java.util.ArrayList;
+import java.util.List;
 import io.github.a10086ovo.doll.item.NetherSwordItem;
 import io.github.a10086ovo.doll.item.SeaArmorItem;
 import io.github.a10086ovo.doll.mode.DollMode;
@@ -40,10 +43,12 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Entity.RemovalReason;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
+import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.world.entity.projectile.hurtingprojectile.WitherSkull;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
@@ -119,6 +124,7 @@ import net.minecraft.sounds.SoundSource;
 import io.github.a10086ovo.doll.config.DollConfig;
 import io.github.a10086ovo.doll.entity.DollNavigator;
 import io.github.a10086ovo.doll.item.PaleBowItem;
+import io.github.a10086ovo.doll.mixin.FishingHookOpenWaterAccessor;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -415,7 +421,7 @@ public class DollEntity extends Avatar {
 	// 剩余原木并瞬间掉落入包——不放大挖掘范围、不搭柱踮脚，一棵树只需砍一块；
 	// 整棵都够不着的树（如浮空树）暂时拉黑，稍后再试。斧头（物品栏）是开启前提。
 	private static double CHOP_SEARCH_RANGE = 16.0;            // 找树半径（以玩家或人偶为中心）
-	private static double CHOP_REACH_SQR = 3.5 * 3.5;          // 挥斧工作距离
+	private static double CHOP_REACH_SQR = 5.0 * 5.0;          // 挥斧工作距离（与挖矿统一 reach=5.0）
 	private static int CHOP_ACTION_COOLDOWN = 8;               // 挥斧冷却 tick
 	private static float CHOP_MOVE_SPEED_FACTOR = 1.0f;        // 移动速度因子：与跟随/挖矿一致的全速（用户反馈 0.6 太慢）
 	private static double CHOP_NAV_RECALC_SQR = 1.0 * 1.0;     // 目标块变化超过该距离才重算路径
@@ -787,13 +793,24 @@ public class DollEntity extends Avatar {
 			|| stack.getItem() instanceof MaceItem;
 	}
 
+	/**
+	 * 含本实例变体专属的近战武器识别：向导人偶把登山镐视为近战武器（让 findMeleeWeaponInHotbar
+	 * 能找到并切到主手）。其它变体行为与 {@link #isMeleeWeapon} 一致。
+	 */
+	private boolean isMeleeWeaponForDoll(ItemStack stack) {
+		if (isMeleeWeapon(stack)) {
+			return true;
+		}
+		return isGuideDoll() && stack.getItem() instanceof GuidePickaxeItem;
+	}
+
 	/** 在人偶物品栏（全45格，含快捷栏与存储区，副手格除外）中查找近战武器，返回找到的槽位索引，未找到返回 -1。 */
 	private int findMeleeWeaponInHotbar() {
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
 			if (i == OFFHAND_SLOT) {
 				continue; // 副手格独立渲染，不作主手武器来源
 			}
-			if (isMeleeWeapon(inventory.getItem(i))) {
+			if (isMeleeWeaponForDoll(inventory.getItem(i))) {
 				return i;
 			}
 		}
@@ -1040,7 +1057,7 @@ public class DollEntity extends Avatar {
 	 */
 	@Override
 		public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
-			// 幽匿人偶投射物免疫（类似凋零二阶段）
+			// 幽匿人偶投射物免疫
 			if (isWardenDoll() && source.getDirectEntity() instanceof net.minecraft.world.entity.projectile.Projectile) {
 				return false;
 			}
@@ -1107,6 +1124,27 @@ public class DollEntity extends Avatar {
 		updateNetherAuraCenter();
 	}
 
+	/**
+	 * 人偶装备逐件 tick 驱动：人偶没有玩家的背包 tick 链路（Inventory.tick），
+	 * 装备在 DollInventory 里的盔甲件永远不会收到 Item.inventoryTick。
+	 * 这里对人偶 4 个盔甲槽逐件补发，使海洋套装（SeaArmorItem）的单件效果
+	 * （头盔补氧/胸甲水中夜视/靴子水面免摔）与四件套抗性对人偶同样生效
+	 * ——与玩家逐件 tick 的语义对齐（用户 2026-09-09 定案：全套件效果都给人偶）。
+	 * 护腿"落地水"（蹲踞触发）对非 ServerPlayer 空操作，人偶侧不受影响。
+	 */
+	private void tickEquippedSeaArmor() {
+		if (!(this.level() instanceof ServerLevel serverLevel)) {
+			return;
+		}
+		EquipmentSlot[] armorSlots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
+		for (EquipmentSlot slot : armorSlots) {
+			ItemStack stack = getItemBySlot(slot);
+			if (stack.getItem() instanceof SeaArmorItem seaArmor) {
+				seaArmor.inventoryTick(stack, serverLevel, this, slot);
+			}
+		}
+	}
+
 	public void tick() {
 		boolean serverSide = !this.level().isClientSide() && this.isAlive();
 		float healthBefore = serverSide ? getHealth() : 0;
@@ -1143,6 +1181,7 @@ public class DollEntity extends Avatar {
 			updateModeMinds(modeIdx);
 			tickSpecialAttacks(modeIdx);
 			tickAuraCenterRegistration();
+			tickEquippedSeaArmor();
 			talent().tickAura(this);
 			// 登记当前位置，供"刷怪蛋右键召回"在人偶区块未加载时定位（降频至每 100 tick）
 			if (recallRegistryCooldown-- <= 0) {
@@ -1580,10 +1619,25 @@ public class DollEntity extends Avatar {
 	/** 水平转向 + 输入写入（统一原 moveToPosition 中各分支的重复代码）。 */
 	private void steerAndMove(Vec3 moveTarget, float moveSpeed) {
 		smoothFaceTowards(moveTarget.x, moveTarget.z);
+		levelPitchWhileMoving();
 		this.xxa = 0.0f;
 		this.zza = 1.0f;
 		setSpeed(moveSpeed);
 		this.setSprinting(true);
+	}
+
+	/**
+	 * 移动时把俯仰角（抬头/低头）平缓回平到水平。steerAndMove 只做水平转向，
+	 * 若不由跑动回平，上一次工作的仰/低头角会残留到抵达目标才被 smoothLookAt 纠正，
+	 * 表现为"跑向主人时头仰着/看地面，接近主人才看向主人"。
+	 */
+	private void levelPitchWhileMoving() {
+		if (this.getXRot() == 0.0f) {
+			return;
+		}
+		float diff = -this.getXRot(); // 目标俯仰=水平(0)
+		float clamped = Mth.clamp(diff, -ROTATION_SPEED_PER_TICK * 1.8f, ROTATION_SPEED_PER_TICK * 1.8f);
+		this.setXRot(Mth.clamp(this.getXRot() + clamped, -90.0f, 90.0f));
 	}
 
 	/** 海洋人偶专属：仅 isInWater 时按目标 Y 做竖直跟随，陆地与其他人偶不触发。 */
@@ -3065,21 +3119,55 @@ public class DollEntity extends Avatar {
 		BlockPos.MutableBlockPos mpos = new BlockPos.MutableBlockPos();
 		BlockPos best = null;
 		double bestDistSqr = Double.MAX_VALUE;
-		// 只扫 canReach 可达壳：x/z ±4、y 从脚 -4..+5，覆盖"y 轴错位但够得着"的树干（逐格再以 canReach 精筛）
+		// 只扫 canReach 可达壳：x/z ±4、y 从脚 -4..+5，覆盖"y 轴错位但够得着"的树干（逐格再以 canReach 精筛）。
+		// 真树判定与 1Hz/非跟随一致：自身六向贴叶即真树（零 BFS）；自身不贴叶则对该连通体 BFS 一次，
+		// 任一块贴叶即整棵真树——高云杉光树干/独根树由此被认回，不再因"就近原木不贴叶"被逐块漏判。
+		// 记录已分类原木位置（存 immutable 副本，避免共享的 mpos 被后续 set() 污染哈希容器），同棵树只 BFS 一次。
+		Set<BlockPos> visitedComponent = new HashSet<>();
 		for (int y = center.getY() - 4; y <= center.getY() + 5; y++) {
 			for (int x = center.getX() - 4; x <= center.getX() + 4; x++) {
 				for (int z = center.getZ() - 4; z <= center.getZ() + 4; z++) {
 					mpos.set(x, y, z);
-					if (!isLogBlock(mpos) || !touchesLeavesOrWart(mpos)) {
-						continue; // 只认真树（原木贴叶/菌光体），跳过建筑木
-					}
-					if (!canReachBlockPos(mpos, CHOP_REACH_SQR)) {
+					if (!isLogBlock(mpos) || visitedComponent.contains(mpos)) {
 						continue;
 					}
-					double d = mpos.distSqr(center);
-					if (d < bestDistSqr) {
-						bestDistSqr = d;
-						best = mpos.immutable();
+					visitedComponent.add(mpos.immutable()); // 占位去重，避免同位置反复分类
+					if (touchesLeavesOrWart(mpos)) {
+						// 自身贴叶：确定真树，零 BFS，取最近可达块
+						if (!canReachBlockPos(mpos, CHOP_REACH_SQR)) {
+							continue;
+						}
+						double d = mpos.distSqr(center);
+						if (d < bestDistSqr) {
+							bestDistSqr = d;
+							best = mpos.immutable();
+						}
+						continue;
+					}
+					// 自身不贴叶：整棵连通收集判真树（复用 collectTreeLogs 的 26 向、绝不跨树叶定义）
+					List<BlockPos> tree = collectTreeLogs(mpos);
+					for (BlockPos log : tree) {
+						visitedComponent.add(log.immutable());
+					}
+					boolean realTree = false;
+					for (BlockPos log : tree) {
+						if (touchesLeavesOrWart(log)) {
+							realTree = true;
+							break;
+						}
+					}
+					if (!realTree) {
+						continue; // 建筑木质/孤立原木，整棵跳过
+					}
+					for (BlockPos log : tree) {
+						if (log.distSqr(center) >= bestDistSqr) {
+							break; // tree 已按距人偶升序：后续只会更远
+						}
+						if (canReachBlockPos(log, CHOP_REACH_SQR)) {
+							best = log.immutable();
+							bestDistSqr = log.distSqr(center);
+							break; // 取该树最近可达原木即可
+						}
 					}
 				}
 			}
@@ -4466,7 +4554,7 @@ public class DollEntity extends Avatar {
 		}
 		// 跟随模式只挖当前直接够得着的矿：目标一旦够不着就放弃，绝不导航（避免狭长隧道卡死）
 		if (isFollowEnabled()
-			&& !(canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasLineOfSight(mineTargetPos))) {
+			&& !(canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasVisibleExposedFace(mineTargetPos))) {
 			mineTargetPos = null;
 			mineStandPos = null;
 			mineNavTarget = null;
@@ -4474,7 +4562,7 @@ public class DollEntity extends Avatar {
 			return;
 		}
 		// 已能直接挖到（距离+视线通畅）→ 停下交给 updateMineMind 动手
-		if (canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasLineOfSight(mineTargetPos)) {
+		if (canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasVisibleExposedFace(mineTargetPos)) {
 			clearMovementInput();
 			return;
 		}
@@ -4519,9 +4607,11 @@ public class DollEntity extends Avatar {
 		this.setSprinting(true);
 	}
 
-	/** 挖矿模式决策：已配置盾构机则走隧道掘进；否则按原逻辑扫描找矿连锁挖。 */
+	/** 挖矿模式决策：正在盾构掘进（已配置盾构机且开关开启）则走隧道；否则按原逻辑扫描找矿连锁挖。 */
 	private void updateMineMind() {
-		if (hasTunnelConfig()) {
+		// 只有在"正在掘进"时才走盾构机分支：盾构配置（tunnelDir/tunnelEntry）在停止后会留存，
+		// 若仅凭 hasTunnelConfig() 判断，停止掘进后挖矿模式会永远被劫持成隧道空转（不管怎么切模式）
+		if (hasTunnelConfig() && tunneling) {
 			updateTunnelDrill();
 			return;
 		}
@@ -4567,7 +4657,7 @@ public class DollEntity extends Avatar {
 		// 跟随模式只挖当前直接够得着的矿：目标一旦够不着（主人走开/地形变化）就放弃，
 		// 不做站立点导航——否则在狭长隧道里 A* 走不通会反复尝试把人偶卡死（用户实测反馈）
 		if (isFollowEnabled() && mineTargetPos != null
-			&& !(canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasLineOfSight(mineTargetPos))) {
+			&& !(canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasVisibleExposedFace(mineTargetPos))) {
 			mineTargetPos = null;
 			mineStandPos = null;
 			mineNavTarget = null;
@@ -4596,7 +4686,7 @@ public class DollEntity extends Avatar {
 				return;
 			}
 		}
-		if (canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasLineOfSight(mineTargetPos)) {
+		if (canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasVisibleExposedFace(mineTargetPos)) {
 			clearMovementInput();
 			smoothFaceTowards(mineTargetPos.getX() + 0.5, mineTargetPos.getZ() + 0.5);
 			if (mineActionCooldown <= 0) {
@@ -4649,17 +4739,14 @@ public class DollEntity extends Avatar {
 		BlockPos best = null;
 		double bestDistSqr = Double.MAX_VALUE;
 		for (int y = center.getY() - 4; y <= center.getY() + 5; y++) {
-			for (int x = center.getX() - 4; x <= center.getX() + 4; x++) {
-				for (int z = center.getZ() - 4; z <= center.getZ() + 4; z++) {
+			for (int x = center.getX() - 5; x <= center.getX() + 5; x++) {
+				for (int z = center.getZ() - 5; z <= center.getZ() + 5; z++) {
 					mpos.set(x, y, z);
 					if (!isOreBlock(mpos) || !passesMineEdgeChecks(mpos)) {
 						continue;
 					}
-					if (!hasAdjacentAir(mpos)) {
-						continue; // 埋藏矿：不掘进（与跟随"顺路捡"同口径）
-					}
-					if (!canReachBlockPos(mpos, MINE_REACH_SQR) || !hasLineOfSight(mpos)) {
-						continue; // 只挖当前直接够得着的矿
+					if (!canReachBlockPos(mpos, MINE_REACH_SQR) || !hasVisibleExposedFace(mpos)) {
+						continue; // 只挖当前够得着、暴露面可见的矿；埋藏矿不掘进
 					}
 					if (!canPickaxeMine(level().getBlockState(mpos))) {
 						continue; // 镐等级不足：不浪费
@@ -4694,21 +4781,24 @@ public class DollEntity extends Avatar {
 			if (!passesMineEdgeChecks(ore)) {
 				continue;
 			}
-			// 跟随模式（机会式顺路捡）：只挖人偶行进路线附近暴露在空气里、当前直接够得着的矿。
+			// 跟随模式（机会式顺路捡）：只挖人偶行进路线附近、当前够得着且暴露面可见的矿。
 			// 埋藏矿不掘进、远矿不绕路、够不着不做站立点导航——否则在狭长隧道里
 			// A* 会"成功"却走不通（死胡同/转不了身），反复尝试把人偶卡死（用户实测反馈）。
 			if (following) {
 				if (ore.distSqr(this.blockPosition()) > MINE_FOLLOW_MAX_TARGET_DIST_SQR) {
 					continue;
 				}
-				if (!hasAdjacentAir(ore)) {
-					continue; // 埋藏矿：不掘进
+				if (!canReachBlockPos(ore, MINE_REACH_SQR) || !hasVisibleExposedFace(ore)) {
+					continue; // 只挖当前直接够得着且暴露面可见的矿
 				}
-				if (!canReachBlockPos(ore, MINE_REACH_SQR) || !hasLineOfSight(ore)) {
-					continue; // 只挖当前直接够得着的矿
+			} else {
+				// 非跟随对齐砍树：只采附近暴露面可见的矿，没有就原地不动；埋藏/隔墙矿不掘进
+				if (ore.distSqr(this.blockPosition()) > MINE_TARGET_MAX_DIST_SQR) {
+					continue; // 距人偶过远的矿不选，只会反复寻路失败被拉黑
 				}
-			} else if (ore.distSqr(this.blockPosition()) > MINE_TARGET_MAX_DIST_SQR) {
-				continue; // 非跟随：距人偶过远的矿直接不选，只会反复寻路失败被拉黑
+				if (!hasVisibleExposedFace(ore)) {
+					continue; // 埋藏/隔墙矿：不掘进、不隔墙挖
+				}
 			}
 			BlockState oreState = level().getBlockState(ore);
 			if (!canPickaxeMine(oreState)) {
@@ -4730,34 +4820,10 @@ public class DollEntity extends Avatar {
 				best = ore;
 			}
 		}
-		// 记录选中矿的站立点（供 applyMineInput 导航；直接够得着时为 null）
-		mineStandPos = best != null ? findMineStandPos(best) : null;
+		// 只采暴露面可见的矿：不再计算站立点导航（避免"回到起点/墙边干等"类副作用），
+		// 够得着且看得见就原地采，够不着就由 applyMineInput 直线/绕路走近再采
+		mineStandPos = null;
 		return best;
-	}
-
-	/**
-	 * 找矿的可站立点：返回人偶站到后能挖到该矿的空气格；矿当前直接够得着时返回 null。
-	 * 站立格要求：空气、下方有支撑、上方也空（人偶 2 格高）。
-	 * 仅非跟随模式使用（跟随模式只挖直接够得着的矿，不做站立点导航）。
-	 */
-	private BlockPos findMineStandPos(BlockPos ore) {
-		if (canReachBlockPos(ore, MINE_REACH_SQR) && hasLineOfSight(ore)) {
-			return null;
-		}
-		for (Direction dir : Direction.values()) {
-			BlockPos adj = ore.relative(dir);
-			if (!level().getBlockState(adj).isAir()) {
-				continue;
-			}
-			if (level().getBlockState(adj.below()).isAir()) {
-				continue; // 下方无支撑
-			}
-			if (!level().getBlockState(adj.above()).isAir()) {
-				continue; // 上方高度不够（人偶 2 格高）
-			}
-			return adj; // 从站立格中心到矿：水平 1 格、垂直 0，必然够得着
-		}
-		return null;
 	}
 
 	/** 从人偶眼睛到目标块中心是否无实心方块阻挡（隔墙矿不可挖）。 */
@@ -4766,6 +4832,27 @@ public class DollEntity extends Avatar {
 		Vec3 to = Vec3.atCenterOf(pos);
 		BlockHitResult hit = level().clip(new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
 		return hit.getType() == HitResult.Type.MISS || hit.getBlockPos().equals(pos);
+	}
+
+	/**
+	 * 矿面可见判定：不苛求"眼睛→矿正中心"的直线（边角/屋檐易误判为不可见），
+	 * 只要矿至少有一个暴露到空气的面、且从人偶处能看见该空旷侧，就能从那个面采到它。
+	 * 埋在墙里（无暴露面）或仅背对面暴露（隔薄墙透视）一律判不可见，绝不隔墙挖——非盾构模式不许破坏非矿物方块。
+	 */
+	private boolean hasVisibleExposedFace(BlockPos ore) {
+		if (hasLineOfSight(ore)) {
+			return true; // 正中心视线已通：直接可见可采
+		}
+		for (Direction dir : Direction.values()) {
+			BlockPos adj = ore.relative(dir);
+			if (!level().getBlockState(adj).isAir()) {
+				continue; // 该面被方块封住，不是暴露面
+			}
+			if (hasLineOfSight(adj)) {
+				return true; // 正对某暴露面的空旷侧可见，从该面即可采到
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -5204,12 +5291,22 @@ public class DollEntity extends Avatar {
 				this.playSound(SoundEvents.FISHING_BOBBER_RETRIEVE, 1.0f,
 					0.4f / (this.getRandom().nextFloat() * 0.4f + 0.8f));
 				ItemStack rod = findFishingRodStack();
+				// 合成一个"浮漂"作为 THIS_ENTITY：顶层 FISHING 表里 treasure 子表条目带
+				// entity_properties(type_specific/fishing_hook, in_open_water=true) 条件，
+				// 只有 THIS_ENTITY 是 FishingHook 且 openWater 为真时宝藏子表才参与权重抽取。
+				// 人偶没有真实抛竿实体，这里按原版 FishingHook.calculateOpenWater 的判定复刻
+				// 开放水域结果写入合成浮漂的 openWater 字段（FishingHookOpenWaterAccessor）。
+				// 顺带把浮漂坐标放到鱼漂水面位置，使 ORIGIN/位置类条件与原版语义一致。
+				FishingHook bobber = new FishingHook(EntityTypes.FISHING_BOBBER, serverLevel);
+				bobber.setPos(x, y, z);
+				((FishingHookOpenWaterAccessor) bobber)
+					.dollMod$setOpenWater(isFishingOpenWater(serverLevel, fishTargetWater));
 				LootParams.Builder builder = new LootParams.Builder(serverLevel)
 					.withParameter(LootContextParams.ORIGIN, new Vec3(x, y, z))
 					.withParameter(LootContextParams.TOOL, rod)
-					.withOptionalParameter(LootContextParams.THIS_ENTITY, this);
+					.withParameter(LootContextParams.THIS_ENTITY, bobber);
 				if (!rod.isEmpty()) {
-					// 与原版 FishingHook 一致：海之眷顾附魔 + 实体幸运属性（人偶被泼幸运药水后叠加生效）
+					// 与原版 FishingHook.retrieve 一致：海之眷顾附魔 + 实体幸运属性（人偶被泼幸运药水后叠加生效）
 					builder.withLuck(EnchantmentHelper.getFishingLuckBonus(serverLevel, rod, this) + this.getLuck());
 				}
 			// 海洋人偶重平衡：删除"内置必出宝藏"——改用标准 FISHING 表，
@@ -5234,6 +5331,73 @@ public class DollEntity extends Avatar {
 		fishTargetWater = null;
 		fishNavTarget = null;
 		fishActionCooldown = FISH_ACTION_COOLDOWN;
+	}
+
+	// ---- 开放水域判定（复刻原版 FishingHook.calculateOpenWater） ----
+	/** 单格水域类型：0=上方空气/睡莲(ABOVE_WATER)，1=源水且无碰撞(INSIDE_WATER)，2=无效(INVALID)。 */
+	private static final int FISH_OPEN_ABOVE_WATER = 0;
+	private static final int FISH_OPEN_INSIDE_WATER = 1;
+	private static final int FISH_OPEN_INVALID = 2;
+
+	/**
+	 * 复刻原版 FishingHook.calculateOpenWater：以水面浮漂所在方块为中心，
+	 * 竖直 dy=-1..2 共 4 层、每层水平 5×5（x/z 各 -2..2）采样。
+	 * 语义：最底层须为整片源水；向上可整片空气/睡莲收尾；任一层内格子类型
+	 * 不一致(INVALID)即判非开放水域；出现"空气层之下又有水层"的上下翻转也判否。
+	 */
+	private boolean isFishingOpenWater(ServerLevel level, BlockPos center) {
+		int type = FISH_OPEN_INVALID;
+		for (int dy = -1; dy <= 2; dy++) {
+			int area = fishingAreaType(level, center.offset(-2, dy, -2), center.offset(2, dy, 2));
+			switch (area) {
+				case FISH_OPEN_INVALID -> { return false; }
+				case FISH_OPEN_ABOVE_WATER -> {
+					if (type == FISH_OPEN_INVALID) {
+						return false;
+					}
+				}
+				case FISH_OPEN_INSIDE_WATER -> {
+					if (type == FISH_OPEN_ABOVE_WATER) {
+						return false;
+					}
+				}
+				default -> { }
+			}
+			type = area;
+		}
+		return true;
+	}
+
+	/** 复刻原版 getOpenWaterTypeForArea：区域内所有格子类型一致才返回该类型，否则 INVALID。 */
+	private int fishingAreaType(Level level, BlockPos min, BlockPos max) {
+		int common = FISH_OPEN_INVALID;
+		for (int y = min.getY(); y <= max.getY(); y++) {
+			for (int x = min.getX(); x <= max.getX(); x++) {
+				for (int z = min.getZ(); z <= max.getZ(); z++) {
+					int t = fishingBlockType(level, new BlockPos(x, y, z));
+					if (common == FISH_OPEN_INVALID) {
+						common = t;
+					} else if (common != t) {
+						return FISH_OPEN_INVALID;
+					}
+				}
+			}
+		}
+		return common;
+	}
+
+	/** 复刻原版 getOpenWaterTypeForBlock：空气/睡莲→ABOVE_WATER；源水且方块无碰撞→INSIDE_WATER；否则 INVALID。 */
+	private int fishingBlockType(Level level, BlockPos pos) {
+		BlockState state = level.getBlockState(pos);
+		if (state.isAir() || state.is(Blocks.LILY_PAD)) {
+			return FISH_OPEN_ABOVE_WATER;
+		}
+		if (state.getFluidState().is(FluidTags.WATER)
+			&& state.getFluidState().isSource()
+			&& state.getCollisionShape(level, pos).isEmpty()) {
+			return FISH_OPEN_INSIDE_WATER;
+		}
+		return FISH_OPEN_INVALID;
 	}
 
 	/**
@@ -6584,6 +6748,31 @@ public class DollEntity extends Avatar {
 		return getDollVariant() == DollVariant.FOREST;
 	}
 
+	/** 是否为向导人偶变体。 */
+	public boolean isGuideDoll() {
+		return getDollVariant() == DollVariant.GUIDE;
+	}
+
+	/**
+	 * 向导人偶主手是否"正持有并使用"登山镐——盾构机 3×3 断面 / 无视重力方块的唯一开关。
+	 *
+	 * 语义是"正在使用"，不是"背包里有"：只认主手实际手持的挖掘工具
+	 * （{@link #getItemBySlot} 在主手走 {@link #findToolForMode}，挖矿模式下即
+	 * {@link #findPickaxeStack} 先选中的那把镐），并且仅限向导人偶变体。
+	 *
+	 * 因此：
+	 * - 塞在背包/存储区里不算，绝不触发；
+	 * - 放在副手不算（副手挖不了方块），绝不触发；
+	 * - 普通镐与登山镐并存时，以主手先选中的那把为准；普通镐被移走/耗尽后主手自动接上
+	 *   登山镐，宽断面与无视重力随之生效（切换自然发生，无需额外逻辑）。
+	 */
+	private boolean isHoldingGuidePickaxe() {
+		if (!isGuideDoll()) {
+			return false;
+		}
+		return getItemBySlot(EquipmentSlot.MAINHAND).getItem() instanceof GuidePickaxeItem;
+	}
+
 	/**
 	 * 指挥棒指定强制攻击目标。传入 null 清除强制目标，回退到正常 AI 搜寻。
 	 * 强制目标不受搜索半径和追击距离限制——玩家明确指定了"打谁"，人偶会持续追击。
@@ -6910,9 +7099,30 @@ public class DollEntity extends Avatar {
 		BlockPos here = blockPosition();
 		BlockPos ahead = here.offset(tunnelDir.getStepX(), 0, tunnelDir.getStepZ());
 		int tunnelY = tunnelEntry.getY();
-		// 前方要挖的两格（隧道 1 宽 × 2 高）
+		// 向导人偶"主手正持有并使用"登山镐：盾构机断面扩为 3 宽 × 3 高（每次掘进 9 格）。
+		// 判据是主手实际手持（见 isHoldingGuidePickaxe）：背包里、副手都不算。
+		// 其它人偶、或向导人偶主手拿的是普通镐，维持原 1 宽 × 2 高（2 格）。
+		// 中心列保留 dig1/dig2 用于落点定位，其它 7 格拼成完整 3×3 断面。
+		boolean wideTunnel = isHoldingGuidePickaxe();
 		BlockPos dig1 = new BlockPos(ahead.getX(), tunnelY, ahead.getZ());
 		BlockPos dig2 = new BlockPos(ahead.getX(), tunnelY + 1, ahead.getZ());
+		List<BlockPos> digAll = new ArrayList<>();
+		digAll.add(dig1);
+		digAll.add(dig2);
+		if (wideTunnel) {
+			for (int dx = -1; dx <= 1; dx++) {
+				for (int dz = -1; dz <= 1; dz++) {
+					if (dx == 0 && dz == 0) {
+						continue; // 中心列已由 dig1/dig2 表示
+					}
+					for (int dy = 0; dy < 3; dy++) {
+						digAll.add(new BlockPos(ahead.getX() + dx, tunnelY + dy, ahead.getZ() + dz));
+					}
+				}
+			}
+			// 中心列顶层（tunnelY+2）补 1 格，构成完整 3×3
+			digAll.add(new BlockPos(ahead.getX(), tunnelY + 2, ahead.getZ()));
+		}
 
 		// 停止条件 1：前方是悬崖。允许最多 MAX_SAFE_FALL_BLOCKS 的落差（与 DollNavigator
 		// 下坡能力同一口径），只有下方是真·深坑才判悬崖。
@@ -6924,20 +7134,23 @@ public class DollEntity extends Avatar {
 			stopTunneling("mine_stop_cliff");
 			return;
 		}
-		// 停止条件 2：前方两格本身或周围 ±2 格有岩浆
-		if (isLavaNear(serverLevel, dig1) || isLavaNear(serverLevel, dig2)) {
-			stopTunneling("mine_stop_lava");
-			return;
-		}
-		// 停止条件 3：前方是重力方块（沙砾/沙子）
-		if (isFallingBlock(serverLevel, dig1) || isFallingBlock(serverLevel, dig2)) {
-			stopTunneling("mine_stop_gravity");
-			return;
-		}
-		// 停止条件 4：前方两格有水（盾构机不游泳，遇水停下避免窒息）
-		if (isWaterBlock(serverLevel, dig1) || isWaterBlock(serverLevel, dig2)) {
-			stopTunneling("mine_stop_water");
-			return;
+		// 停止条件 2~4：前方断面任一格周围有岩浆 / 是重力方块 / 有水，立即停止。
+		// 向导人偶持镐时断面为 3×3，统一按断面遍历（原 1×2 走原 2 格循环）。
+		// 3×3 断面下重力方块判定范围随之变大，会频繁误停，故宽断面模式直接无视
+		// 沙砾/沙子（规则：宽断面 = 更强掘进能力，代价自担）；岩浆与水仍会停止。
+		for (BlockPos dig : digAll) {
+			if (isLavaNear(serverLevel, dig)) {
+				stopTunneling("mine_stop_lava");
+				return;
+			}
+			if (!wideTunnel && isFallingBlock(serverLevel, dig)) {
+				stopTunneling("mine_stop_gravity");
+				return;
+			}
+			if (isWaterBlock(serverLevel, dig)) {
+				stopTunneling("mine_stop_water");
+				return;
+			}
 		}
 		// 停止条件 5：前方是需要分级工具、但当前镐挖不动的方块（钻石矿/黑曜石等）。
 		// 统一走 canPickaxeMine——旧写法额外要求 ds.is(MINEABLE_WITH_PICKAXE)，
@@ -6945,7 +7158,7 @@ public class DollEntity extends Avatar {
 		// 当普通路障空手挖掉（方块消失、零掉落）。
 		// 是否有"任意一把镐"用于开挖前预检（耗尽即停）。实际每格用哪把镐在下面按等级挑选。
 		ItemStack pickaxe = findBestPickaxeStack();
-		for (BlockPos dig : new BlockPos[] { dig1, dig2 }) {
+		for (BlockPos dig : digAll) {
 			BlockState ds = serverLevel.getBlockState(dig);
 			if (requiresTieredTool(ds) && !canPickaxeMine(ds)) {
 				stopTunneling("mine_stop_unbreakable");
@@ -6964,10 +7177,10 @@ public class DollEntity extends Avatar {
 			return;
 		}
 
-		// 挖前方两格（掉落进背包），前进一格；
+		// 挖前方断面（掉落进背包），前进一格；
 		// 路障空手挖不耗镐耐久，需要分级工具的方块（矿石/黑曜石）才用镐。
 		// 前方挖到矿石时连锁采集同族矿脉（继承普通挖矿模式的连锁能力）
-		for (BlockPos dig : new BlockPos[] { dig1, dig2 }) {
+		for (BlockPos dig : digAll) {
 			BlockState digState = serverLevel.getBlockState(dig);
 			if (digState.isAir()) {
 				continue;
@@ -6992,13 +7205,15 @@ public class DollEntity extends Avatar {
 				return;
 			}
 		}
-		// 挖完后验证实际开挖的隧道两格（dig1/dig2，固定 tunnelY 高度）是否已挖通（空气），
+		// 挖完后验证实际开挖的隧道断面（digAll：原 1×2 或向导持镐的 3×3）是否已挖通（空气），
 		// 否则停止——防止几何异常/液体残留导致人偶被传送进实心方块或水中窒息。
-		// 注意必须校验 dig1/dig2 而非"人偶当前高度"的 ahead：人偶掉进洞穴/被推动后
+		// 注意必须校验 digAll 而非"人偶当前高度"的 ahead：人偶掉进洞穴/被推动后
 		// 高度可能偏离 tunnelY，校验从未开挖的方块会触发无端的"前方挖不通"。
-		if (!serverLevel.getBlockState(dig1).isAir() || !serverLevel.getBlockState(dig2).isAir()) {
-			stopTunneling("mine_stop_blocked");
-			return;
+		for (BlockPos dig : digAll) {
+			if (!serverLevel.getBlockState(dig).isAir()) {
+				stopTunneling("mine_stop_blocked");
+				return;
+			}
 		}
 		// 前进并把落脚点锚定到隧道列（tunnelY 固定高度），防止人偶高度漂移
 		// （掉进洞穴/被玩家推动/地面沉降）后，下一周期从错误高度继续掘进或误判停止
@@ -7016,14 +7231,19 @@ public class DollEntity extends Avatar {
 		}
 	}
 
-	/** 扫描人偶周围（XZ ±3、Y -2~+3）最近的矿石，用于盾构机侧向探矿。 */
+	/** 扫描人偶周围的矿石，用于盾构机侧向探矿。 */
 	private BlockPos scanNearbyOre(ServerLevel level) {
 		BlockPos center = blockPosition();
 		BlockPos best = null;
 		double bestDist = Double.MAX_VALUE;
-		for (int y = center.getY() - 2; y <= center.getY() + 3; y++) {
-			for (int x = center.getX() - 3; x <= center.getX() + 3; x++) {
-				for (int z = center.getZ() - 3; z <= center.getZ() + 3; z++) {
+		// 向导人偶主手正持登山镐：扫描半径扩大到 XZ ±6、Y −3..+4，覆盖 3×3 宽断面外缘暴露矿石。
+		boolean wide = isHoldingGuidePickaxe();
+		int xzR = wide ? 6 : 3;
+		int yLow = wide ? -3 : -2;
+		int yHigh = wide ? 4 : 3;
+		for (int y = center.getY() + yLow; y <= center.getY() + yHigh; y++) {
+			for (int x = center.getX() - xzR; x <= center.getX() + xzR; x++) {
+				for (int z = center.getZ() - xzR; z <= center.getZ() + xzR; z++) {
 					BlockPos p = new BlockPos(x, y, z);
 					if (!isOreBlock(p)) {
 						continue;

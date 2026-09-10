@@ -181,7 +181,7 @@ public class DollConfig {
 	}
 	public static class Chop {
 		public double searchRange = 16.0;
-		public double reach = 3.5;
+		public double reach = 5.0;
 		public int actionCooldown = 8;
 		public float moveSpeedFactor = 1.0f;
 		public double navRecalc = 1.0;
@@ -212,7 +212,7 @@ public class DollConfig {
 	}
 	public static class Mine {
 		public double searchRange = 16.0;
-		public double reach = 3.5;
+		public double reach = 5.0;
 		public int actionCooldown = 8;
 		public int searchCooldown = 20;
 		public int maxScanTargets = 8;

@@ -18,7 +18,7 @@ public class AnvilMenuMixin {
 	/**
 	 * 每次从石砧取出结果（onTake）都确定性地消耗一次耐久：
 	 * 每个阶段固定用 3 次，第 3 次用完后切换到下一损伤阶段（最后一个阶段则损坏消失）。
-	 * 创造模式玩家与原版铁砧一样不消耗耐久。
+	 * 创造模式玩家不消耗耐久。
 	 */
 	@Inject(method = "onTake(Lnet/minecraft/world/entity/player/Player;Lnet/minecraft/world/item/ItemStack;)V", at = @At("HEAD"))
 	private void dollMod$countRockAnvilUse(Player player, ItemStack stack, CallbackInfo ci) {

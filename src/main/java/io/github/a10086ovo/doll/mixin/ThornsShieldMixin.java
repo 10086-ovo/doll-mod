@@ -9,6 +9,8 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
@@ -24,8 +26,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * <p>
  * 在 LivingEntity.hurtServer HEAD 注入：
  * <ul>
- *   <li>玩家持荆棘盾牌格挡时：完全取消伤害（无伤格挡），消耗耐久，播放音效，荆棘反伤</li>
- *   <li>森林人偶副手持荆棘盾牌时：100% 反伤（不格挡伤害）</li>
+ *   <li>持荆棘盾牌格挡的实体（玩家等可举盾者）：完全取消伤害（无伤格挡），消耗耐久，播放音效，荆棘反伤</li>
+ *   <li>任意人偶副手持荆棘盾牌：被动 100% 反伤（不格挡伤害）；森林人偶额外令攻击者中毒 III</li>
  * </ul>
  * <p>
  * 注意：thorns 伤害类型属于 BYPASSES_SHIELD 标签，荆棘反伤不会触发攻击者的盾牌格挡，无递归风险。
@@ -82,23 +84,28 @@ public class ThornsShieldMixin {
 			return;
 		}
 
-		// 情况2：森林人偶副手持荆棘盾牌 —— 100% 反伤（不格挡伤害）
-		if (self instanceof DollEntity doll && doll.isForestDoll()) {
+		// 情况2：任意人偶副手持荆棘盾牌 —— 被动 100% 反伤（不格挡伤害）
+		// 森林人偶额外令攻击者中毒 III（有限时长）——主题毒性专精；其余变体人偶只反伤不下毒
+		if (self instanceof DollEntity doll) {
 			var offhandStack = doll.getItemBySlot(EquipmentSlot.OFFHAND);
 			if (offhandStack.getItem() instanceof ThornsShieldItem) {
 				// 播放原版盾牌格挡音效
 				level.playSound(null, doll.getX(), doll.getY(), doll.getZ(),
 					SoundEvents.SHIELD_BLOCK, SoundSource.HOSTILE, 1.0F, 0.8F + doll.getRandom().nextFloat() * 0.4F);
 
-			// 100% 反伤（期间置位：荆棘应穿透末影斧 80% 闪避）
-			float reflectDamage = amount * 1.0f;
-			DamageSource reflectSource = level.damageSources().thorns(doll);
-			ThornsShieldContext.setThornsReflecting(true);
-			try {
-				attacker.hurtServer(level, reflectSource, reflectDamage);
-			} finally {
-				ThornsShieldContext.setThornsReflecting(false);
-			}
+				// 100% 反伤（期间置位：荆棘应穿透末影斧 80% 闪避）
+				float reflectDamage = amount * 1.0f;
+				DamageSource reflectSource = level.damageSources().thorns(doll);
+				ThornsShieldContext.setThornsReflecting(true);
+				try {
+					attacker.hurtServer(level, reflectSource, reflectDamage);
+					if (doll.isForestDoll() && attacker instanceof LivingEntity attackerLiving) {
+						attackerLiving.addEffect(new MobEffectInstance(MobEffects.POISON,
+							ThornsShieldItem.FOREST_POISON_TICKS, 2, false, false, false));
+					}
+				} finally {
+					ThornsShieldContext.setThornsReflecting(false);
+				}
 			}
 		}
 	}

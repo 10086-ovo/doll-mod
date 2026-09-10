@@ -33,8 +33,8 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * 石砧方块。与原版铁砧行为一致，但总耐久更少。
- * 三个损伤状态（完好/微裂/大裂）分别使用独立的方块实例，与原版铁砧架构一致。
+ * 石砧方块：命名、修复、附魔合并均可使用，总耐久少于铁砧。
+ * 三个损伤状态（完好/微裂/大裂）分别使用独立的方块实例。
  */
 public class RockAnvilBlock extends FallingBlock {
 
@@ -103,7 +103,7 @@ public class RockAnvilBlock extends FallingBlock {
 
 	/**
 	 * 消耗一次使用次数。每个阶段可用 3 次，用完 3 次后切换到下一损伤阶段；
-	 * 最后一个阶段用完 3 次后直接损坏消失。与原版铁砧一样由 AnvilMenu 在取出结果时调用。
+	 * 最后一个阶段用完 3 次后直接损坏消失。由 AnvilMenu 在取出结果时调用。
 	 */
 	public static void consumeUse(Level level, BlockPos pos, BlockState state) {
 		if (level.isClientSide()) return;

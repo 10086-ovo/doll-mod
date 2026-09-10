@@ -6,7 +6,7 @@
 
 ## 0. 构建与运行
 
-- 环境：JDK 26 + Fabric Loader 26.2 + Fabric API（`gradle.properties` `group=io.github.a10086ovo`）。
+- 环境：Minecraft 26.2 + Fabric Loader 0.19.3 + Fabric API 0.157.0+26.2；本地构建用 JDK 26（`fabric.mod.json` 要求 java ≥ 25；`gradle.properties` `group=io.github.a10086ovo`）。
 - 命令：
   - `./gradlew runClient` — 启动开发实例，读取 `build/` 已编译产物（`doll-mod-1.0.0.jar`），不依赖 `src/` 即可跑。
   - `./gradlew build` — 重新编译并打包到 `build/libs/`。
@@ -36,7 +36,7 @@
   - `src/client/java/...` — 仅客户端：渲染器、Screen 渲染、client mixin。
 - 关键包与职责：
   - `entity` — `DollEntity`（核心）/ 变体 `DollVariant` / `WildWardenDollEntity`（BOSS）/ 投掷物（`ThrownEnderAxe`、`NetherFlyingSwordEntity`）/ 召回（`DollRecallRegistry`、`DollRecallService`）/ 搜索类型（`Structure/Biome/VillageSearchType`）。
-  - `item` — 装备（`EnderAxeItem`、`NetherSwordItem`、`PaleBowItem`、`ThornsShieldItem`）、头颅、盾、`GuideBookItem`、刷怪蛋 `DollSpawnEggItem`。
+  - `item` — 装备（`EnderAxeItem`、`NetherSwordItem`、`PaleBowItem`、`ThornsShieldItem`、`GuidePickaxeItem`）、头颅、盾、`GuideBookItem`、刷怪蛋 `DollSpawnEggItem`。
   - `block` — 7 种头颅方块（`*DollHeadBlock` + `*DollSkullType` + `*DollHeadBlockEntity`）+ `RockAnvilBlock`（三级损伤）+ `SculkShrineBlock`（祭坛）。
   - `config` — 外置配置 `DollConfig`（`config/dollmod/doll.json`）。
   - `guide` — 指南书数据模型与加载（自定义 JSON）。
@@ -65,6 +65,7 @@
   - `LivingEntityFearAuraMixin`、`MobMixin` — 苍白人偶恐惧光环（16 格内敌对生物失去攻击 AI）。
   - `NetherSwordHealthMixin` — 下界剑手持生命上限 +10。
   - `WitherSkullMixin` — 下界人偶烈焰弹（凋灵骷髅头颅弹）。
+  - `GuidePickaxeSmoothStepMixin` — 玩家持有登山镐（主手或副手）时平滑翻越一格高方块（`@Inject` 于 `LivingEntity#maxUpStep` 的 `RETURN`，仅取 `max(原值, 1.0)`；**不可用 `@Overwrite`**，否则会抹掉 `STEP_HEIGHT` 属性与骑乘加成）。
   - `ThornsShieldMixin`、`AnvilBlockMixin`、`AnvilMenuMixin`、`ItemCombinerMenuAccessor`、`EnchantmentHelperMixin`、`AreaEffectCloudMixin`/`Accessor`、`PlayerGuideBookMixin` — 各功能适配。
 
 ## 3. API 适配要点（MC 26.2 / Fabric）
@@ -80,7 +81,7 @@
 
 ### 盔甲（ArmorMaterial）——8 参构造
 - `new ArmorMaterial(durabilityBase, Map<ArmorType,Integer>, enchantmentValue, equipSound, toughness, knockbackResistance, repairTag, equipmentAssetsKey)`。
-- 配 `Item.Properties.humanoidArmor(material, ArmorType)` + `.repairable(repairTag)`。→ `DollMod.java` 海洋套装（数值对标钻石套）。
+- 配 `Item.Properties.humanoidArmor(material, ArmorType)` + `.repairable(repairTag)`。→ `DollMod.java` 海洋套装（耐久基准 33、防御 3/8/6/3、附魔值 10、韧性 2.0）。
 - 装备纹理资源走 `src/main/resources/assets/doll-mod/equipment/`（如 `sea.json`）。
 
 ### 盾牌（ThornsShieldItem）
@@ -96,7 +97,7 @@
 - **唯一真相源 `canPickaxeMine(BlockState)`**（→ `entity/DollEntity.java`）：所有挖矿入口必须调用它，**不要各写一份 `requiresTieredTool + isCorrectToolForDrops` 判断**。
   五个入口：选目标 `selectMineTarget` / 单块挖 `mineBlock` / 连锁 `chainMineOres` / 盾构机掘进 `updateTunnelDrill` / 盾构机侧向探矿 `scanNearbyOre`。
   历史教训：侧向探矿那段曾漏判，导致木镐把钻石矿"拆掉但零掉落"——方块消失、资源白丢，且表现极隐蔽。
-- **镐头选择"最聪明"策略（已与作者确认）**：
+- **镐头选择策略（已与作者确认）**：
   - 能力判定用 `findBestPickaxeStack()`（背包里 Tier 最高的镐）。**修复缺陷**：旧 `findPickaxeStack()` 只按格子顺序返回第一把镐（石镐在前、钻石镐在后时，人偶误判"挖不动钻石矿"而绕开它）。
   - 实际挖掘用 `findPickaxeForState(state)`（在 `isCorrectToolForDrops(state)` 为真的镐里挑 Tier 最低的一把），把钻石 / 下界合金镐留给真正需要的矿，省耐久。
   - 分级 `pickaxeTierLevel()`：26.2 已移除 `TieredItem`，改为测 `isCorrectToolForDrops` 在参考方块上的结果定级——铁矿石（`NEEDS_STONE_TOOL`）=石级、钻石矿（`NEEDS_IRON_TOOL`）=铁级、黑曜石（`NEEDS_DIAMOND_TOOL`）=钻石级；下界合金镐单独记最高级，保证优先用钻石镐省耐久；木/金镐连铁矿石都挖不动 → 0 级。**正确性始终由 `isCorrectToolForDrops` 兜底，分级只用于"够用的镐里挑最弱"的排序**，即便分级偏差也绝不会选到不够用的镐。
@@ -186,15 +187,16 @@
 - **镐等级唯一真相源 `canPickaxeMine(BlockState)`**：选目标 / 单块挖 / 连锁 / 盾构机掘进 / 盾构机侧向探矿 五个入口全部调用它，**不要各写一份判断**。→ `entity/DollEntity.java`。
 - **跟随离队边界**：`mineExcursionAllowed()` 受 `MINE_EXCURSION_MAX_TICKS`（5s）/ `MINE_EXCURSION_MAX_DIST_SQR`（12²）约束，否则人偶会一路追矿越跑越远。（注：砍树离队是 20s / 32²，与挖矿不同。）
 - **扫描中心 `getMineScanCenter()`**：跟随时人偶离主人 ≤8 格用主人为中心（保留设计），离远改用人偶自身为中心，否则会挑主人身边够不着的矿 → 寻路失败 → 拉黑，表现为"跟随时不认矿"。
+- **盾构机断面宽度**：普通为 1 宽 × 2 高；向导人偶**主手持有并使用**登山镐时扩为 3×3（每周期掘进 9 格），侧向探矿半径同步扩大，且跳过重力方块判定（岩浆 / 水仍会停）。判据是主手实际手持（`isHoldingGuidePickaxe()`）——放背包里、放副手都不算。
 - **盾构机停止条件（`updateTunnelDrill`）一览，顺序即优先级**：
   1. `mine_stop_cliff`：前方落差 > `MAX_SAFE_FALL_BLOCKS` 才停（早期判定写反 → 平地秒停；后又过严 → 山区小空腔频繁误停，已放宽）。
   2. `mine_stop_lava`：前方 ±2 格有岩浆。
-  3. `mine_stop_gravity`：前方是沙砾 / 沙子。
+  3. `mine_stop_gravity`：前方是沙砾 / 沙子（3×3 宽断面模式跳过此判定）。
   4. `mine_stop_water`：前方两格有水（盾构机不游泳）。
   5. `mine_stop_unbreakable`：需要分级工具且 `!canPickaxeMine`（统一后不会漏判不在 `MINEABLE_WITH_PICKAXE` tag 内的分级方块）。
   6. `mine_stop_no_pickaxe`：镐空 → **必须在开挖前停**，否则深板岩这类 `requiresCorrectToolForDrops` 路障会被"零掉落"挖掉。
   7. `mine_stop_backpack_full`：背包满。
-  - （开挖后仍校验 `dig1/dig2` 是否已挖通，否则 `mine_stop_blocked`；）
+  - （开挖后仍校验断面各格 `digAll`（普通 1×2 / 宽断面 3×3）是否已挖通，否则 `mine_stop_blocked`；）
   - **`mine_stop_bedrock`**：基岩单独报原因（旧实现 `continue` 跳过，被"挖不通"兜底误导）。
   - **连锁矿脉 bug**：`updateTunnelDrill` 原把 `isOreBlock(dig)` 写在 `tunnelMineBlock` 之后，挖完变空气恒为 false → 连锁从未触发。已改为挖前 `wasOre` 判定。
   - **镐耗尽静默损失**：无镐时旧实现仍对石/深板岩继续挖 → 深板岩 `requiresCorrectToolForDrops` 零掉落。改由上述停止条件 6 拦截。
@@ -275,7 +277,7 @@
 
 ## 9. 性能与优化模组兼容性
 
-> 本模组与主流性能优化模组（Sodium、Lithium、FerriteCore、ImmediatelyFast）**高度兼容**，自身优化也已到位。以下为维护时须守住的红线，破坏任何一条都可能拖累性能优化模组或造成卡顿。
+> 本模组兼容主流性能优化模组（Sodium、Lithium、FerriteCore、ImmediatelyFast）。以下为维护时须守住的红线，破坏任何一条都可能拖累性能优化模组或造成卡顿。
 
 ### 渲染层（与 Sodium / ImmediatelyFast 兼容的关键）
 - 所有渲染器**必须走标准 `EntityRenderers.register` / `BlockEntityRenderers.register`** 注册；自定义实体渲染器继承 `EntityRenderer` / `HumanoidMobRenderer` 并用新 `SubmitNodeCollector` + `RenderTypes` 管线。→ `DollModClient.java`。

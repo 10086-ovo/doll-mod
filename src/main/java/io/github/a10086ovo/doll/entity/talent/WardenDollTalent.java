@@ -110,7 +110,7 @@ public class WardenDollTalent implements DollTalent {
 		);
 		target.hurtMarked = true;
 
-		// 造成伤害（穿甲音波，对标原版 Warden sonicBoom）
+		// 造成伤害（穿甲音波）
 		target.hurtServer(serverLevel, doll.damageSources().sonicBoom(doll), DollEntity.SONIC_BOOM_DAMAGE);
 
 		// 音波命中后同样补设 lastHurtByPlayer，使经验/稀有掉落正常

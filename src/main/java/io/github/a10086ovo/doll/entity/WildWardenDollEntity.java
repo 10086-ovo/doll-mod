@@ -33,7 +33,7 @@ import net.minecraft.world.phys.Vec3;
 /**
  * 野生幽匿人偶 —— 独立于 DollEntity 体系的敌对生物（BOSS）。
  * 继承 Monster，使用原版 Goal 系统实现寻路/寻敌。
- * 300 HP / 10 攻击力 / 移动速度 0.3（仿监守者）。
+ * 300 HP / 10 攻击力 / 移动速度 0.3。
  * 弱再生 I（boss 禁强再生，仅 I 级）；满抗击退；免疫火焰；无抗性提升（平衡重做已删）。
  * 被动音波：6 伤害 / 7 秒冷却 / 限 32 格。
  * 被攻击后反击，创造/旁观模式不锁定。
@@ -86,16 +86,16 @@ public class WildWardenDollEntity extends Monster {
 			.add(Attributes.ATTACK_DAMAGE, WILD_ATTACK_DAMAGE)
 			.add(Attributes.MOVEMENT_SPEED, WILD_BASE_SPEED)
 			.add(Attributes.FOLLOW_RANGE, WILD_FOLLOW_RANGE)
-			.add(Attributes.KNOCKBACK_RESISTANCE, 1.0);  // 满抗击退，仿监守者
+			.add(Attributes.KNOCKBACK_RESISTANCE, 1.0);  // 满抗击退
 	}
 
 	@Override
 	public boolean fireImmune() {
-		return true; // 免疫火焰和岩浆伤害，仿监守者
+		return true; // 免疫火焰和岩浆伤害
 	}
 
 	/**
-	 * 投射物免疫（类似凋零二阶段）：完全免疫所有投射物伤害。
+	 * 投射物免疫：完全免疫所有投射物伤害。
 	 */
 	@Override
 	public boolean hurtServer(ServerLevel level, DamageSource source, float amount) {
@@ -123,7 +123,7 @@ public class WildWardenDollEntity extends Monster {
 				Player p = (Player) target;
 				return !p.isCreative() && !p.isSpectator();
 			}));
-		// 攻击所有非创造/旁观生物（仿监守者，排除同类）
+		// 攻击所有非创造/旁观生物（排除同类）
 		this.goalSelector.addGoal(3, new NearestAttackableTargetGoal<LivingEntity>(this, LivingEntity.class, 0, true, false,
 			(target, level) -> {
 				if (target instanceof Player player) {
@@ -255,7 +255,7 @@ public class WildWardenDollEntity extends Monster {
 		);
 		target.hurtMarked = true;
 
-		// 造成伤害（穿甲音波，对标原版 Warden sonicBoom）
+		// 造成伤害（穿甲音波）
 		target.hurtServer(serverLevel, this.damageSources().sonicBoom(this), SONIC_BOOM_DAMAGE);
 	}
 

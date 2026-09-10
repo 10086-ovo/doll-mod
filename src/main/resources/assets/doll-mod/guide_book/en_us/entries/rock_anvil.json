@@ -7,7 +7,7 @@
 		{
 			"type": "text",
 			"title": "Overview",
-			"text": "Basic alternative to the Iron Anvil. Functions identically — naming, repairing, and combining enchantments.\n\nThree damage states: intact → cracked → chipped → destroyed. 3 uses per stage, 9 total. Falling from a height greater than 1 block downgrades the damage stage; the final stage is destroyed instead."
+			"text": "Used for naming, repairing, and combining enchantments.\n\nThree damage states: intact → cracked → chipped → destroyed. 3 uses per stage, 9 total. Falling from a height greater than 1 block downgrades the damage stage; the final stage is destroyed instead."
 		},
 		{
 			"type": "crafting",

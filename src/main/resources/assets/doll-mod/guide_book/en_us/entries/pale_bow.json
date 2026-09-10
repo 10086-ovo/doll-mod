@@ -7,7 +7,7 @@
     {
       "type": "text",
       "title": "Overview",
-      "text": "A Pale Garden-themed ranged weapon with higher durability than the vanilla bow.\n\n• Keeps all vanilla bow mechanics: charge to shoot, enchantable (Power, Flame, Punch, Infinity, etc.)\n• Durability 1536 (four times the vanilla bow's 384)\n• Uses any arrow as ammo (same as the vanilla bow)\n\nVulnerability effect\n• Arrow hits apply Vulnerability: +50% damage taken for 5s\n• Works for both the owner and dolls\n• Repeated hits only refresh the duration, do not stack the multiplier\n• If the target is frozen by a Pale Doll's Fear Aura, the two vulnerabilities stack for +100% damage taken in total"
+      "text": "A Pale Garden-themed ranged weapon.\n\n• Keeps all vanilla bow mechanics: charge to shoot, enchantable (Power, Flame, Punch, Infinity, etc.)\n• Durability 1536 (four times the vanilla bow's 384)\n• Uses any arrow as ammo\n\nVulnerability effect\n• Arrow hits apply Vulnerability: +50% damage taken for 5s\n• Works for both the owner and dolls\n• Repeated hits only refresh the duration, do not stack the multiplier\n• If the target is frozen by a Pale Doll's Fear Aura, the two vulnerabilities stack for +100% damage taken in total"
     },
     {
       "type": "text",
@@ -27,7 +27,7 @@
         "S": "minecraft:string"
       },
       "result": "doll-mod:pale_bow",
-      "text": "3 resin bricks + 3 string in the same zigzag layout as the vanilla bow. Resin bricks are smelted from resin blocks found in the Pale Garden."
+      "text": "3 resin bricks + 3 string in a zigzag layout. Resin bricks are smelted from resin blocks found in the Pale Garden."
     }
   ]
 }

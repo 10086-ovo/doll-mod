@@ -3,10 +3,12 @@
 	"package": "io.github.a10086ovo.client.mixin",
 	"compatibilityLevel": "JAVA_25",
 	"client": [
+		"AbstractContainerMenuMixin",
 		"AvatarRendererDollMixin",
 		"SeaWaterFogMixin",
 		"ClientPacketListenerMixin",
 		"DollEntityClientMixin",
+		"GuiSetScreenMixin",
 		"MinecraftStopUseItemMixin",
 		"MinecraftUseItemOnDollMixin",
 		"SkullBlockRendererMixin",

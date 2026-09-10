@@ -16,7 +16,7 @@ import java.util.Map;
 /**
  * 指南书 JSON 加载器。目录布局：
  * <pre>
- * data/doll-mod/guide_book/
+ * assets/doll-mod/guide_book/
  *   book.json                            — 书籍定义
  *   en_us/categories/&lt;id&gt;.json      — 章节（id 取自文件名）
  *   en_us/entries/&lt;id&gt;.json          — 条目（category 字段归入章节）
