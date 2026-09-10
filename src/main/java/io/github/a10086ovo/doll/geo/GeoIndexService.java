@@ -31,8 +31,9 @@ import java.util.List;
  * <p><b>扫描方式（本轮优化重点）</b>：结构<b>不再逐区块满网格判定</b>。原实现对半径 16000 格
  * 要遍历 {@code (2*1000+1)^2 = 4,004,001} 个区块 × 每个结构，单维度约 1 亿次 {@code isStructureChunk}，
  * 实测每维度 35~44 秒。现改为原版 {@code /locate} 同款做法：按 placement 的 {@code spacing}
- * 只枚举<b>候选区块</b>（{@code getPotentialStructureChunk} 把"区域索引"换算成该区域唯一可能的候选区块），
- * 候选数降到约 {@code (2*1000/spacing)^2}。以 spacing=32 计约 4,200 个/结构，<b>约降 1000 倍</b>，
+ * 只枚举<b>候选区块</b>（对每个区域索引调用 {@code getPotentialStructureChunk} 取该区域唯一可能的候选区块，
+ * <b>注意该方法收的是区块坐标</b>——见 {@link #collectRandomSpread} 的坐标单位陷阱），
+ * 候选数降到约 {@code (2*radiusChunks/spacing)^2}。以 spacing=34 计约 3,500 个/结构，<b>约降 1000 倍</b>，
  * 且判定仍走 {@code isStructureChunk}（保留频率削减与排除区语义），结果集与满网格扫描一致。
  *
  * <p>要塞（{@link ConcentricRingsStructurePlacement}）单独处理：直接取原版已算好的
@@ -106,9 +107,17 @@ public final class GeoIndexService {
 	/**
 	 * 按 spacing 只枚举候选区块（原版 {@code /locate} 同款），环形由近及远。
 	 *
-	 * <p>区域索引 → 候选区块由 {@code getPotentialStructureChunk(seed, regionX, regionZ)} 给出；
+	 * <p>区域索引 → 候选区块由 {@code getPotentialStructureChunk(seed, x, z)} 给出；
 	 * 再过滤到半径内、并以 {@code isStructureChunk} 复核（含频率削减 {@code frequency} 与
 	 * 排除区 {@code exclusionZone}），因此结果与满网格扫描完全一致，只是判定次数少了约三个数量级。
+	 *
+	 * <p><b>⚠ 坐标单位陷阱（曾因此漏掉约 8/9 的结构、村庄几乎全丢）</b>：
+	 * {@code getPotentialStructureChunk} 的第 2/3 个参数是<b>区块坐标</b>，不是区域索引——
+	 * 它内部会自己做 {@code floorDiv(x, spacing)} 再换算成区域。旁证：原版
+	 * {@code StructurePlacement.isPlacementChunk(state, x, z)} 就是把原始区块坐标直接传进去做自比较。
+	 * 因此这里必须传 {@code rx * spacing}（该区域内的任一区块坐标，{@code floorDiv(rx*spacing, spacing) == rx}
+	 * 对负值同样成立）。若误传区域索引本身，{@code floorDiv(rx, spacing)} 会在整个窗口上只取到极少数几个值，
+	 * 候选集塌成 (2*radiusChunks/spacing²)² 个（spacing=34 时仅 2×2=4 个），且结果与区域窗口无关。
 	 */
 	private static void collectRandomSpread(ChunkGeneratorStructureState state, RandomSpreadStructurePlacement rsp,
 			int cx, int cz, int radiusChunks, int maxResults, List<int[]> out) {
@@ -136,7 +145,8 @@ public final class GeoIndexService {
 					if (rx < minRX || rx > maxRX || rz < minRZ || rz > maxRZ) {
 						continue;
 					}
-					ChunkPos cand = rsp.getPotentialStructureChunk(seed, rx, rz);
+					// 传区块坐标（rx*spacing），不能传区域索引——见方法注释的坐标单位陷阱
+					ChunkPos cand = rsp.getPotentialStructureChunk(seed, rx * spacing, rz * spacing);
 					if (cand == null || cand.getChessboardDistance(cx, cz) > radiusChunks) {
 						continue;
 					}
@@ -263,8 +273,9 @@ public final class GeoIndexService {
 	 * 某维度全部结构注册键，<b>按字符串排序；villagesOnly=true 只留 {@code village_} 前缀</b>。
 	 *
 	 * <p><b>不变量（切勿改动排序/过滤规则）</b>：本方法的下标即客户端与服务端展示该结构时使用的
-	 * {@code targetIndex}，也是 GeoIndex 的 geoKey 后半段。必须与 {@code DollNetworking} 的
-	 * {@code resolveStructureKey} / {@code structuresList} 完全一致，否则索引坐标会与目标错位。
+	 * {@code targetIndex}，也是 GeoIndex 的 geoKey 后半段。必须与 {@code DollNetworking.resolveStructureKey}
+	 * 完全一致（同样的字符串排序、同样的 {@code village_} 前缀过滤），否则索引坐标会与目标错位；
+	 * {@link #orderedBiomeKeys} 同理对应 {@code DollNetworking.resolveBiomeKey}。
 	 */
 	public static List<ResourceKey<Structure>> orderedStructureKeys(ServerLevel level, boolean villagesOnly) {
 		var reg = level.registryAccess().lookupOrThrow(Registries.STRUCTURE);

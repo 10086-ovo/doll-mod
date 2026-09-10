@@ -30,12 +30,16 @@ import java.util.Map;
  * <p>现按终稿 D9「主线程口径 = 可控而非零」落地：
  * <ul>
  *   <li>改由 {@code ServerTickEvents.END_SERVER_TICK} 驱动，每 tick 只花
- *       {@link #BUDGET_NANOS} 纳秒（默认 2ms）推进；</li>
- *   <li>结构与村庄逐个收集（单个约 4 千次候选判定，毫秒级），群系按网格点逐点采样，
+ *       {@link #BUDGET_NANOS} 纳秒（默认 10ms）推进；</li>
+ *   <li>结构与村庄逐个收集（单个约 3~10ms），群系按网格点逐点采样，
  *       预算耗尽即让出主线程，下个 tick 从游标处继续；</li>
  *   <li>顺序上先结构/村庄、后群系——前者几乎瞬间完成且查询价值最高，底图立刻可用；</li>
  *   <li>每个维度完成后立即落盘（D5），重启即读回，不必重算。</li>
  * </ul>
+ *
+ * <p><b>日志口径</b>：{@code 耗时} 记的是<b>该维度自己</b>的时长（从它成为当前任务起算），
+ * 不是从开服起算；早期版本误用 Job 构造时刻，导致第二、三个维度的耗时成了累计值。
+ * 同时分别记录「结构/村庄阶段」与「群系阶段」的耗时，便于定位热点。
  *
  * <p>线程：所有状态只在服务端主线程读写（{@code begin}/{@code advance}/{@code cancel}
  * 均由主线程事件调用），无需额外加锁。
@@ -58,8 +62,17 @@ public final class GeoIndexBuildJob {
 	 */
 	public static final int PREINDEX_BIOME_STEP = 64;
 
-	/** 每 tick 允许占用的主线程时间预算（纳秒）。 */
-	public static final long BUDGET_NANOS = 2_000_000L;
+	/**
+	 * 每 tick 允许占用的主线程时间预算（纳秒）——<b>这是唯一的调优旋钮</b>。
+	 *
+	 * <p>墙钟 ≈ 真实工作量 ÷ (预算 / 50ms)。最初取 2ms 只等于 4% 占空比，
+	 * 实测三维总共约 5.2s 的工作量被拉长成 129s（×25），是要治的病本身。
+	 * 取 10ms（20% 占空比）后同样工作量约 26s，且一个 tick 仍留 40ms 给原版逻辑，
+	 * 正常世界下 TPS 不受影响。想更快就继续调大，但要留意下方两处让出粒度：
+	 * 结构阶段是"每个结构让出一次"（单个结构约 3~10ms），群系阶段每
+	 * {@link #BIOME_POINTS_PER_BUDGET_CHECK} 个点让出一次，故实际单 tick 会略超预算。
+	 */
+	public static final long BUDGET_NANOS = 10_000_000L;
 
 	/** 群系采样每累计多少个点检查一次时间预算（点级让出粒度）。 */
 	private static final int BIOME_POINTS_PER_BUDGET_CHECK = 64;
@@ -91,8 +104,17 @@ public final class GeoIndexBuildJob {
 			}
 		}
 		current = QUEUE.poll();
+		markJobStart(current);
 		LOGGER.info("DollGeoPreIndex 开服底图预索引开始（主线程时间片推进，每 tick {} ms）：{} 个维度",
 			BUDGET_NANOS / 1_000_000, QUEUE.size() + (current != null ? 1 : 0));
+	}
+
+	/** 记录"该维度此刻成为当前任务"，作为它自己耗时的起点（勿改用 Job 构造时刻，那是全维度共用的）。 */
+	private static void markJobStart(Job j) {
+		if (j != null) {
+			j.jobStartNanos = System.nanoTime();
+			j.phaseStartNanos = j.jobStartNanos;
+		}
 	}
 
 	/** 服务端停止：丢弃未完成的构建任务（已完成的维度都已落盘）。 */
@@ -123,6 +145,7 @@ public final class GeoIndexBuildJob {
 				}
 				return true;
 			}
+			markJobStart(current);
 			if (System.nanoTime() >= deadline) {
 				return false;
 			}
@@ -143,6 +166,11 @@ public final class GeoIndexBuildJob {
 				if (j.idx >= list.size()) {
 					j.phase++;
 					j.idx = 0;
+					if (j.phase == PHASE_BIOME) {
+						// 结构/村庄阶段收尾：结掉这一段耗时，开始计群系阶段
+						j.structNanos = System.nanoTime() - j.phaseStartNanos;
+						j.phaseStartNanos = System.nanoTime();
+					}
 					continue;
 				}
 				int index = j.idx++;
@@ -156,6 +184,7 @@ public final class GeoIndexBuildJob {
 			if (stepBiome(j, deadline)) {
 				return true;
 			}
+			j.biomeNanos = System.nanoTime() - j.phaseStartNanos;
 			j.phase = PHASE_DONE;
 			return false;
 		}
@@ -167,14 +196,31 @@ public final class GeoIndexBuildJob {
 			if (!GeoIndexService.structurePossibleInDimension(j.level, key)) {
 				return;
 			}
+			j.catsTried++;
+			long t0 = System.nanoTime();
 			List<int[]> cands = GeoIndexService.collectNearest(
 				j.level, key, j.cx, j.cz, PREINDEX_RADIUS_BLOCKS, PREINDEX_PER_CATEGORY_MAX);
 			if (cands.isEmpty()) {
+				// 该维度确实没有这个结构时属正常；但若某个密结构（如村庄）长期为 0，说明枚举又出问题了。
+				LOGGER.info("DollGeoPreIndex 结构无候选 {}@{}", key.identifier(), j.dimId);
 				return;
 			}
 			int cat = village ? SearchCategory.VILLAGE : SearchCategory.STRUCTURE;
 			GeoIndex.merge(j.dimId, cat + ":" + index, cands);
-			j.structureHits += cands.size();
+			j.catsWithHits++;
+			if (village) {
+				j.villagePoints += cands.size();
+			} else {
+				j.structPoints += cands.size();
+			}
+			long ms = (System.nanoTime() - t0) / 1_000_000;
+			if (cands.size() >= PREINDEX_PER_CATEGORY_MAX) {
+				j.catsAtCap++;
+			} else if (cands.size() < 8 || ms >= 50) {
+				// 修复后仍出现"密结构却只有个位数候选"或"单结构超过 50ms"都值得盯：前者像枚举漏采，后者像让出粒度太粗。
+				LOGGER.info("DollGeoPreIndex 结构收集偏少/偏慢 {}@{} -> {} 个坐标 / {} ms",
+					key.identifier(), j.dimId, cands.size(), ms);
+			}
 		} catch (Throwable t) {
 			// 单个结构失败只跳过它，不影响本维度其它结构与其后的群系阶段。
 			LOGGER.error("DollGeoPreIndex 结构索引异常 {}：{}", key, t.toString());
@@ -247,8 +293,11 @@ public final class GeoIndexBuildJob {
 		} catch (Throwable t) {
 			LOGGER.error("DollGeoPreIndex 维度 {} 落盘索引异常：{}", j.dimId, t.toString());
 		}
-		LOGGER.info("DollGeoPreIndex 维度 {} 预索引完成，耗时 {} ms：结构/村庄命中 {} 个坐标，群系采样点 {} 个",
-			j.dimId, (System.nanoTime() - j.startNanos) / 1_000_000, j.structureHits, j.biomePoints);
+		LOGGER.info("DollGeoPreIndex 维度 {} 预索引完成，本维度耗时 {} ms（结构/村庄阶段 {} ms + 群系阶段 {} ms）",
+			j.dimId, (System.nanoTime() - j.jobStartNanos) / 1_000_000,
+			j.structNanos / 1_000_000, j.biomeNanos / 1_000_000);
+		LOGGER.info("DollGeoPreIndex 维度 {} 明细：结构 {} 点 / 村庄 {} 点（有结果分类 {}/{}，达上限 {} 个），群系采样点 {} 个",
+			j.dimId, j.structPoints, j.villagePoints, j.catsWithHits, j.catsTried, j.catsAtCap, j.biomePoints);
 	}
 
 	/** 一个维度的构建状态（可断点续跑）。 */
@@ -257,15 +306,26 @@ public final class GeoIndexBuildJob {
 		final String dimId;
 		final int cx;
 		final int cz;
-		final long startNanos;
 		final List<ResourceKey<Structure>> structures;
 		final List<ResourceKey<Structure>> villages;
 		final Map<ResourceKey<Biome>, Integer> biomeIndex;
 
 		int phase = PHASE_STRUCTURE;
 		int idx;
-		int structureHits;
 		int biomePoints;
+
+		/** 本维度自己的计时（从它成为当前任务起算，由 {@code markJobStart} 赋值）。 */
+		long jobStartNanos;
+		long phaseStartNanos;
+		long structNanos;
+		long biomeNanos;
+
+		/** 结构/村庄收集统计：检出点数、有结果分类数、尝试分类数、达上限分类数。 */
+		int structPoints;
+		int villagePoints;
+		int catsTried;
+		int catsWithHits;
+		int catsAtCap;
 
 		// 群系网格游标与行缓冲
 		GeoIndexService.BiomeGridSampler sampler;
@@ -276,7 +336,6 @@ public final class GeoIndexBuildJob {
 		Job(ServerLevel level) {
 			this.level = level;
 			this.dimId = level.dimension().identifier().toString();
-			this.startNanos = System.nanoTime();
 			int x = 0;
 			int z = 0;
 			try {
