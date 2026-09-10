@@ -9,38 +9,68 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * GeoIndex 运行时索引状态（M1：世界级、进服即有）。
  *
- * <p>以维度为单元持有 {@code "category:targetIndex" -> 候选坐标列表}，由底图/深扫任务（当前为
- * {@link GeoIndexService#collectCandidates}）灌入，查询时直接读内存索引得到结果，避免每次重算。
+ * <p>以维度为单元持有 {@code "category:targetIndex" -> 候选坐标列表}，由底图/深扫任务（见
+ * {@link GeoIndexBuildJob} 与 {@link GeoIndexService}）灌入，查询时直接读内存索引得到结果，
+ * 避免每次重算。
  *
  * <p>生命周期：服务器启动时自磁盘加载（D5），停服时落盘；可随时并入新收集到的候选。
  * 结构索引由世界种子固定永不陈腐，因此合并是幂等的（天然去重）。
-
- * <p>线程：本类方法仅在服务端主线程调用（tick），与 {@code DollNetworking} 现有搜索路径保持一致，
- * 无需额外加锁。
+ *
+ * <p><b>去重为何用哈希</b>：旧实现每并入一个点都要线性扫一遍已有列表，对群系这种动辄数万点的桶
+ * 是 O(n²)——单维度累计上亿次比较，是开服卡顿的来源之一。现改为每个桶维护
+ * {@code (x,z) 打包成 long 的 HashSet}，单点并入摊还 O(1)，语义不变（更精确：旧实现带 ±1 模糊）。
+ *
+ * <p>线程：本类方法可能被查询路径（服务端主线程）与构建任务先后调用，故对 {@link #BY_DIMENSION}
+ * 的所有读写统一加 {@link #LOCK}，保证并发安全、不丢数据。
  */
 public final class GeoIndex {
 
 	private static final Logger LOGGER = LoggerFactory.getLogger(DollModConstants.MOD_ID);
 
-	private static final Map<String, Map<String, List<int[]>>> BY_DIMENSION = new HashMap<>();
+	private static final Map<String, Map<String, Bucket>> BY_DIMENSION = new HashMap<>();
 
 	private GeoIndex() {
 	}
 
-	/**
-	 * 全局静态锁：预索引在后台守护线程写、玩家搜索在主线程读、群系在工作线程并入，
-	 * 故对 {@link #BY_DIMENSION} 的所有读写本类统一加 {@code synchronized}（方法级锁同一对象，即
-	 * {@code GeoIndex} 的 Class 对象），保证并发安全、不丢数据。
-	 */
+	/** 全局静态锁：构建任务写、玩家搜索读，统一加锁保证并发安全。 */
 	private static final Object LOCK = new Object();
 
-	private static Map<String, List<int[]>> dimMap(String dimensionId) {
+	/** 一个目标键下的候选坐标集合：列表保序（对外查询用）+ 哈希索引（去重用）。 */
+	private static final class Bucket {
+		private final List<int[]> points = new ArrayList<>();
+		private final Set<Long> index = new HashSet<>();
+
+		/** 并入一个点；已存在返回 false。 */
+		boolean add(int x, int z) {
+			if (!index.add(pack(x, z))) {
+				return false;
+			}
+			points.add(new int[]{x, z});
+			return true;
+		}
+
+		boolean isEmpty() {
+			return points.isEmpty();
+		}
+
+		boolean contains(int x, int z) {
+			return index.contains(pack(x, z));
+		}
+
+		static long pack(int x, int z) {
+			return ((long) x << 32) ^ (z & 0xFFFFFFFFL);
+		}
+	}
+
+	private static Map<String, Bucket> dimMap(String dimensionId) {
 		synchronized (LOCK) {
 			return BY_DIMENSION.computeIfAbsent(dimensionId, k -> new HashMap<>());
 		}
@@ -50,77 +80,78 @@ public final class GeoIndex {
 	public static void loadForDimension(MinecraftServer server, ServerLevel level) {
 		String dimId = dimId(level);
 		Map<String, List<int[]>> loaded = GeoIndexStorage.load(server, dimId);
-		synchronized (LOCK) {
-			BY_DIMENSION.put(dimId, loaded);
+		Map<String, Bucket> buckets = new HashMap<>(Math.max(16, loaded.size() * 2));
+		for (Map.Entry<String, List<int[]>> e : loaded.entrySet()) {
+			Bucket b = new Bucket();
+			for (int[] c : e.getValue()) {
+				b.add(c[0], c[1]);
+			}
+			buckets.put(e.getKey(), b);
 		}
-		LOGGER.info("GeoIndex 加载维度 {}：{} 个目标条目", dimId, loaded.size());
+		synchronized (LOCK) {
+			BY_DIMENSION.put(dimId, buckets);
+		}
+		LOGGER.info("GeoIndex 加载维度 {}：{} 个目标条目", dimId, buckets.size());
 	}
 
 	/** 服务端停止：将该维度索引落盘。 */
 	public static void saveForDimension(MinecraftServer server, ServerLevel level) {
 		String dimId = dimId(level);
-		Map<String, List<int[]>> map;
+		Map<String, Bucket> buckets;
 		synchronized (LOCK) {
-			map = BY_DIMENSION.get(dimId);
+			buckets = BY_DIMENSION.get(dimId);
 		}
-		if (map == null || map.isEmpty()) {
+		if (buckets == null || buckets.isEmpty()) {
 			return;
 		}
-		GeoIndexStorage.save(server, dimId, map);
+		// 转换为落盘格式（GeoIndexStorage 只认 List<int[]>）
+		Map<String, List<int[]>> plain = new HashMap<>(buckets.size() * 2);
+		synchronized (LOCK) {
+			for (Map.Entry<String, Bucket> e : buckets.entrySet()) {
+				plain.put(e.getKey(), new ArrayList<>(e.getValue().points));
+			}
+		}
+		GeoIndexStorage.save(server, dimId, plain);
 	}
 
 	private static String dimId(ServerLevel level) {
 		return level.dimension().identifier().toString();
 	}
 
-	/** 查询某目标索引是否存在候选；无则空列表。 */
+	/** 查询某目标索引的候选；无则空列表。返回的列表只读使用（调用方不得改动）。 */
 	public static List<int[]> query(String dimensionId, String categoryTargetKey) {
 		synchronized (LOCK) {
-			Map<String, List<int[]>> m = BY_DIMENSION.get(dimensionId);
+			Map<String, Bucket> m = BY_DIMENSION.get(dimensionId);
 			if (m == null) {
 				return List.of();
 			}
-			List<int[]> v = m.get(categoryTargetKey);
-			return v != null ? v : List.of();
+			Bucket b = m.get(categoryTargetKey);
+			return b != null && !b.isEmpty() ? b.points : List.of();
 		}
 	}
 
-	/** 将新收集到的某目标候选并入索引（幂等去重，避免重复占用）。 */
+	/** 将新收集到的某目标候选并入索引（哈希去重，幂等）。 */
 	public static void merge(String dimensionId, String categoryTargetKey, List<int[]> fresh) {
 		if (fresh == null || fresh.isEmpty()) {
 			return;
 		}
 		synchronized (LOCK) {
-			Map<String, List<int[]>> m = dimMap(dimensionId);
-			List<int[]> existing = m.computeIfAbsent(categoryTargetKey, k -> new ArrayList<>());
+			Bucket b = dimMap(dimensionId).computeIfAbsent(categoryTargetKey, k -> new Bucket());
 			for (int[] c : fresh) {
-				if (!contains(existing, c[0], c[1])) {
-					existing.add(c);
-				}
+				b.add(c[0], c[1]);
 			}
 		}
 	}
 
-	/** 是否已收录目标。 */
+	/** 是否已收录该坐标。 */
 	public static boolean contains(String dimensionId, String categoryTargetKey, int x, int z) {
 		synchronized (LOCK) {
-			Map<String, List<int[]>> m = BY_DIMENSION.get(dimensionId);
+			Map<String, Bucket> m = BY_DIMENSION.get(dimensionId);
 			if (m == null) {
 				return false;
 			}
-			return contains(m.get(categoryTargetKey), x, z);
+			Bucket b = m.get(categoryTargetKey);
+			return b != null && b.contains(x, z);
 		}
-	}
-
-	private static boolean contains(List<int[]> list, int x, int z) {
-		if (list == null) {
-			return false;
-		}
-		for (int[] c : list) {
-			if (Math.abs(c[0] - x) <= 1 && Math.abs(c[1] - z) <= 1) {
-				return true;
-			}
-		}
-		return false;
 	}
 }

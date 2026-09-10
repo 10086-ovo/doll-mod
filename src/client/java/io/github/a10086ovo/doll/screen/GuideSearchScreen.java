@@ -1,9 +1,6 @@
 package io.github.a10086ovo.doll.screen;
 
 import io.github.a10086ovo.doll.DollModConstants;
-import io.github.a10086ovo.doll.entity.BiomeSearchType;
-import io.github.a10086ovo.doll.entity.StructureSearchType;
-import io.github.a10086ovo.doll.entity.VillageSearchType;
 import io.github.a10086ovo.doll.network.DollClientNetworking;
 import io.github.a10086ovo.doll.network.SearchCategory;
 import io.github.a10086ovo.doll.network.payload.SearchResultsPayload;

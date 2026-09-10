@@ -1,11 +1,8 @@
 package io.github.a10086ovo.doll.network;
 
 import io.github.a10086ovo.doll.DollModConstants;
-import io.github.a10086ovo.doll.entity.BiomeSearchType;
 import io.github.a10086ovo.doll.entity.DollEntity;
 import io.github.a10086ovo.doll.entity.DollRecallRegistry;
-import io.github.a10086ovo.doll.entity.StructureSearchType;
-import io.github.a10086ovo.doll.entity.VillageSearchType;
 import io.github.a10086ovo.doll.network.payload.DollSnapshot;
 import io.github.a10086ovo.doll.network.payload.OpenDollControlPanelPayload;
 import io.github.a10086ovo.doll.network.payload.RecallDollPayload;
@@ -17,6 +14,7 @@ import io.github.a10086ovo.doll.network.payload.ToggleMarkPayload;
 import io.github.a10086ovo.doll.network.payload.UpdateDollSnapshotPayload;
 import io.github.a10086ovo.doll.util.SearchMarkStore;
 import io.github.a10086ovo.doll.geo.GeoIndex;
+import io.github.a10086ovo.doll.geo.GeoIndexBuildJob;
 import io.github.a10086ovo.doll.geo.GeoIndexService;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -39,10 +37,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.biome.Climate;
-import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.level.levelgen.structure.Structure;
-import net.minecraft.world.level.levelgen.structure.StructureSet;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -88,27 +84,8 @@ public final class DollNetworking {
 	private static final int SEARCH_RADIUS_CHUNKS = 100;
 	private static final int SEARCH_RADIUS_BLOCKS = SEARCH_RADIUS_CHUNKS * 16;
 
-	/**
-	 * L1 开服预索引参数：预索引各维度以出生点为中心、半径 16000 格（1000 区块）的结构/村庄/群系，
-	 * 使玩家搜索落在该范围内的目标直接命中 GeoIndex、秒回。
-	 * 结构/村庄每分类最多收录 PREINDEX_PER_CATEGORY_MAX 个「最近」候选（offering：只漏远处不漏近处）；
-	 * 群系按 PREINDEX_BIOME_STEP 方形网格采样（与现搜索步长 48 一致）。
-	 */
-	private static final int PREINDEX_RADIUS_BLOCKS = 16000;
-	private static final int PREINDEX_PER_CATEGORY_MAX = 2000;
-	private static final int PREINDEX_BIOME_STEP = 48;
-
 	/** 群系搜索结果的最小代表点间距（格）：同一片连续群系只保留间隔≥此值的代表性坐标，避免相邻点被重复列出。 */
 	private static final int BIOME_RESULT_MIN_GAP = 64;
-
-	/** 开服预索引后台线程（SERVER_STARTED 启动、SERVER_STOPPING 中断并 join）。 */
-	private static volatile Thread preIndexThread;
-
-	/**
-	 * 预索引中止标志：服务端停止中断后台线程时置位，用于防止「索引已就绪」完成提示误发
-	 * （后台线程内部多处用 {@code Thread.interrupted()} 消费中断位，仅靠标志位才能可靠识别提前 return）。
-	 */
-	private static volatile boolean preIndexAborted;
 
 	/** 预索引是否仍在进行：进入预定为 false，全部维度完成后置 false；玩家加入时据此补发「正在预载」提示。 */
 	private static volatile boolean preIndexRunning;
@@ -364,41 +341,31 @@ public final class DollNetworking {
 			searchCooldown.remove(id);
 		});
 
-		// 服务器启动：清空世界级共享缓存、排队任务，加载各维度 GeoIndex 索引，并在后台守护线程启动 L1 预索引
-		// （结构位置随世界种子而定，跨世界不应复用）。预索引纯推演（读 generatorState/噪声采样，不加载区块），
-		// 与现有群系异步搜索在后台线程访问一致，放后台线程避免阻塞主线程与玩家进入。
+		// 服务器启动：清空世界级共享缓存、排队任务，加载各维度 GeoIndex 索引，并启动 L1 底图构建任务
+		// （结构位置随世界种子而定，跨世界不应复用）。底图构建改由每 tick 时间片在主线程推进，
+		// 详见 GeoIndexBuildJob —— 不再起后台线程一次性算完（那会顶满 CPU 并造成长时间卡顿）。
 		ServerLifecycleEvents.SERVER_STARTED.register(server -> {
 			sharedSearchCache.clear();
 			pendingSearches.clear();
 			for (ServerLevel lv : server.getAllLevels()) {
 				GeoIndex.loadForDimension(server, lv);
 			}
-			Thread t = new Thread(() -> runStartupPreIndex(server), "DollGeoPreIndex");
-			t.setDaemon(true);
-			preIndexThread = t;
+			GeoIndexBuildJob.begin(server);
 			preIndexRunning = true;
-			t.start();
+			broadcastPreIndexMessage(server, "gui." + DollModConstants.MOD_ID + ".preindex_start");
 		});
 
-		// 服务器停止：中断并短暂 join 后台预索引线程以稳定停止，再落盘各维度 GeoIndex 索引（D5 持久化）
-	ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
-		preIndexAborted = true;
-		preIndexRunning = false;
-		Thread t = preIndexThread;
-		if (t != null) {
-			t.interrupt();
-			try {
-				t.join(50);
-			} catch (InterruptedException ignored) {
-				Thread.currentThread().interrupt();
+		// 服务器停止：丢弃未完成的底图构建任务（已完成维度都已落盘），再统一落盘各维度索引（D5）
+		ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+			preIndexRunning = false;
+			GeoIndexBuildJob.cancel();
+			for (ServerLevel lv : server.getAllLevels()) {
+				GeoIndex.saveForDimension(server, lv);
 			}
-		}
-		for (ServerLevel lv : server.getAllLevels()) {
-			GeoIndex.saveForDimension(server, lv);
-		}
-	});
+		});
 
-		// 每 tick 递进结构/村庄分片：主线程有界执行，避免单 tick 瞬时过载
+		// 每 tick：① 递进结构/村庄搜索分片（主线程有界执行，避免单 tick 瞬时过载）
+		//        ② 递进 L1 底图构建（同样按每 tick 时间片推进，对齐终稿 D9「主线程耗时可控而非零」）
 		ServerTickEvents.END_SERVER_TICK.register(server -> {
 			int budget = STRUCTURE_SLICES_PER_TICK;
 			Iterator<StructureSearchJob> it = pendingSearches.iterator();
@@ -414,6 +381,10 @@ public final class DollNetworking {
 					it.remove();
 					finalizeSearch(job);
 				}
+			}
+			if (preIndexRunning && GeoIndexBuildJob.advance(server)) {
+				preIndexRunning = false;
+				broadcastPreIndexMessage(server, "gui." + DollModConstants.MOD_ID + ".preindex_done");
 			}
 		});
 	}
@@ -514,231 +485,24 @@ public final class DollNetworking {
 			return ResourceKey.create(Registries.BIOME, ids.get(targetIndex));
 		}
 
-		/**
-		 * 返回某维度全部结构注册键（按字符串排序；villagesOnly=true 只留 village_ 前缀）。
-		 * 顺序与 {@link #resolveStructureKey} 完全一致（同一过滤 + 排序规则），故列表下标 i 即是
-		 * 客户端/服务端展示该结构时用的 targetIndex，供预索引拼接 geoKey = "category:i"。
-		 */
-		private static List<ResourceKey<Structure>> structuresList(ServerLevel level, boolean villagesOnly) {
-			Registry<Structure> reg = level.registryAccess().lookupOrThrow(Registries.STRUCTURE);
-			List<Identifier> ids = new ArrayList<>(reg.keySet());
-			ids.removeIf(id -> id.getPath().startsWith("village_") != villagesOnly);
-			ids.sort(Comparator.comparing(Identifier::toString));
-			List<ResourceKey<Structure>> out = new ArrayList<>(ids.size());
-			for (Identifier id : ids) {
-				out.add(ResourceKey.create(Registries.STRUCTURE, id));
-			}
-			return out;
-		}
-
-		/**
-		 * 返回某维度全部群系注册键（按字符串排序），下标 i 即客户端 {@code registryBiomes} 的 targetIndex。
-		 * 排序规则与 {@link #resolveBiomeKey} 一致。
-		 */
-		private static List<ResourceKey<Biome>> biomeKeysList(ServerLevel level) {
-			Registry<Biome> reg = level.registryAccess().lookupOrThrow(Registries.BIOME);
-			List<Identifier> ids = new ArrayList<>(reg.keySet());
-			ids.sort(Comparator.comparing(Identifier::toString));
-			List<ResourceKey<Biome>> out = new ArrayList<>(ids.size());
-			for (Identifier id : ids) {
-				out.add(ResourceKey.create(Registries.BIOME, id));
-			}
-			return out;
-		}
-
-		/**
-		 * L1 开服预索引：为每个维度以该维度出生点为中心、半径 16000 格，把结构/村庄/群系全部纯推演定位
-		 * 并写入 GeoIndex。后台守护线程执行（SERVER_STARTED 启动），不阻塞主线程与玩家进入。
-		 *
-		 * <p>geoKey 拼接：categoryInt 取自 {@link SearchCategory} 枚举（STRUCTURE=0/BIOME=1/VILLAGE=2），
-		 * 与客户端请求的 payload.category() 同源；targetIndex 为该目标在 structuresList/biomeKeysList
-		 * 里的下标，与客户端 registryStructures/registryBiomes 及服务端 resolveStructureKey/resolveBiomeKey
-		 * 展示序号一致，保证坐标不错位。
-		 */
-		private static void runStartupPreIndex(MinecraftServer server) {
-			preIndexAborted = false;
-			preIndexRunning = true;
-			long threadStart = System.currentTimeMillis();
-			LOGGER.info("DollGeoPreIndex 开服预索引开始");
-			try {
-				// 预载开始：向当前在线的每个玩家温和提示（切主线程发送）；发送失败不得中断预索引
-				broadcastPreIndexMessage(server, "gui." + DollModConstants.MOD_ID + ".preindex_start");
-				int dimCount = 0;
-				for (ServerLevel lv : server.getAllLevels()) {
-					if (Thread.interrupted() || preIndexAborted) {
-						preIndexRunning = false;
-						return;
-					}
-					String dimId = lv.dimension().identifier().toString();
-					long dt0 = System.currentTimeMillis();
-					try {
-						preIndexDimension(server, lv);
-						dimCount++;
-						LOGGER.info("DollGeoPreIndex 维度 {} 预索引完成，耗时 {} ms", dimId, System.currentTimeMillis() - dt0);
-					} catch (Throwable t) {
-						// 单维度失败仅为局部：记日志并继续其它维度，不得中断整个预索引线程。
-						LOGGER.error("DollGeoPreIndex 维度 {} 预索引异常：{}", dimId, t.toString(), t);
-					}
-					if (Thread.interrupted() || preIndexAborted) {
-						preIndexRunning = false;
-						return;
-					}
-				}
-				// 全部维度预索引完成且该线程未被中断/中止，才提示「就绪」；
-				// 有任何维度局部失败也视为"已启动足够索引"，仍发完成提示（避免玩家永远等不到）。
-				preIndexRunning = false;
-				LOGGER.info("DollGeoPreIndex 预索引完成：{} 个维度，总耗时 {} ms", dimCount, System.currentTimeMillis() - threadStart);
-				broadcastPreIndexMessage(server, "gui." + DollModConstants.MOD_ID + ".preindex_done");
-			} catch (Throwable t) {
-				// 线程级兜底：绝不让任何未捕获异常静默杀死后台线程（否则既无「就绪」提示、索引也缺一大块）。
-				preIndexRunning = false;
-				LOGGER.error("DollGeoPreIndex 开服预索引异常", t);
-			}
-		}
-
-		/** 把预索引状态提示切到服务端主线程，逐个通知当前在线的玩家。后台线程调用（非主线程），由 server.execute 归队发送。 */
+		/** 逐个通知当前在线玩家一条本地化提示（主线程调用）。 */
 		private static void broadcastPreIndexMessage(MinecraftServer server, String langKey) {
-			server.execute(() -> {
-				for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-					p.sendSystemMessage(Component.translatable(langKey));
-				}
-			});
-		}
-
-		/** 单维度预索引：结构(STRUCTURE)→村庄(VILLAGE)→群系(BIOME)，完成后立即落盘。 */
-		private static void preIndexDimension(MinecraftServer server, ServerLevel level) {
-			int cx;
-		int cz;
-		try {
-			// 维度出生点：26.2 中经 LevelData.getRespawnData().pos() 取出生方块坐标（getSharedSpawnPos 已不存在）。
-			BlockPos spawn = level.getLevelData().getRespawnData().pos();
-			cx = spawn.getX();
-			cz = spawn.getZ();
-		} catch (Exception e) {
-			cx = 0;
-			cz = 0;
-		}
-			String dimId = level.dimension().identifier().toString();
-
-			// 结构：categoryInt = SearchCategory.STRUCTURE(=0)。仅收集该维度可能存在且收集到非空候选的目标。
-			// 对每个结构单独 try/catch：任一结构失败只跳过该结构，不影响本维度的村庄/群系及其它结构。
-			List<ResourceKey<Structure>> structures;
-			try {
-				structures = structuresList(level, false);
-			} catch (Throwable t) {
-				structures = List.of();
-			}
-			for (int i = 0; i < structures.size(); i++) {
-				if (Thread.interrupted()) {
-					return;
-				}
-				ResourceKey<Structure> key = structures.get(i);
-				try {
-					if (!structureExistsInDim(level, key)) {
-						continue;
-					}
-					List<int[]> cands = GeoIndexService.collectNearest(
-						level, key, cx, cz, PREINDEX_RADIUS_BLOCKS, PREINDEX_PER_CATEGORY_MAX);
-					if (!cands.isEmpty()) {
-						GeoIndex.merge(dimId, SearchCategory.STRUCTURE + ":" + i, cands);
-					}
-				} catch (Throwable t) {
-					LOGGER.error("DollGeoPreIndex 结构索引异常 {}：{}", key, t.toString());
-				}
-			}
-
-			// 村庄：categoryInt = SearchCategory.VILLAGE(=2)。
-			List<ResourceKey<Structure>> villages;
-			try {
-				villages = structuresList(level, true);
-			} catch (Throwable t) {
-				villages = List.of();
-			}
-			for (int i = 0; i < villages.size(); i++) {
-				if (Thread.interrupted()) {
-					return;
-				}
-				ResourceKey<Structure> key = villages.get(i);
-				try {
-					if (!structureExistsInDim(level, key)) {
-						continue;
-					}
-					List<int[]> cands = GeoIndexService.collectNearest(
-						level, key, cx, cz, PREINDEX_RADIUS_BLOCKS, PREINDEX_PER_CATEGORY_MAX);
-					if (!cands.isEmpty()) {
-						GeoIndex.merge(dimId, SearchCategory.VILLAGE + ":" + i, cands);
-					}
-				} catch (Throwable t) {
-					LOGGER.error("DollGeoPreIndex 村庄索引异常 {}：{}", key, t.toString());
-				}
-			}
-
-			// 群系：categoryInt = SearchCategory.BIOME(=1)。按方形网格预采样分桶，按 biomeKeysList 下标写入。
-			List<ResourceKey<Biome>> biomes;
-			try {
-				biomes = biomeKeysList(level);
-			} catch (Throwable t) {
-				biomes = List.of();
-			}
-			Map<ResourceKey<Biome>, List<int[]>> buckets;
-			try {
-				buckets = GeoIndexService.preIndexBiomes(level, cx, cz, PREINDEX_RADIUS_BLOCKS, PREINDEX_BIOME_STEP);
-			} catch (Throwable t) {
-				LOGGER.error("DollGeoPreIndex 群系预采样异常 {}：{}", dimId, t.toString());
-				buckets = java.util.Collections.emptyMap();
-			}
-			for (int i = 0; i < biomes.size(); i++) {
-				if (Thread.interrupted()) {
-					return;
-				}
-				ResourceKey<Biome> key = biomes.get(i);
-				List<int[]> pts = buckets.get(key);
-				if (pts == null || pts.isEmpty()) {
-					continue;
-				}
-				GeoIndex.merge(dimId, SearchCategory.BIOME + ":" + i, pts);
-			}
-
-			// 该维度预索引完成：立即落盘，避免整机崩溃丢失（落盘失败仅为局部，不影响后续维度）。
-			try {
-				GeoIndex.saveForDimension(server, level);
-			} catch (Throwable t) {
-				LOGGER.error("DollGeoPreIndex 维度 {} 落盘索引异常：{}", dimId, t.toString());
+			for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+				p.sendSystemMessage(Component.translatable(langKey));
 			}
 		}
 
 		/**
-		 * 该结构是否为当前维度可能生成：遍历维度生成状态里的全部结构集，
-		 * 只要某个候选结构命中目标结构键即返回 true。
+		 * 该结构是否为当前维度可能生成（委托 GeoIndex 侧，避免两处各写一份结构集反查）。
 		 * 只在服务端主线程调用（读取 GeneratorState 需主线程安全情境）。
 		 */
 		private static boolean structureExistsInDim(ServerLevel level, ResourceKey<Structure> key) {
-			try {
-				ChunkGeneratorStructureState state = level.getChunkSource().getGeneratorState();
-				if (state == null || state.possibleStructureSets() == null) {
-					return false;
-				}
-				for (Holder<StructureSet> setHolder : state.possibleStructureSets()) {
-					if (setHolder == null || setHolder.value() == null) {
-						continue;
-					}
-					for (StructureSet.StructureSelectionEntry entry : setHolder.value().structures()) {
-						if (entry != null && entry.structure() != null && entry.structure().is(key)) {
-							return true;
-						}
-					}
-				}
-			} catch (Throwable t) {
-				// 刚进世界时 GeneratorState 可能尚未就绪：单个判断失败不影响其它结构。
-				return false;
-			}
-			return false;
+			return GeoIndexService.structurePossibleInDimension(level, key);
 		}
 
-		/** 该群系是否为当前维度可能生成：查看维度 BiomeSource 的 possibleBiomes。只在服务端主线程调用。 */
+		/** 该群系是否为当前维度可能生成（委托 GeoIndex 侧）。只在服务端主线程调用。 */
 		private static boolean biomeExistsInDim(ServerLevel level, ResourceKey<Biome> key) {
-			return level.getChunkSource().getGenerator().getBiomeSource().possibleBiomes().stream()
-				.anyMatch(h -> h.is(key));
+			return GeoIndexService.biomePossibleInDimension(level, key);
 		}
 
 		/**
