@@ -40,6 +40,7 @@
   - `block` — 7 种头颅方块（`*DollHeadBlock` + `*DollSkullType` + `*DollHeadBlockEntity`）+ `RockAnvilBlock`（三级损伤）+ `SculkShrineBlock`（祭坛）。
   - `config` — 外置配置 `DollConfig`（`config/dollmod/doll.json`）。
   - `guide` — 指南书数据模型与加载（自定义 JSON）。
+  - `geo` — 底图索引子系统：`GeoIndex`（桶存储）/ `GeoIndexBuildJob`（分阶段构建）/ `GeoIndexService`（候选枚举 + 群系校验）/ `GeoIndexStorage`（落盘与版本自愈）/ `StructureGenVerifier`（生成判定）。见 §6。
   - `inventory` — `DollInventory`（45 格人偶背包）。
   - `loot` — `SeaArmorLootInjector`（海洋套装战利品注入）。
   - `recipe` — `DollUpgradeRecipe`（升级配方）。
@@ -244,15 +245,33 @@
 - **图标引用用注册 ID（如 `doll-mod:xxx`），不是 Java 字段名。**
 
 ### 向导人偶搜索
-- 入口：GUIDE 人偶背包界面点击左侧**单一「搜索」按钮**，打开 `GuideSearchScreen`，按 结构 / 群系 / 村庄 三个标签分类。
-- 网络通道在 `DollNetworking`：C2S `search_request`、S2C `search_results`、C2S `toggle_search_mark`。
-- 搜索半径 **100 区块（1600 格）**，以玩家发起时位置为中心；结果缓存 LRU + 断线清理，防内存泄漏。
-- 群系搜索**异步化**：主线程只取 `BiomeSource`/`Sampler` 引用、提交工作线程做纯噪声采样（`getNoiseBiome`，不生成区块），完成后回主线程写缓存并发包。旧实现每格 `level.getBiome()` 强制同步生成区块，是多人卡顿主因。
-- 结构 / 村庄搜索用原版 `findNearestMapStructure`（半径单位区块），不生成区块；性能关键：中心 100 区块 1 次 + 外围 8 方向（70 区块处各 30 区块半径）1 次，共 9 次调用、全部收敛在 100 区块半径内。旧实现约 50 次调用、最远 12600 格。
-- 结构 / 村庄搜索按 **跨 tick 分片** 执行（`STRUCTURE_SLICES_PER_TICK=3`，每次 `findNearestMapStructure` 为一片，9 片分 3 tick 递进），消除单 tick 瞬时峰值；界面在结果回此前持续呈"搜索中"。
-- **世界级共享缓存**（多人核心收益）：以「维度:目标」为中心点各异的候选坐标条目（每目标 ≤8 条），甲搜过、乙在搜索半径内以乙坐标过滤+排序即可复用，同一目标多人不再各查一遍；服务器启动清空（结构位置随种子而定，跨世界不复用）。
-- 每玩家 2s 冷却 + 每目标共享条目上限 + LRU 结果缓存（上限 256 玩家）+ 断线清理，防主线程过载与内存泄漏。
+- 入口：GUIDE 人偶**背包界面里的「搜索」图标** → `GuideSearchScreen`。屏内是「☰ 分类菜单 + 搜索框 + 匹配列表」整合视图，右上角另有「全域索引」按钮；结果视图带「◀ 返回 / 刷新」。分类仍是 结构 / 群系 / 村庄。
+- 网络通道在 `DollNetworking`：C2S `search_request`、S2C `search_results`、C2S `toggle_search_mark`、S2C `structure_catalog`（结构清单，客户端无结构注册表，须由服务端下发）；索引相关通道见下节。
+- **搜索范围已不是固定半径**：结构/村庄由 `ON_DEMAND_RADII = {2048,4096,8192,16384}` 由近及远分档（自适应刹车：某档 ≥50ms 不再放大，累计 ≥500ms 硬停）；群系由 `BIOME_SCAN_BANDS = {{2048,48},{8192,192},{16384,640}}` 近细远粗螺旋。`SEARCH_RADIUS_BLOCKS`(1600) **如今只剩「共享缓存复用窗口」一个用途**——旧文档把它当搜索半径，是误判的来源。
+- **查询四级链路**（旧「索引优先」已重排）：① 玩家结果缓存（非 refresh）秒回 → ② 累积索引有候选则走生成校验 → ③ 首次搜该目标走 `collectOnDemand`（以**玩家**为中心按需收集并 `GeoIndex.merge` 进累积缓存，跨会话落盘）→ ④ 兜底才是原版 `findNearestMapStructure`（类型精确，跨 tick 分片）。
+- 群系搜索**异步化**：主线程只取 `BiomeSource`/`Sampler` 引用、提交工作线程纯噪声采样（`getNoiseBiome`，不生成区块）。旧实现每格 `level.getBiome()` 强制同步生成区块，是多人卡顿主因。采样走**多档 Y**（`GeoIndexService.BIOME_PROBE_BLOCK_YS = {64,0,-64}`），故洞穴类群系（繁茂洞穴 / 深暗之域）可被搜到；结果带**命中高度 Y**（`SearchResultsPayload.Entry.y`，无法判定时为 `GeoIndexService.NO_Y`）。
+- **结构 / 村庄候选的生成校验并行化**：`VERIFY_WORKERS = 8` 个线程共享 `AtomicInteger` 抢单，领号上限 = `MAX_RESULTS + failed`（在飞候选也算已领、失败退还名额，低通过率类型才不会少给结果），凑够 `MAX_RESULTS = 10` 条即整体收工；结果用候选位次做下标，天然保持「由近及远」。主线程不阻塞：由最后一个收工的工作线程 `server.execute(finishVerify)` 回主线程发包。村庄单候选 440~550ms（jigsaw 装配 + `WORLD_SURFACE_WG` 投影），是唯一慢目标。
+- **世界级共享缓存**（多人核心收益）：以「维度:目标」存候选坐标条目，甲搜过、乙在复用窗口内以自己的坐标过滤 + 排序即可复用，同一目标多人不再各查一遍；服务器启动清空（结构位置随种子而定，跨世界不复用）。
+- **连点保护**：`verifyInFlight`（同玩家同目标去重）+ `PENDING_SEARCH_MAX`。**旧的「每玩家 2s 全局冷却」已删除**。
+- LRU 结果缓存（上限 `CACHE_MAX_PLAYERS = 256`）+ 断线清理，防内存泄漏。
 - 打卡状态存 `SearchMarkStore`，玩家 NBT 键 `guide_search_marks`，跨会话持久。
+
+### 全域索引（GeoIndex）
+> **定性（本版定稿）**：索引是**「随用随长的缓存」，不是「开服预建的底图」**。旧做法在开服把「全维度 × 半径 16000 × 三高度」一次算完——实测新世界 81.4s（群系占 79%、未访问维度占 38%），且单个结构枚举不可让出会卡服。现在**开服零成本**，玩家点按钮才付这笔钱。
+
+- **入口**：搜索屏右上角「全域索引」按钮 → C2S `index_build_request`(dollEntityId, cancel)。服务端**权威**：校验发起者持有**自己**的 GUIDE 人偶，并以**发起者当前位置**为中心（锚在出生点会在玩家走远后失效，这是旧实现的隐性错配）。
+- **进度回报**：S2C `index_build_progress`(percent, phase, state)；state：`0` 进行中 / `1` 完成 / `2` 已取消 / `3` 空闲。**广播给全体在线玩家**（索引是服务端全局资源，谁建的都一样；单播会在发起者掉线后永久卡在"构建中"），取消也是全局的。客户端把「已取消」**归一成「空闲」**——否则按钮会停在"构建中"再也点不动。
+- **阶段编号**（`GeoIndexBuildJob.PHASE_*`，也是 `IndexBuildProgressPayload.phase` 的**唯一权威编号**）：`0=结构 1=村庄 2=群系 3=村庄预确认 4=已结束`。`DollNetworking.INDEX_PHASE_END` 直接引用 `PHASE_DONE`，**勿各写一份数字**。
+- **桶分两类语义，绝不能混**：`"category:targetIndex"` = **候选桶**（placement + 群系合法，**未装配**，用时必须再生成校验）；`GeoIndex.confirmedKey(cat,idx)` = **已确认桶**（已装配、可**免检**直接回放）。
+- **村庄「已确认」**：建索引最后阶段把每类村庄离中心最近的 `VILLAGE_PRECONFIRM_TRIES = 16` 个逐个装配确认，存入已确认桶。装配在**独立**线程池 `CONFIRM_EXECUTOR`（8 线程，**刻意不复用搜索校验池**——否则"刚建完就搜"会排在上百个预确认任务后面）；主线程只**派发 + 每 tick 轮询** `Confirm.finished`。搜索侧一律**逐点免检**，**不得**改成"已确认桶非空就整条快速通道"（玩家走远后会给出远处村庄却漏掉脚下的）。
+- **硬上界**：`GeoIndexService.MAX_REGION_RINGS = 128` 夹住单结构枚举量（`spacing=1` 的埋藏宝藏 / 废弃矿井从约 400 万次区域判定压到约 6.6 万次）；代价是密结构覆盖半径被压到 `128 × spacing` 区块。
+- **群系级校验（`BiomeGate`）**：placement 级判定（`getPotentialStructureChunk` + `isStructureChunk`）**完全不含群系约束**，故候选必须再用 `Structure.biomes()` 过滤一次；允许群系与同集兄弟重叠的**混型集合**（下界堡垒↔要塞、基础传送门↔6 变体）**整类不做预索引**，回落到类型精确的实时路径。`BiomeGate` 探 **5 档** Y（64/320/0/-32/-64），**刻意比群系搜索的 3 档更宽**（宁宽勿窄：假阳性由后续生成校验逐点剔除，漏筛真点才不可挽回）。
+- **进度权重必须按「实测耗时」折算**：`GeoIndexBuildJob` 的 `PROGRESS_BIOME_POINTS_PER_STRUCTURE = 2470`、`PROGRESS_BIOME_POINTS_PER_CONFIRM_ITEM = 1090` 都来自实测；**改任一阶段的常数都要回头重算权重**，否则进度条会卡在 1% 再一瞬冲到头（纯显示层参数，不影响结果）。
+- **落盘与版本自愈**（`GeoIndexStorage`）：文件带保留键 `_schema`（`SCHEMA_VERSION`）与 `_built`（完成标记）。**凡改动索引语义 / 桶构成必须 `SCHEMA_VERSION += 1`**，加载时版本不符**整份丢弃**（新语义混进旧桶无法分辨哪些点脏）。**且必须告知玩家"请重新点一次「全域索引」"**：索引是玩家手动点的，旧文件被丢弃后不会自动重建。版本沿革：`1`（隐含，无版本字段；单成员结构集未做群系校验）→ `2`（群系级校验改为对**所有**结构都做；混型集合整类出局）→ `3`（新增 `_built`；此前"加载索引"与"是否需要重建"脱钩，每次开服都把已落盘的索引从零重扫一遍）→ `4`（新增村庄「已确认」桶）。
+- **并发安全**：`GeoIndex.query()` 返回桶内**活列表**，要排序或长期持有必须改用 `querySnapshot()`（加锁内复制）——`merge()` 可能由工作线程调用（异步群系搜索、预确认收尾）。`StructureTemplateManager.structureRepository` 在 26.2 是 `ConcurrentHashMap`（源码已核），故工作线程并发 `Structure.generate` 安全——这正是并行校验的前提。
+- **依赖方向**：生成判定统一放 `geo/StructureGenVerifier`（`Env` / `create` / `reallyGenerates`），搜索校验与建索引预确认**共用这一份**；方向必须是 `network → geo`，**禁止反向**（会成包循环）。
+- **调试优先级**：坐标 / 索引类 bug，**离线解剖索引文件 > 开游戏实测**（更快且更有说服力）；`build/` 下留有几支读原版源码 / 离线解剖索引的诊断脚本。
+
 
 ## 7. 资源 / 数据生成
 
@@ -294,9 +313,10 @@
 
 ### 资源 / 搜索层（多人卡顿的历史教训）
 - 群系搜索用 `getNoiseBiome` 纯噪声采样放**工作线程**（主线程只提交任务；固定 3 线程池），勿用 `level.getBiome()`（会强制同步生成区块）。→ `DollNetworking.startBiomeSearchAsync`。
-- 结构 / 村庄搜索依赖服务端线程专属的 `StructureManager`，**不可逕移工作线程**（线程不安全）；以粒子级安全之道——跨 tick 分片递进，每 tick 有界执行。→ `DollNetworking` 的 `STRUCTURE_SLICES_PER_TICK` + `pendingSearches`。
+- 结构 / 村庄搜索**分两段、线程要求不同**：**候选枚举**读 `ChunkGeneratorStructureState`，须在服务端**主线程**（故 `collectOnDemand` 仍在主线程，靠 `ON_DEMAND_EXPAND_MAX_MS` / `ON_DEMAND_TOTAL_MAX_MS` 刹车兜住）；**生成校验**（`Structure.generate`）可放**工作线程**——`StructureTemplateManager.structureRepository` 在 26.2 是 `ConcurrentHashMap`（源码已核），故 `VERIFY_WORKERS = 8` 抢单并行安全。→ `DollNetworking.enqueueStructureVerify`。（**旧说法「结构搜索一律不可移工作线程」已过时**，照抄会误判。）
+- 实时兜底仍走**跨 tick 分片**：`STRUCTURE_SLICES_PER_TICK = 3` + `pendingSearches`，每 tick 有界执行、消除单 tick 峰值。
 - 结构位置随种子固定，落**世界级共享缓存**按中心点复用，多人搜索同一目标免重复调用 `findNearestMapStructure`（多人不卡之根本）。
-- 每玩家 2s 冷却 + 结构分片预算 `STRUCTURE_SLICES_PER_TICK` + 任务队列上限 64 + LRU 结果缓存（上限 256 玩家）+ 断线清理，防主线程过载与内存泄漏。
+- **连点保护**：`verifyInFlight`（同玩家同目标去重）+ `PENDING_SEARCH_MAX`（任务队列上限）——**旧的「每玩家 2s 冷却」已删除**；另有结构分片预算 + LRU 结果缓存（上限 `CACHE_MAX_PLAYERS = 256`）+ 断线清理，防主线程过载与内存泄漏。
 - 召回前用 `getChunk(..., ChunkStatus.FULL, false)` 做存档存在性检查，**避免对不存在区块同步建块**（重模组存档可卡数秒）。
 
 ### 内存 / 生命周期
