@@ -379,8 +379,134 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 	}
 
 	/**
+	 * 结构显示名表：{@code id, 中文名, 英文名}。
+	 *
+	 * <p><b>为什么必须自备</b>：实测原版语言表里 {@code structure.minecraft.*} <b>一个都没有</b>
+	 * （结构定位输出用的是原始 id，原版不给结构起可翻译名）。搜索界面按
+	 * {@code "structure." + namespace + "." + path} 取显示名，缺键就会直接显示原始键名。
+	 */
+	private static final String[][] STRUCTURE_DISPLAY_NAMES = {
+		{"ancient_city", "远古城市", "Ancient City"},
+		{"bastion_remnant", "堡垒遗迹", "Bastion Remnant"},
+		{"buried_treasure", "埋藏的宝藏", "Buried Treasure"},
+		{"desert_pyramid", "沙漠神殿", "Desert Pyramid"},
+		{"end_city", "末地城", "End City"},
+		{"fortress", "下界要塞", "Nether Fortress"},
+		{"igloo", "雪屋", "Igloo"},
+		{"jungle_pyramid", "丛林神庙", "Jungle Pyramid"},
+		{"mansion", "林地府邸", "Woodland Mansion"},
+		{"mineshaft", "废弃矿井", "Mineshaft"},
+		{"mineshaft_mesa", "恶地废弃矿井", "Mesa Mineshaft"},
+		{"monument", "海底神殿", "Ocean Monument"},
+		{"nether_fossil", "下界化石", "Nether Fossil"},
+		{"ocean_ruin_cold", "寒带海底废墟", "Cold Ocean Ruin"},
+		{"ocean_ruin_warm", "暖带海底废墟", "Warm Ocean Ruin"},
+		{"pillager_outpost", "掠夺者前哨站", "Pillager Outpost"},
+		{"ruined_portal", "废弃传送门", "Ruined Portal"},
+		{"ruined_portal_desert", "沙漠废弃传送门", "Desert Ruined Portal"},
+		{"ruined_portal_jungle", "丛林废弃传送门", "Jungle Ruined Portal"},
+		{"ruined_portal_mountain", "山地废弃传送门", "Mountain Ruined Portal"},
+		{"ruined_portal_nether", "下界废弃传送门", "Nether Ruined Portal"},
+		{"ruined_portal_ocean", "海洋废弃传送门", "Ocean Ruined Portal"},
+		{"ruined_portal_swamp", "沼泽废弃传送门", "Swamp Ruined Portal"},
+		{"shipwreck", "沉船", "Shipwreck"},
+		{"shipwreck_beached", "搁浅沉船", "Beached Shipwreck"},
+		{"stronghold", "要塞", "Stronghold"},
+		{"swamp_hut", "沼泽小屋", "Swamp Hut"},
+		{"trail_ruins", "古迹废墟", "Trail Ruins"},
+		{"trial_chambers", "试炼密室", "Trial Chambers"},
+	};
+
+	/**
+	 * 群系显示名表：{@code id, 中文名, 英文名}。
+	 *
+	 * <p>原版只提供 {@code biome.minecraft.*} 的英文名（且开发环境客户端 jar 内不含 zh_cn），
+	 * 中文名需模组自备；同时对部分群系采用本模组的既定译名（如 dripstone_caves→「溶洞」）。
+	 */
+	private static final String[][] BIOME_DISPLAY_NAMES = {
+		{"badlands", "恶地", "Badlands"},
+		{"bamboo_jungle", "竹林", "Bamboo Jungle"},
+		{"basalt_deltas", "玄武岩三角洲", "Basalt Deltas"},
+		{"beach", "沙滩", "Beach"},
+		{"birch_forest", "桦木森林", "Birch Forest"},
+		{"cherry_grove", "樱花林", "Cherry Grove"},
+		{"cold_ocean", "冷水海洋", "Cold Ocean"},
+		{"crimson_forest", "绯红森林", "Crimson Forest"},
+		{"dark_forest", "黑森林", "Dark Forest"},
+		{"deep_cold_ocean", "冷水深海", "Deep Cold Ocean"},
+		{"deep_dark", "深暗之域", "Deep Dark"},
+		{"deep_frozen_ocean", "冰冻深海", "Deep Frozen Ocean"},
+		{"deep_lukewarm_ocean", "温水深海", "Deep Lukewarm Ocean"},
+		{"deep_ocean", "深海", "Deep Ocean"},
+		{"desert", "沙漠", "Desert"},
+		{"dripstone_caves", "溶洞", "Dripstone Caves"},
+		{"end_barrens", "末地荒岛", "End Barrens"},
+		{"end_highlands", "末地高地", "End Highlands"},
+		{"end_midlands", "末地内陆", "End Midlands"},
+		{"eroded_badlands", "侵蚀恶地", "Eroded Badlands"},
+		{"flower_forest", "繁花森林", "Flower Forest"},
+		{"forest", "森林", "Forest"},
+		{"frozen_ocean", "冰冻海洋", "Frozen Ocean"},
+		{"frozen_peaks", "冰封山峰", "Frozen Peaks"},
+		{"frozen_river", "冻河", "Frozen River"},
+		{"grove", "雪林", "Grove"},
+		{"ice_spikes", "冰刺之地", "Ice Spikes"},
+		{"jagged_peaks", "尖峭山峰", "Jagged Peaks"},
+		{"jungle", "丛林", "Jungle"},
+		{"lukewarm_ocean", "温水海洋", "Lukewarm Ocean"},
+		{"lush_caves", "繁茂洞穴", "Lush Caves"},
+		{"mangrove_swamp", "红树林沼泽", "Mangrove Swamp"},
+		{"meadow", "草甸", "Meadow"},
+		{"mushroom_fields", "蘑菇岛", "Mushroom Fields"},
+		{"nether_wastes", "下界荒地", "Nether Wastes"},
+		{"ocean", "海洋", "Ocean"},
+		{"old_growth_birch_forest", "原始桦木森林", "Old Growth Birch Forest"},
+		{"old_growth_pine_taiga", "原始松木针叶林", "Old Growth Pine Taiga"},
+		{"old_growth_spruce_taiga", "原始云杉针叶林", "Old Growth Spruce Taiga"},
+		{"pale_garden", "苍白花园", "Pale Garden"},
+		{"plains", "平原", "Plains"},
+		{"river", "河流", "River"},
+		{"savanna", "热带草原", "Savanna"},
+		{"savanna_plateau", "热带高原", "Savanna Plateau"},
+		{"small_end_islands", "末地小岛", "Small End Islands"},
+		{"snowy_beach", "积雪的沙滩", "Snowy Beach"},
+		{"snowy_plains", "雪原", "Snowy Plains"},
+		{"snowy_slopes", "雪坡", "Snowy Slopes"},
+		{"snowy_taiga", "积雪的针叶林", "Snowy Taiga"},
+		{"soul_sand_valley", "灵魂沙峡谷", "Soul Sand Valley"},
+		{"sparse_jungle", "稀疏丛林", "Sparse Jungle"},
+		{"stony_peaks", "裸岩山峰", "Stony Peaks"},
+		{"stony_shore", "石岸", "Stony Shore"},
+		{"sulfur_caves", "硫磺洞穴", "Sulfur Caves"},
+		{"sunflower_plains", "向日葵平原", "Sunflower Plains"},
+		{"swamp", "沼泽", "Swamp"},
+		{"taiga", "针叶林", "Taiga"},
+		{"the_end", "末地", "The End"},
+		{"the_void", "虚空", "The Void"},
+		{"warm_ocean", "暖水海洋", "Warm Ocean"},
+		{"warped_forest", "诡异森林", "Warped Forest"},
+		{"windswept_forest", "风袭森林", "Windswept Forest"},
+		{"windswept_gravelly_hills", "风袭沙砾丘陵", "Windswept Gravelly Hills"},
+		{"windswept_hills", "风袭丘陵", "Windswept Hills"},
+		{"windswept_savanna", "风袭热带草原", "Windswept Savanna"},
+		{"wooded_badlands", "繁茂的恶地", "Wooded Badlands"},
+	};
+
+	/** 按 {@code 前缀 + id} 批量写入显示名表（中/英二选一）。 */
+	private static void addDisplayNames(FabricLanguageProvider.TranslationBuilder b, boolean en,
+			String prefix, String[][] table) {
+		for (String[] row : table) {
+			b.add(prefix + row[0], en ? row[2] : row[1]);
+		}
+	}
+
+	/**
 	 * 语言条目总表：zh_cn / en_us 两个 provider 共用。
 	 * 所有键必须两边同时维护，保持键集合一致（en 缺失会在英文客户端显示原始 key）。
+	 *
+	 * <p><b>⚠ 必须写在本方法里，不能只手改 generated 目录下的 JSON</b>：datagen 是"整表重写"，
+	 * 任何只存在于 JSON、生成器里没有的键，都会在下一次 {@code runDatagen} 时被静默删除
+	 * （曾因此一次性丢掉 66 个群系名 + 29 个结构名 + 7 个界面键，表现为界面/聊天框显示原始键名）。
 	 */
 	private static void addAllEntries(FabricLanguageProvider.TranslationBuilder b, boolean en) {
 		b.add("item." + MOD_ID + "." + DollModConstants.DOLL_TIER1_EGG_ID, en ? "Tier 1 Doll Spawn Egg" : "一阶人偶刷怪蛋");
@@ -513,13 +639,46 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 		b.add("gui." + MOD_ID + ".search_empty_cat", en ? "No targets of this type in the current dimension" : "当前维度没有此类目标");
 		b.add("gui." + MOD_ID + ".search_pick_hint", en ? "Click a target to search (results are kept until you refresh)" : "点击目标搜索（结果保留，可点刷新重搜）");
 		b.add("gui." + MOD_ID + ".search_pending", en ? "Searching..." : "搜索中...");
-		b.add("gui." + MOD_ID + ".search_no_result", en ? "Found no target within 1600 blocks" : "1600 格内未找到目标");
+		b.add("gui." + MOD_ID + ".search_pending_slow", en ? "Still searching... (%s s)" : "仍在搜索...（已 %s 秒）");
+		b.add("gui." + MOD_ID + ".search_verifying_hint",
+			en ? "The first search of a structure runs a worldgen check (large structures take longer), usually 1-3 s; searching it again this session is instant."
+				: "首次搜索该结构需做生成校验（村庄等大结构较慢），通常 1~3 秒；同一局内再搜即可秒出");
+		// 不写死半径：群系与结构/村庄的实际扫描范围不同（群系按 BIOME_SCAN_BANDS 最远 16384 格，
+		// 结构/村庄走按需分档且带自适应刹车，可能提前停），任何固定数字都会在下一次调参后变成假话。
+		b.add("gui." + MOD_ID + ".search_no_result", en ? "No target found within the search range" : "搜索范围内未找到目标");
 		b.add("gui." + MOD_ID + ".search_refresh", en ? "Refresh" : "刷新");
-		b.add("gui." + MOD_ID + ".search_refresh_hint", en ? "Re-search around your current position (100-chunk radius)" : "以当前位置为中心重新搜索（半径 100 区块）");
+		b.add("gui." + MOD_ID + ".search_refresh_hint", en ? "Ignore cached results and re-search around your current position" : "忽略已有结果，以当前位置为中心重新搜索");
 		b.add("gui." + MOD_ID + ".search_result_mark", en ? "Mark as visited" : "标记为已探索");
 		b.add("gui." + MOD_ID + ".search_result_unmark", en ? "Unmark visited" : "取消已探索标记");
 		b.add("gui." + MOD_ID + ".search_dist", en ? "%s blocks" : "距离 %s 格");
 		b.add("gui." + MOD_ID + ".search_coord", en ? "%s, %s" : "坐标 %s, %s");
+		b.add("gui." + MOD_ID + ".search_coord_y", en ? "%s, %s  Y=%s" : "坐标 %s, %s  Y=%s");
+		// 搜索界面剩余的提示/占位文案（键缺失时输入框占位与结果提示会直接显示原始键名）
+		b.add("gui." + MOD_ID + ".search_not_in_dim", en ? "This structure or biome does not exist in this dimension" : "该维度不存在此结构或群系");
+		b.add("gui." + MOD_ID + ".search_box_hint", en ? "Type Chinese or English name…" : "输入中文或英文名称…");
+		b.add("gui." + MOD_ID + ".search_default_hint", en ? "Type a name to search structures, biomes or villages" : "输入名称搜索结构、群系或村庄");
+		b.add("gui." + MOD_ID + ".search_no_match", en ? "No match. Try a Chinese or English name" : "未找到匹配，试试中文或英文名称");
+		b.add("gui." + MOD_ID + ".category_menu", en ? "Category menu" : "分类菜单");
+		// 搜索屏「全域索引」按钮：玩家主动触发建索引（旧的开服自动预索引及其聊天框播报已移除）
+		b.add("gui." + MOD_ID + ".index_build_button", en ? "World index" : "全域索引");
+		b.add("gui." + MOD_ID + ".index_build_done", en ? "Built" : "已建立");
+		b.add("gui." + MOD_ID + ".index_build_hint",
+			en ? "Build the map index for this dimension so searches hit instantly (about ten seconds)"
+				: "为当前维度建立地图索引，之后搜索可直接命中（约十几秒）");
+		b.add("gui." + MOD_ID + ".index_build_rebuild_hint",
+			en ? "Already built; click to rebuild around your current position"
+				: "已建立；点击可以你当前位置为中心重建");
+		b.add("gui." + MOD_ID + ".index_build_cancel_hint",
+			en ? "Building index (%s phase) — click to cancel" : "正在建立索引（%s 阶段），点击取消");
+		b.add("gui." + MOD_ID + ".index_phase_structure", en ? "structures" : "结构");
+		b.add("gui." + MOD_ID + ".index_phase_village", en ? "villages" : "村庄");
+		b.add("gui." + MOD_ID + ".index_phase_biome", en ? "biomes" : "群系");
+		b.add("gui." + MOD_ID + ".index_phase_confirm", en ? "confirming villages" : "确认村庄");
+
+		// 结构/群系显示名：键形如 structure.minecraft.ancient_city、biome.minecraft.plains
+		addDisplayNames(b, en, "structure.minecraft.", STRUCTURE_DISPLAY_NAMES);
+		addDisplayNames(b, en, "biome.minecraft.", BIOME_DISPLAY_NAMES);
+
 		addMsg(b, "search_cooldown", en, "Search cooldown: %ss remaining", "搜索冷却中，还需 %s 秒");
 		addMsg(b, "search_busy", en, "The server is busy, try again in a moment", "服务器繁忙，请稍后再试");
 

@@ -37,6 +37,10 @@ public class DollModConstants {
 	public static final String NETWORK_TOGGLE_MARK_ID = "toggle_search_mark";
 	/** 统一搜索：服务端推送本世界全部结构注册键清单的 S2C 通道（客户端无结构注册表，须由此得知可搜结构）。 */
 	public static final String NETWORK_STRUCTURE_CATALOG_ID = "structure_catalog";
+	/** 全域索引：客户端请求「开始/取消」为当前维度构建底图索引的 C2S 通道。 */
+	public static final String NETWORK_INDEX_BUILD_REQUEST_ID = "index_build_request";
+	/** 全域索引：服务端回报构建进度的 S2C 通道。 */
+	public static final String NETWORK_INDEX_BUILD_PROGRESS_ID = "index_build_progress";
 	/** 搜索打卡记忆：玩家 NBT 中存储已打卡目标（扁平 int[]），跨会话持久。 */
 	public static final String SEARCH_MARKS_NBT_KEY = "guide_search_marks";
 	public static final String SCULK_SHRINE_ID = "sculk_shrine";

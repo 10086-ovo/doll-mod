@@ -16,18 +16,28 @@ import java.util.List;
  *
  * @param category      搜索分类（{@link io.github.a10086ovo.doll.network.SearchCategory}）
  * @param targetIndex   该分类下的目标索引
- * @param results       命中坐标列表（x, z 为方块坐标，marked 表示该目标已被玩家打卡）
- * @param notInDimension 该目标在当前维度不可能存在（区别于「存在但 1600 格内未找到」）
+ * @param results       命中坐标列表（x, z 为方块坐标，y 为命中的探测高度，marked 表示该目标已被玩家打卡）
+ * @param notInDimension 该目标在当前维度不可能存在（区别于「存在但搜索范围内未找到」）
  */
 public record SearchResultsPayload(int category, int targetIndex, List<Entry> results, boolean notInDimension)
 	implements CustomPacketPayload {
 
 	public static final int MAX_RESULTS = 10;
 
-	public record Entry(int x, int z, boolean marked) {
+	/**
+	 * 一条命中结果。
+	 *
+	 * @param x       方块 X
+	 * @param z       方块 Z
+	 * @param y       命中的<b>探测高度</b>（方块 Y）；仅群系搜索有意义，
+	 *                结构/村庄或无法判定时为 {@link io.github.a10086ovo.doll.geo.GeoIndexService#NO_Y}
+	 * @param marked  是否已被玩家标记为已探索
+	 */
+	public record Entry(int x, int z, int y, boolean marked) {
 		public static final StreamCodec<ByteBuf, Entry> STREAM_CODEC = StreamCodec.composite(
 			ByteBufCodecs.VAR_INT, Entry::x,
 			ByteBufCodecs.VAR_INT, Entry::z,
+			ByteBufCodecs.VAR_INT, Entry::y,
 			ByteBufCodecs.BOOL, Entry::marked,
 			Entry::new
 		);

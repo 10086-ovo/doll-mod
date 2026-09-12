@@ -1,8 +1,10 @@
 package io.github.a10086ovo.doll.network;
 
 import io.github.a10086ovo.doll.screen.GuideSearchScreen;
+import io.github.a10086ovo.doll.network.payload.IndexBuildProgressPayload;
 import io.github.a10086ovo.doll.network.payload.OpenDollControlPanelPayload;
 import io.github.a10086ovo.doll.network.payload.RecallDollPayload;
+import io.github.a10086ovo.doll.network.payload.RequestIndexBuildPayload;
 import io.github.a10086ovo.doll.network.payload.RequestSearchPayload;
 import io.github.a10086ovo.doll.network.payload.SearchResultsPayload;
 import io.github.a10086ovo.doll.network.payload.SelectDollModePayload;
@@ -48,6 +50,11 @@ public final class DollClientNetworking {
 		ClientPlayNetworking.send(new ToggleMarkPayload(category, targetIndex, x, z));
 	}
 
+	/** 客户端 -> 服务端：请求为<b>当前维度</b>构建「全域索引」；{@code cancel=true} 则取消正在进行的构建。 */
+	public static void sendIndexBuild(int dollEntityId, boolean cancel) {
+		ClientPlayNetworking.send(new RequestIndexBuildPayload(dollEntityId, cancel));
+	}
+
 	/** 注册服务端 -> 客户端的接收器（在客户端初始化时调用一次）。 */
 	public static void registerReceivers() {
 		ClientPlayNetworking.registerGlobalReceiver(OpenDollControlPanelPayload.TYPE, (payload, context) -> {
@@ -72,6 +79,13 @@ public final class DollClientNetworking {
 			// 结构清单：进服即推送，缓存供搜索界面构建结构/村庄目标池。
 			List<String> ids = payload.structureIds();
 			context.client().execute(() -> structureCatalog = ids);
+		});
+		ClientPlayNetworking.registerGlobalReceiver(IndexBuildProgressPayload.TYPE, (payload, context) -> {
+			// 全域索引构建进度：路由到搜索屏显示（按钮就地变成进度条，可点取消）。
+			var current = context.client().gui.screen();
+			if (current instanceof GuideSearchScreen screen) {
+				screen.receiveIndexProgress(payload);
+			}
 		});
 	}
 }

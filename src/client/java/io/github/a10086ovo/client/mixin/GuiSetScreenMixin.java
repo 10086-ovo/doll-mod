@@ -38,9 +38,15 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  * 抛 {@code IndexOutOfBoundsException} → 客户端断线（界面显示「网络协议错误」）。
  *
  * <p><b>修法：</b>
- * 在 {@code Gui.setScreen} 这个唯一的屏幕切换收口处补一条规则 —— 当**旧屏是容器屏**、
- * **新屏不是容器屏**、且当前客户端仍持有非玩家的自定义菜单时，先补发关容器包。
+ * 在 {@code Gui.setScreen} 这个唯一的屏幕切换收口处补一条规则 —— 当<b>旧屏是容器屏</b>、
+ * <b>新屏不是容器屏</b>、且当前客户端仍持有非玩家的自定义菜单时，先补发关容器包。
  * 这正是原版本该做而没做的事，语义上只是把「屏幕已经离开容器」这个事实同步给服务端。
+ *
+ * <p><b>定位：这是「兜底」，不是「常规手段」。</b>
+ * 应该主动关容器的是<b>发起切屏的那一方</b>——例如 {@code DollInventoryScreen#openGuideSearch}
+ * 在切到搜索屏前就显式 {@code closeContainer()}，因为「离开背包去搜索」是它自己的意图，
+ * 由它说清楚最合适。本守卫只负责兜住那些<b>忘了关</b>的意外路径，因此命中时只打 {@code debug}
+ * 级日志，不刷玩家控制台；正常游戏流程不应出现该日志。
  *
  * <p>不会误伤的情形：
  * <ul>
@@ -79,7 +85,9 @@ public class GuiSetScreenMixin {
 			return;
 		}
 
-		DollMod.LOGGER.warn("[DollMenu] 容器屏被普通屏幕顶替，补发关容器包: menu={} containerId={} 新屏={}",
+		// 正常路径（人偶背包 → 搜索屏）已由 DollInventoryScreen#openGuideSearch 主动关容器，
+		// 不该再落到这里；落到这里即说明有代码忘了显式关容器。故只留 debug 级记录，不刷玩家日志。
+		DollMod.LOGGER.debug("[DollMenu] 容器屏被普通屏幕顶替，补发关容器包: menu={} containerId={} 新屏={}",
 			player.containerMenu.getClass().getSimpleName(), player.containerMenu.containerId,
 			newScreen == null ? "null" : newScreen.getClass().getSimpleName());
 		// 发 ServerboundContainerClosePacket + 客户端把 containerMenu 复位为 inventoryMenu
