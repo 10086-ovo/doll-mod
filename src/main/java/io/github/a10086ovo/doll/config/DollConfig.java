@@ -15,7 +15,7 @@ import java.nio.file.Path;
 /**
  * 人偶模组外置配置。
  * <p>
- * 载荷整体置于 {@code config/dollmod/doll.json}（JSON，Gson 随原版内置、零新依赖）。
+ * 载荷整体置于 {@code config/doll-mod/doll.json}（JSON，Gson 随原版内置、零新依赖）。
  * 凡索敌/觅途/跟随/各模式之阈值、时限、开关，皆尽归于此，服主与玩家可调而勿须重编。
  * <p>
  * 设计要点（一以贯之）：
@@ -249,7 +249,7 @@ public class DollConfig {
 	// ==================== 加载/存写 ====================
 
 	private static Path configPath() {
-		return FMLPaths.CONFIGDIR.get().resolve("dollmod").resolve("doll.json");
+		return FMLPaths.CONFIGDIR.get().resolve("doll-mod").resolve("doll.json");
 	}
 
 	/** 当前生效配置（静态镜像的应用源）。 */

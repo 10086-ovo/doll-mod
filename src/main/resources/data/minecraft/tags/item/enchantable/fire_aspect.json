@@ -1,7 +1,7 @@
 {
   "replace": false,
   "values": [
-    "dollmod:ender_axe",
-    "dollmod:nether_sword"
+    "doll-mod:ender_axe",
+    "doll-mod:nether_sword"
   ]
 }

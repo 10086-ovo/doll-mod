@@ -70,7 +70,7 @@ public class DollModClient {
 					net.minecraft.network.chat.Component title) -> new DollInventoryScreen(menu, inventory, title));
 
 			// 荆棘盾牌特殊渲染器防御性补注册：
-			// items/thorns_shield.json 里 "type": "dollmod:thorns_shield" 依赖 SpecialModelRenderers
+			// items/thorns_shield.json 里 "type": "doll-mod:thorns_shield" 依赖 SpecialModelRenderers
 			// 的 ID_MAPPER；正常情况下由 SpecialModelRenderersMixin 在 bootstrap 尾部注入，
 			// 万一 mixin 时机不巧（bootstrap 先于配置注册执行），这里用反射再 put 一次（幂等覆盖）。
 			registerThornsShieldSpecialRenderer();

@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "key": {
+    "H": "doll-mod:guide_doll_head",
+    "P": "minecraft:paper"
+  },
+  "pattern": [
+    "PPP",
+    "PHP",
+    "PPP"
+  ],
+  "result": {
+    "id": "doll-mod:guide_doll_egg"
+  }
+}

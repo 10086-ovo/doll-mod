@@ -1,0 +1,6 @@
+{
+  "parent": "doll-mod:block/template_rock_anvil",
+  "textures": {
+    "top": "doll-mod:block/chipped_rock_anvil_top"
+  }
+}

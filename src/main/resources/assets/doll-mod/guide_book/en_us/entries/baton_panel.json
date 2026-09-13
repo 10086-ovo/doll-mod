@@ -1,0 +1,47 @@
+{
+	"name": "Baton & Remote",
+	"icon": "doll-mod:doll_baton",
+	"category": "basics",
+	"sortnum": 0,
+	"pages": [
+		{
+			"type": "text",
+			"title": "Baton",
+			"text": "Commands a single doll.\n\n• Right-click a doll → select it\n• After selection, right-click a block to set corner A, then corner B (work area rectangle)\n• Shift-right-click the doll → clear work area\n• Max work area side: 64 blocks\n• In Melee/Archer mode, right-click a mob to force-target it"
+		},
+		{
+			"type": "text",
+			"title": "Remote",
+			"text": "Right-click anywhere to open the control panel. Lists all living dolls. Switch modes and toggle Follow for all at once.\n\nBaton = precise single-doll control, on-site work area setup.\nRemote = global management of all dolls.\n\nWork areas apply only to Woodcutting/Farming/Mining modes."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"  S",
+				" S ",
+				"S  "
+			],
+			"keys": {
+				"S": "minecraft:stick"
+			},
+			"result": "doll-mod:doll_baton",
+			"text": "3 sticks diagonally."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"I",
+				"R",
+				"I"
+			],
+			"keys": {
+				"I": "minecraft:iron_ingot",
+				"R": "minecraft:redstone"
+			},
+			"result": "doll-mod:doll_panel",
+			"text": "Iron ingot, redstone, iron ingot vertically."
+		}
+	]
+}

@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "R": "minecraft:resin_brick",
+    "S": "minecraft:string"
+  },
+  "pattern": [
+    " RS",
+    "R S",
+    " RS"
+  ],
+  "result": {
+    "id": "doll-mod:pale_bow"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "key": {
+    "H": "doll-mod:nether_doll_head",
+    "N": "minecraft:netherrack"
+  },
+  "pattern": [
+    "NNN",
+    "NHN",
+    "NNN"
+  ],
+  "result": {
+    "id": "doll-mod:nether_doll_egg"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "key": {
+    "H": "doll-mod:forest_doll_head",
+    "O": "minecraft:oak_log"
+  },
+  "pattern": [
+    "OOO",
+    "OHO",
+    "OOO"
+  ],
+  "result": {
+    "id": "doll-mod:forest_doll_egg"
+  }
+}

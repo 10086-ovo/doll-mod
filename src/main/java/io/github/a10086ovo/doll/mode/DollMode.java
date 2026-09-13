@@ -16,7 +16,7 @@ import net.minecraft.world.item.Items;
  * 第 8 格（44）为跟随开关。模式按钮（0-7）与快捷栏格子已解耦，不再一一对应。
  * 点击已激活的模式按钮可取消选择（进入无模式空闲状态）。
  * <p>
- * 显示名统一走翻译键 {@code mode.dollmod.<name>}（zh_cn/en_us 由 datagen 生成），
+ * 显示名统一走翻译键 {@code mode.doll-mod.<name>}（zh_cn/en_us 由 datagen 生成），
  * 按钮高亮状态用黄色（原版常用强调色）。
  */
 public enum DollMode {
@@ -68,7 +68,7 @@ public enum DollMode {
 		return this.name().toLowerCase();
 	}
 
-	/** 翻译键：mode.dollmod.<name>（zh_cn/en_us 由 datagen 生成）。 */
+	/** 翻译键：mode.doll-mod.<name>（zh_cn/en_us 由 datagen 生成）。 */
 	private Component displayName() {
 		return Component.translatable("mode." + DollModConstants.MOD_ID + "." + lowerCaseName());
 	}

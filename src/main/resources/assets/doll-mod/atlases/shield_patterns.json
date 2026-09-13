@@ -1,0 +1,8 @@
+{
+  "sources": [
+    {
+      "type": "minecraft:single",
+      "resource": "doll-mod:entity/shield/thorns_shield"
+    }
+  ]
+}

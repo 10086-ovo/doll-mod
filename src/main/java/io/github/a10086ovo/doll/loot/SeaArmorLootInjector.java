@@ -26,7 +26,7 @@ import net.minecraftforge.event.LootTableLoadEvent;
  */
 public class SeaArmorLootInjector {
 
-	/** 自定义战利品表的注册键：dollmod:chests/buried_treasure_sea_armor */
+	/** 自定义战利品表的注册键：doll-mod:chests/buried_treasure_sea_armor */
 	private static final ResourceKey<LootTable> SEA_ARMOR_TABLE_KEY = ResourceKey.create(
 		Registries.LOOT_TABLE,
 		Identifier.fromNamespaceAndPath(DollModConstants.MOD_ID, "chests/buried_treasure_sea_armor")

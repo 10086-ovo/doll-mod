@@ -21,21 +21,21 @@ import java.util.List;
  */
 public enum BiomeSearchType {
 	// --- 主世界 ---
-	CHERRY_GROVE    (0, "cherry_grove",    Level.OVERWORLD, Items.CHERRY_SAPLING,   "biome.dollmod.cherry_grove"),
-	DESERT          (1, "desert",          Level.OVERWORLD, Items.CACTUS,           "biome.dollmod.desert"),
-	BAMBOO_JUNGLE   (2, "bamboo_jungle",   Level.OVERWORLD, Items.BAMBOO,           "biome.dollmod.bamboo_jungle"),
-	MUSHROOM_FIELDS (3, "mushroom_fields", Level.OVERWORLD, Items.RED_MUSHROOM,     "biome.dollmod.mushroom_fields"),
-	SNOWY_PLAINS    (4, "snowy_plains",    Level.OVERWORLD, Items.SNOW_BLOCK,       "biome.dollmod.snowy_plains"),
-	PLAINS          (5, "plains",          Level.OVERWORLD, Items.GRASS_BLOCK,      "biome.dollmod.plains"),
-	SWAMP           (6, "swamp",           Level.OVERWORLD, Items.LILY_PAD,         "biome.dollmod.swamp"),
-	LUSH_CAVES      (7, "lush_caves",      Level.OVERWORLD, Items.GLOW_BERRIES,     "biome.dollmod.lush_caves"),
-	PALE_GARDEN     (8, "pale_garden",     Level.OVERWORLD, Items.PALE_OAK_LEAVES,  "biome.dollmod.pale_garden"),
+	CHERRY_GROVE    (0, "cherry_grove",    Level.OVERWORLD, Items.CHERRY_SAPLING,   "biome.doll-mod.cherry_grove"),
+	DESERT          (1, "desert",          Level.OVERWORLD, Items.CACTUS,           "biome.doll-mod.desert"),
+	BAMBOO_JUNGLE   (2, "bamboo_jungle",   Level.OVERWORLD, Items.BAMBOO,           "biome.doll-mod.bamboo_jungle"),
+	MUSHROOM_FIELDS (3, "mushroom_fields", Level.OVERWORLD, Items.RED_MUSHROOM,     "biome.doll-mod.mushroom_fields"),
+	SNOWY_PLAINS    (4, "snowy_plains",    Level.OVERWORLD, Items.SNOW_BLOCK,       "biome.doll-mod.snowy_plains"),
+	PLAINS          (5, "plains",          Level.OVERWORLD, Items.GRASS_BLOCK,      "biome.doll-mod.plains"),
+	SWAMP           (6, "swamp",           Level.OVERWORLD, Items.LILY_PAD,         "biome.doll-mod.swamp"),
+	LUSH_CAVES      (7, "lush_caves",      Level.OVERWORLD, Items.GLOW_BERRIES,     "biome.doll-mod.lush_caves"),
+	PALE_GARDEN     (8, "pale_garden",     Level.OVERWORLD, Items.PALE_OAK_LEAVES,  "biome.doll-mod.pale_garden"),
 	// --- 下界 ---
-	NETHER_WASTES   (9,  "nether_wastes",   Level.NETHER, Items.NETHERRACK,      "biome.dollmod.nether_wastes"),
-	SOUL_SAND_VALLEY(10, "soul_sand_valley",Level.NETHER, Items.SOUL_SAND,       "biome.dollmod.soul_sand_valley"),
-	CRIMSON_FOREST  (11, "crimson_forest",  Level.NETHER, Items.CRIMSON_FUNGUS,  "biome.dollmod.crimson_forest"),
-	WARPED_FOREST   (12, "warped_forest",   Level.NETHER, Items.WARPED_FUNGUS,   "biome.dollmod.warped_forest"),
-	BASALT_DELTAS   (13, "basalt_deltas",   Level.NETHER, Items.BASALT,          "biome.dollmod.basalt_deltas");
+	NETHER_WASTES   (9,  "nether_wastes",   Level.NETHER, Items.NETHERRACK,      "biome.doll-mod.nether_wastes"),
+	SOUL_SAND_VALLEY(10, "soul_sand_valley",Level.NETHER, Items.SOUL_SAND,       "biome.doll-mod.soul_sand_valley"),
+	CRIMSON_FOREST  (11, "crimson_forest",  Level.NETHER, Items.CRIMSON_FUNGUS,  "biome.doll-mod.crimson_forest"),
+	WARPED_FOREST   (12, "warped_forest",   Level.NETHER, Items.WARPED_FUNGUS,   "biome.doll-mod.warped_forest"),
+	BASALT_DELTAS   (13, "basalt_deltas",   Level.NETHER, Items.BASALT,          "biome.doll-mod.basalt_deltas");
 
 	private static final BiomeSearchType[] VALUES = values();
 

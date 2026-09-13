@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "doll-mod:item/ender_doll_egg"
+  }
+}

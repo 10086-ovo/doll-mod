@@ -26,7 +26,7 @@ public class ThornsShieldSpecialRenderer extends ShieldSpecialRenderer {
 
     /** 指向 atlas 中荆棘盾牌自定义纹理的 SpriteId */
     private static final SpriteId THORNS_SHIELD_SPRITE =
-            Sheets.SHIELD_MAPPER.apply(Identifier.fromNamespaceAndPath("dollmod", "thorns_shield"));
+            Sheets.SHIELD_MAPPER.apply(Identifier.fromNamespaceAndPath("doll-mod", "thorns_shield"));
 
     private final SpriteGetter sprites;
     private final ShieldModel model;
@@ -48,7 +48,7 @@ public class ThornsShieldSpecialRenderer extends ShieldSpecialRenderer {
     /**
      * Unbaked 实现，负责在模型烘焙阶段创建渲染器实例。
      * 通过 Mixin 注册到 {@link net.minecraft.client.renderer.special.SpecialModelRenderers} 的 ID_MAPPER 中，
-     * 对应物品模型 JSON 中的 {@code "type": "dollmod:thorns_shield"}。
+     * 对应物品模型 JSON 中的 {@code "type": "doll-mod:thorns_shield"}。
      */
     public static final class Unbaked implements SpecialModelRenderer.Unbaked<DataComponentMap> {
         public static final Unbaked INSTANCE = new Unbaked();

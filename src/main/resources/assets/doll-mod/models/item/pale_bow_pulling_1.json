@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/bow",
+  "textures": {
+    "layer0": "doll-mod:item/pale_bow_pulling_1"
+  }
+}

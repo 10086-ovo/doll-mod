@@ -1,7 +1,7 @@
 {
   "values": [
-    "dollmod:rock_anvil",
-    "dollmod:chipped_rock_anvil",
-    "dollmod:damaged_rock_anvil"
+    "doll-mod:rock_anvil",
+    "doll-mod:chipped_rock_anvil",
+    "doll-mod:damaged_rock_anvil"
   ]
 }

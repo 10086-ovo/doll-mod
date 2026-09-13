@@ -16,7 +16,7 @@ import java.util.Map;
 /**
  * 指南书 JSON 加载器。目录布局：
  * <pre>
- * data/dollmod/guide_book/
+ * data/doll-mod/guide_book/
  *   book.json                            — 书籍定义
  *   en_us/categories/&lt;id&gt;.json      — 章节（id 取自文件名）
  *   en_us/entries/&lt;id&gt;.json          — 条目（category 字段归入章节）
@@ -42,7 +42,7 @@ public final class GuideBookLoader {
 	public static GuideBook load(ResourceManager manager, String lang) {
 		// 检查语言目录是否存在，不存在则回退
 		String langDir = lang;
-		Identifier testId = Identifier.fromNamespaceAndPath("dollmod",
+		Identifier testId = Identifier.fromNamespaceAndPath("doll-mod",
 			BOOK_DIR + "/" + langDir + "/categories");
 		boolean langExists = manager.getResource(testId).isPresent()
 			|| manager.listResources(BOOK_DIR + "/" + langDir + "/categories",
@@ -101,7 +101,7 @@ public final class GuideBookLoader {
 	}
 
 	private static <T> T loadJson(ResourceManager manager, String path, Class<T> clazz) {
-		Identifier id = Identifier.fromNamespaceAndPath("dollmod", path);
+		Identifier id = Identifier.fromNamespaceAndPath("doll-mod", path);
 		return manager.getResource(id)
 			.map(res -> loadResource(id, res, clazz))
 			.orElse(null);

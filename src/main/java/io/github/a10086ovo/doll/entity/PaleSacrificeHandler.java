@@ -49,7 +49,7 @@ import java.util.UUID;
 public class PaleSacrificeHandler {
 
 	private static final Identifier PALE_SACRIFICE_MODIFIER_ID =
-		Identifier.fromNamespaceAndPath("dollmod", "pale_sacrifice");
+		Identifier.fromNamespaceAndPath("doll-mod", "pale_sacrifice");
 	private static final double PALE_SACRIFICE_BONUS = 100.0;
 	private static final int PALE_SACRIFICE_DURATION_TICKS = 1200; // 60 seconds
 	private static final double PALE_SACRIFICE_SEARCH_RADIUS = 16.0;

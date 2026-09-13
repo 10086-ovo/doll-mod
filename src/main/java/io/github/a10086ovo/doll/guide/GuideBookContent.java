@@ -3,7 +3,7 @@ package io.github.a10086ovo.doll.guide;
 /**
  * 指南书数据加载与缓存。
  * <p>
- * 从 {@code assets/dollmod/guide_book/} 目录加载 JSON 到
+ * 从 {@code assets/doll-mod/guide_book/} 目录加载 JSON 到
  * {@link GuideBook} 数据模型，供 {@link io.github.a10086ovo.doll.screen.GuideBookScreen}
  * 直接渲染。不再编译为原版成书（WrittenBookContent）。
  * <p>

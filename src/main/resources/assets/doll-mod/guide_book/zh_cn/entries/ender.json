@@ -1,0 +1,46 @@
+{
+  "name": "末影人偶",
+  "icon": "doll-mod:ender_doll_egg",
+  "category": "special",
+  "sortnum": 5,
+  "pages": [
+    {
+      "type": "text",
+      "title": "基础属性",
+      "text": "末影人偶具备受击闪避与低血量处决能力。\n\n• 生命值：120\n• 恢复 IV + 抗性 II（无抗火）"
+    },
+    {
+      "type": "text",
+      "title": "光环与能力",
+      "text": "战斗能力\n• 闪避：近战受击 67%、投射物 100% 概率完全免伤并瞬移躲避\n• 近战 / 射手模式下自动发射末影弹（直接命中与 3 格范围均造成 20 伤害，不点燃，冷却 3 秒）\n• 处决：目标血量低于 25% 时立即斩杀，无冷却（无法斩杀野生幽匿人偶 Boss）\n• 持末影斧时斩杀线取 30%\n\n光环\n• 末地生物安抚：末影人 / 末影螨 / 潜影贝无法对人偶和主人建立仇恨，遗留仇恨自动清除（末影龙不在安抚之列）"
+    },
+    {
+      "type": "crafting",
+      "title": "合成配方",
+      "pattern": [
+        "PP",
+        "PP"
+      ],
+      "keys": {
+        "P": "minecraft:purpur_block"
+      },
+      "result": "doll-mod:ender_doll_head",
+      "text": "4 紫珀块摆 2×2 合成末影人偶头颅。"
+    },
+    {
+      "type": "crafting",
+      "title": "合成配方",
+      "pattern": [
+        "EEE",
+        "EHE",
+        "EEE"
+      ],
+      "keys": {
+        "E": "minecraft:end_stone",
+        "H": "doll-mod:ender_doll_head"
+      },
+      "result": "doll-mod:ender_doll_egg",
+      "text": "8 末地石围一圈，中间放末影人偶头颅，合成末影人偶蛋。\n\n合成后到铁砧上为蛋命名，手持右键地面即可召唤人偶。"
+    }
+  ]
+}

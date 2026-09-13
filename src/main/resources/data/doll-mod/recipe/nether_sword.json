@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "N": "minecraft:blaze_rod",
+    "S": "minecraft:stick"
+  },
+  "pattern": [
+    " N ",
+    " N ",
+    " S "
+  ],
+  "result": {
+    "id": "doll-mod:nether_sword"
+  }
+}

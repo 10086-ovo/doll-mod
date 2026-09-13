@@ -19,7 +19,7 @@ repositories {
 dependencies { implementation minecraft.dependency('net.minecraftforge:forge:26.2-65.1.0') }
 tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
 processResources {
-    def props = [mod_id: 'dollmod', mod_name: '人偶模组', mod_version: project.version,
+    def props = [mod_id: 'doll-mod', mod_name: '人偶模组', mod_version: project.version,
                  minecraft_version: '26.2', forge_version: '65.1.0']
     inputs.properties props
     filteringCharset = 'UTF-8'

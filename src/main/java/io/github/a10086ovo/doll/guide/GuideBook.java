@@ -12,7 +12,7 @@ public class GuideBook {
 	/** 首页欢迎文字 */
 	public String landingText = "";
 	/** GUI 背景纹理路径（用户绘制，占位为默认值） */
-	public String bookTexture = "dollmod:textures/gui/guide_book.png";
+	public String bookTexture = "doll-mod:textures/gui/guide_book.png";
 	/** 章节列表（加载时填充） */
 	public List<GuideCategory> categories = new ArrayList<>();
 }

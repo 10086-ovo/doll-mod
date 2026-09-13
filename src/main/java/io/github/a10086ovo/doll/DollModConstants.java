@@ -1,7 +1,7 @@
 package io.github.a10086ovo.doll;
 
 public class DollModConstants {
-	public static final String MOD_ID = "dollmod";
+	public static final String MOD_ID = "doll-mod";
 	public static final String DOLL_ENTITY_ID = "doll";
 	public static final String DOLL_TIER1_EGG_ID = "doll_egg_s1";
 	public static final String DOLL_TIER2_EGG_ID = "doll_egg_s2";

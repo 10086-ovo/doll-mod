@@ -8,7 +8,7 @@ import java.util.List;
 public class GuideEntry {
 	/** 显示名（翻译键或纯文本） */
 	public String name = "";
-	/** 图标物品 ID（如 "dollmod:doll_egg_s1"） */
+	/** 图标物品 ID（如 "doll-mod:doll_egg_s1"） */
 	public String icon = "";
 	/** 所属章节 ID（如 "getting_started"） */
 	public String category = "";

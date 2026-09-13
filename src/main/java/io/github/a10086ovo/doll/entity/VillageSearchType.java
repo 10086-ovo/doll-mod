@@ -16,11 +16,11 @@ import net.minecraft.world.level.levelgen.structure.Structure;
  * 直接按结构注册键搜索即可，无需再做群系过滤。
  */
 public enum VillageSearchType {
-	PLAINS (0, "village_plains",  Items.HAY_BLOCK,  "village.dollmod.plains"),
-	DESERT (1, "village_desert",  Items.SAND,       "village.dollmod.desert"),
-	SAVANNA(2, "village_savanna", Items.ACACIA_LOG, "village.dollmod.savanna"),
-	SNOWY  (3, "village_snowy",   Items.SNOW_BLOCK, "village.dollmod.snowy"),
-	TAIGA  (4, "village_taiga",   Items.SPRUCE_LOG, "village.dollmod.taiga");
+	PLAINS (0, "village_plains",  Items.HAY_BLOCK,  "village.doll-mod.plains"),
+	DESERT (1, "village_desert",  Items.SAND,       "village.doll-mod.desert"),
+	SAVANNA(2, "village_savanna", Items.ACACIA_LOG, "village.doll-mod.savanna"),
+	SNOWY  (3, "village_snowy",   Items.SNOW_BLOCK, "village.doll-mod.snowy"),
+	TAIGA  (4, "village_taiga",   Items.SPRUCE_LOG, "village.doll-mod.taiga");
 
 	private static final VillageSearchType[] VALUES = values();
 

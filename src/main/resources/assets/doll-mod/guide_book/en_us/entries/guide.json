@@ -1,0 +1,56 @@
+{
+	"name": "Guide Doll",
+	"icon": "doll-mod:guide_doll_egg",
+	"category": "special",
+	"sortnum": 0,
+	"pages": [
+		{
+			"type": "text",
+			"title": "Base Stats",
+			"text": "Support and exploration doll. Does not attack but provides a guiding aura and coordinate search.\n\nHP: 120. Regen IV + Resistance II."
+		},
+		{
+			"type": "text",
+			"title": "Guiding Aura",
+			"text": "Radius: 32 blocks. Owner within range receives:\n• Speed II + Jump Boost II + Armor +4\n\nOnly the owner benefits. Effects expire when leaving range."
+		},
+		{
+			"type": "text",
+			"title": "Coordinate Search",
+			"text": "Click \"Search\" in the Guide Doll inventory. Three tabs: Structures / Biomes / Villages. Results are sorted by distance. Click a target to search. Checkmark button marks visited — persists across restarts."
+		},
+		{
+			"type": "text",
+			"title": "How to Obtain",
+			"text": "Craft the Guide Doll Head, then the Guide Doll Egg. Name the egg on an anvil to summon."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"CC",
+				"CC"
+			],
+			"keys": {
+				"C": "minecraft:compass"
+			},
+			"result": "doll-mod:guide_doll_head",
+			"text": "4 compasses in a 2x2 grid."
+		},
+		{
+			"type": "crafting",
+			"title": "Crafting Recipe",
+			"pattern": [
+				"PPP",
+				"PHP",
+				"PPP"
+			],
+			"keys": {
+				"P": "minecraft:paper",
+				"H": "doll-mod:guide_doll_head"
+			},
+			"result": "doll-mod:guide_doll_egg",
+			"text": "8 paper surround the Guide Doll Head."
+		}
+	]
+}

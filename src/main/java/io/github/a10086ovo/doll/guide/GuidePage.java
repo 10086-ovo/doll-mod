@@ -19,7 +19,7 @@ public class GuidePage {
 	public String text = "";
 	/** item 页标题 */
 	public String title = "";
-	/** item 页展示的物品 ID（如 "dollmod:doll_egg_s1"） */
+	/** item 页展示的物品 ID（如 "doll-mod:doll_egg_s1"） */
 	public String item = "";
 	/** crafting 页配方图案（每行一个字符串，字符对应 keys） */
 	public List<String> pattern = List.of();

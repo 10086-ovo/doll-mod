@@ -1,0 +1,32 @@
+{
+  "parent": "minecraft:recipes/root",
+  "criteria": {
+    "has_sea_doll_head": {
+      "conditions": {
+        "items": [
+          {
+            "items": "doll-mod:sea_doll_head"
+          }
+        ]
+      },
+      "trigger": "minecraft:inventory_changed"
+    },
+    "has_the_recipe": {
+      "conditions": {
+        "recipe": "doll-mod:sea_doll_egg"
+      },
+      "trigger": "minecraft:recipe_unlocked"
+    }
+  },
+  "requirements": [
+    [
+      "has_the_recipe",
+      "has_sea_doll_head"
+    ]
+  ],
+  "rewards": {
+    "recipes": [
+      "doll-mod:sea_doll_egg"
+    ]
+  }
+}

@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * 在 {@link SpecialModelRenderers#bootstrap()} 执行完毕后，
  * 将荆棘盾牌自定义 SpecialModelRenderer 注册到 ID_MAPPER 中，
- * 使物品模型 JSON 中的 {@code "type": "dollmod:thorns_shield"} 能被正确解析。
+ * 使物品模型 JSON 中的 {@code "type": "doll-mod:thorns_shield"} 能被正确解析。
  */
 @Mixin(SpecialModelRenderers.class)
 public abstract class SpecialModelRenderersMixin {
@@ -26,7 +26,7 @@ public abstract class SpecialModelRenderersMixin {
     @Inject(method = "bootstrap", at = @At("TAIL"))
     private static void dollMod$registerThornsShieldRenderer(CallbackInfo ci) {
         ID_MAPPER.put(
-                Identifier.fromNamespaceAndPath("dollmod", "thorns_shield"),
+                Identifier.fromNamespaceAndPath("doll-mod", "thorns_shield"),
                 ThornsShieldSpecialRenderer.Unbaked.MAP_CODEC
         );
     }

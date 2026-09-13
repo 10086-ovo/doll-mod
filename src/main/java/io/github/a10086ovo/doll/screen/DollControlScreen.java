@@ -353,7 +353,7 @@ public class DollControlScreen extends Screen {
 		};
 	}
 
-	/** 控制面板 GUI 文案翻译键（前缀 gui.dollmod.）。 */
+	/** 控制面板 GUI 文案翻译键（前缀 gui.doll-mod.）。 */
 	private static String t(String key) {
 		return Component.translatable("gui." + DollModConstants.MOD_ID + "." + key).getString();
 	}

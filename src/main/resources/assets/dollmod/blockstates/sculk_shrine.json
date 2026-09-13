@@ -1,6 +1,0 @@
-{
-  "variants": {
-    "triggered=false": { "model": "dollmod:block/sculk_shrine" },
-    "triggered=true":  { "model": "dollmod:block/sculk_shrine" }
-  }
-}

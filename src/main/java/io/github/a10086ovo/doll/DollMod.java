@@ -208,7 +208,7 @@ public class DollMod {
 	public static net.minecraft.world.inventory.MenuType<DollScreenHandler> DOLL_SCREEN_HANDLER;
 
 	public static final Component ROCK_ANVIL_CONTAINER_TITLE =
-		Component.translatable("container.dollmod.rock_anvil");
+		Component.translatable("container.doll-mod.rock_anvil");
 
 	public static RockAnvilBlock ROCK_ANVIL_BLOCK;
 	public static RockAnvilBlock CHIPPED_ROCK_ANVIL_BLOCK;
@@ -759,7 +759,7 @@ public class DollMod {
 			}
 			DollEntity.applyConfig();
 			if (!cfgLoaded) {
-				LOGGER.warn("dollmod 配置异常，本次以默认值运行（详见 config/dollmod/doll.json）。");
+				LOGGER.warn("dollmod 配置异常，本次以默认值运行（详见 config/doll-mod/doll.json）。");
 			}
 		});
 
@@ -822,7 +822,7 @@ public class DollMod {
 	@SubscribeEvent
 	public static void onRegisterCommands(RegisterCommandsEvent event) {
 		event.getDispatcher().register(
-			Commands.literal("dollmod")
+			Commands.literal("doll-mod")
 				.requires(Commands.hasPermission(Commands.LEVEL_MODERATORS))
 				.then(Commands.literal("reload")
 					.executes(ctx -> {
@@ -837,10 +837,10 @@ public class DollMod {
 						if (ok) {
 							DollEntity.applyConfig();
 							src.sendSuccess(() ->
-								Component.literal("§adollmod 配置已重载并应用（config/dollmod/doll.json），调参即时生效。"), false);
+								Component.literal("§adollmod 配置已重载并应用（config/doll-mod/doll.json），调参即时生效。"), false);
 						} else {
 							src.sendSuccess(() ->
-								Component.literal("§cdollmod 配置读取失败，已回退默认值运行。请检查 config/dollmod/doll.json 是否合法 JSON，再 /dollmod reload 重试。"), false);
+								Component.literal("§cdollmod 配置读取失败，已回退默认值运行。请检查 config/doll-mod/doll.json 是否合法 JSON，再 /dollmod reload 重试。"), false);
 						}
 						return 1;
 					})));

@@ -21,19 +21,19 @@ import java.util.List;
  * 只搜索当前维度：GUI 仅显示与玩家所在维度匹配的结构。
  */
 public enum StructureSearchType {
-	MONSTER_ROOM (0, "monster_room",      Level.OVERWORLD, Items.MOSSY_COBBLESTONE,    "structure.dollmod.monster_room"),
-	JUNGLE_TEMPLE (1, "jungle_temple",    Level.OVERWORLD, Items.MOSSY_STONE_BRICKS,   "structure.dollmod.jungle_temple"),
-	MONUMENT      (2, "monument",         Level.OVERWORLD, Items.PRISMARINE,           "structure.dollmod.monument"),
-	ANCIENT_CITY  (3, "ancient_city",    Level.OVERWORLD, Items.SCULK_CATALYST,       "structure.dollmod.ancient_city"),
-	MANSION       (4, "mansion",          Level.OVERWORLD, Items.DARK_OAK_LOG,         "structure.dollmod.mansion"),
-	TRIAL_CHAMBERS(5, "trial_chambers",  Level.OVERWORLD, Items.TRIAL_KEY,            "structure.dollmod.trial_chambers"),
-	MINESHAFT     (6, "mineshaft",        Level.OVERWORLD, Items.RAIL,                 "structure.dollmod.mineshaft"),
-	STRONGHOLD    (7, "stronghold",       Level.OVERWORLD, Items.END_PORTAL_FRAME,    "structure.dollmod.stronghold"),
-	BURIED_TREASURE(8,"buried_treasure",  Level.OVERWORLD, Items.HEART_OF_THE_SEA,    "structure.dollmod.buried_treasure"),
-	SHIPWRECK     (9, "shipwreck",        Level.OVERWORLD, Items.OAK_BOAT,             "structure.dollmod.shipwreck"),
-	FORTRESS      (10,"fortress",         Level.NETHER,    Items.NETHER_BRICKS,        "structure.dollmod.fortress"),
-	BASTION       (11,"bastion_remnant",  Level.NETHER,    Items.GILDED_BLACKSTONE,    "structure.dollmod.bastion_remnant"),
-	END_CITY      (12,"end_city",         Level.END,       Items.PURPUR_BLOCK,         "structure.dollmod.end_city");
+	MONSTER_ROOM (0, "monster_room",      Level.OVERWORLD, Items.MOSSY_COBBLESTONE,    "structure.doll-mod.monster_room"),
+	JUNGLE_TEMPLE (1, "jungle_temple",    Level.OVERWORLD, Items.MOSSY_STONE_BRICKS,   "structure.doll-mod.jungle_temple"),
+	MONUMENT      (2, "monument",         Level.OVERWORLD, Items.PRISMARINE,           "structure.doll-mod.monument"),
+	ANCIENT_CITY  (3, "ancient_city",    Level.OVERWORLD, Items.SCULK_CATALYST,       "structure.doll-mod.ancient_city"),
+	MANSION       (4, "mansion",          Level.OVERWORLD, Items.DARK_OAK_LOG,         "structure.doll-mod.mansion"),
+	TRIAL_CHAMBERS(5, "trial_chambers",  Level.OVERWORLD, Items.TRIAL_KEY,            "structure.doll-mod.trial_chambers"),
+	MINESHAFT     (6, "mineshaft",        Level.OVERWORLD, Items.RAIL,                 "structure.doll-mod.mineshaft"),
+	STRONGHOLD    (7, "stronghold",       Level.OVERWORLD, Items.END_PORTAL_FRAME,    "structure.doll-mod.stronghold"),
+	BURIED_TREASURE(8,"buried_treasure",  Level.OVERWORLD, Items.HEART_OF_THE_SEA,    "structure.doll-mod.buried_treasure"),
+	SHIPWRECK     (9, "shipwreck",        Level.OVERWORLD, Items.OAK_BOAT,             "structure.doll-mod.shipwreck"),
+	FORTRESS      (10,"fortress",         Level.NETHER,    Items.NETHER_BRICKS,        "structure.doll-mod.fortress"),
+	BASTION       (11,"bastion_remnant",  Level.NETHER,    Items.GILDED_BLACKSTONE,    "structure.doll-mod.bastion_remnant"),
+	END_CITY      (12,"end_city",         Level.END,       Items.PURPUR_BLOCK,         "structure.doll-mod.end_city");
 
 	private static final StructureSearchType[] VALUES = values();
 

@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "key": {
+    "H": "doll-mod:pale_doll_head",
+    "P": "minecraft:pale_oak_log"
+  },
+  "pattern": [
+    "PPP",
+    "PHP",
+    "PPP"
+  ],
+  "result": {
+    "id": "doll-mod:pale_doll_egg"
+  }
+}

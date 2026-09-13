@@ -781,7 +781,7 @@ public class GuideBookScreen extends Screen {
 		}
 
 		/**
-		 * 把字符串形式的物品 ID（如 "dollmod:doll_egg_s1"）解析为 ItemStack。
+		 * 把字符串形式的物品 ID（如 "doll-mod:doll_egg_s1"）解析为 ItemStack。
 	 * 找不到时返回屏障图标作为占位。
 	 */
 	private ItemStack resolveItemIcon(String itemId) {
