@@ -32,7 +32,7 @@ import java.util.List;
  *   所以这里以 raw 类型构造 AvatarRenderer（unchecked，运行时安全）。
  * - 屏幕注册改用原版 {@code MenuScreens.register}（26.2 Forge 无 RegisterMenuScreensEvent）。
  */
-@Mod.EventBusSubscriber(modid = DollModConstants.MOD_ID, value = Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = DollModConstants.FORGE_MOD_ID, value = Dist.CLIENT)
 public class DollModClient {
 
 	private static long lastClientTickNanos = System.nanoTime();
@@ -61,6 +61,15 @@ public class DollModClient {
 					var current = net.minecraft.client.Minecraft.getInstance().gui.screen();
 					if (current instanceof GuideSearchScreen screen) {
 						screen.receiveResults(payload);
+					}
+				});
+
+			// 全域索引构建进度：路由到当前打开的搜索屏（按钮就地变进度条，可点取消）
+			DollClientNetworking.setIndexBuildProgressConsumer(
+				(io.github.a10086ovo.doll.network.payload.IndexBuildProgressPayload payload) -> {
+					var current = net.minecraft.client.Minecraft.getInstance().gui.screen();
+					if (current instanceof GuideSearchScreen screen) {
+						screen.receiveIndexProgress(payload);
 					}
 				});
 

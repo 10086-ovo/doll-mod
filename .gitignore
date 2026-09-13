@@ -4,6 +4,9 @@ run/
 logs/
 *.class
 
+# WorkBuddy 工作记忆 / 诊断备份 / 临时脚本
+.workbuddy/
+
 # IDE
 .idea/
 *.iml

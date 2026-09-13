@@ -1,25 +1,33 @@
 package io.github.a10086ovo.doll.screen;
 
 import io.github.a10086ovo.doll.DollModConstants;
-import io.github.a10086ovo.doll.entity.BiomeSearchType;
-import io.github.a10086ovo.doll.entity.StructureSearchType;
-import io.github.a10086ovo.doll.entity.VillageSearchType;
+import io.github.a10086ovo.doll.geo.GeoIndexService;
 import io.github.a10086ovo.doll.network.DollClientNetworking;
 import io.github.a10086ovo.doll.network.SearchCategory;
+import io.github.a10086ovo.doll.network.payload.IndexBuildProgressPayload;
 import io.github.a10086ovo.doll.network.payload.SearchResultsPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.core.Registry;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.levelgen.structure.Structure;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * 向导人偶统一搜索菜单（纯 Screen，非容器）。
@@ -28,16 +36,20 @@ import java.util.List;
  * {@link net.minecraft.client.Minecraft#setScreenAndShow} 进入本屏。整体替代旧的
  * 结构/群系/村庄三套独立二级菜单。
  *
- * <p>两视图：
+ * <p>三视图：
  * <ul>
- *   <li>类型选择（PICK）：顶部分类页签（结构/群系/村庄）+ 可滚动目标列表
- *       （仅为当前维度存在的目标）。点击某行即发起统一搜索；
+ *   <li>整合搜索（SEARCH，默认）：初始为空白，顶部一个支持中英文输入的搜索框；
+ *       输入关键词即实时筛出当前维度匹配的目标。界内最左侧是一个「☰」按钮，
+ *       打开二级目的清单（分类查找）；</li>
+ *   <li>分类查找（PICK，二级菜单）：顶部分类页签（结构/群系/村庄）+ 可滚动目标列表，
+ *       点击某行即发起统一搜索并与玩家分类归属；</li>
  *   <li>搜索结果（RESULTS）：列表从上到下按与玩家水平距离由近及远排列，每行显示目标图标、
  *       名称、水平距离、坐标，右侧一个「√」打卡按钮（点击翻转前端 + 通知服务端持久化）。
- *       右上角「刷新」按钮以玩家当前位置为中心强制重新搜索（半径 100 区块），
- *       其余时候服务端优先回放本玩家缓存，其次复用世界级共享缓存，避免多人反复搜索；确实重新搜索时，
- *       群系在工作线程异步采样，结构/村庄在服务端跨 tick 分片执行（每 tick 有界），结果迟至期间本屏持续呈「搜索中」。
+ *       右上角「刷新」按钮忽略已有结果，以玩家当前位置为中心强制重新搜索。</li>
  * </ul>
+ *
+ * <p>搜索目标池（SEARCH 视图的实时筛选项）为当前维度下可搜索的结构/群系/村庄的并集；
+ * 结果与既有搜索工作流完全一致（服务端优先回放缓存，其次重新搜索）。
  *
  * <p>26.2 坐标系：本屏是纯 Screen（无容器平移），事件坐标与绘图均为窗口绝对坐标。
  */
@@ -68,12 +80,28 @@ public class GuideSearchScreen extends Screen {
 	private static final int TAB_GAP = 4;
 	private static final int[] TAB_CATS = { SearchCategory.STRUCTURE, SearchCategory.BIOME, SearchCategory.VILLAGE };
 
-	// 类型选择列表（紧贴页签下沿，去掉搜索框后上移对齐）
+	// 视图标识
+	private static final int VIEW_SEARCH = 0;
+	private static final int VIEW_PICK = 1;
+	private static final int VIEW_RESULTS = 2;
+
+	// 整合搜索（SEARCH）布局
+	private static final int MENU_BTN_W = 20;
+	private static final int MENU_BTN_H = 20;
+	/** 右上角「全域索引」按钮（SEARCH 视图）：空闲时点它开始为当前维度建索引，构建中则点它取消。 */
+	private static final int INDEX_BTN_W = 64;
+	private static final int INDEX_BTN_H = 20;
+	private static final int SEARCH_BOX_H = 20;
+	private static final int SEARCH_TOP = 30;
+	private static final int SEARCH_ROW = 24;
+	private static final int SEARCH_ROWS = (PANEL_H - SEARCH_TOP - 6) / SEARCH_ROW;
+
+	// 分类查找（PICK）布局
 	private static final int PICK_TOP = 46;
 	private static final int PICK_ROW = 24;
 	private static final int PICK_ROWS = (PANEL_H - PICK_TOP - 6) / PICK_ROW;
 
-	// 结果列表
+	// 结果（RESULTS）布局
 	private static final int RES_TOP = 26;
 	private static final int RES_ROW = 26;
 	private static final int RES_ROWS = (PANEL_H - RES_TOP - 6) / RES_ROW;
@@ -89,16 +117,31 @@ public class GuideSearchScreen extends Screen {
 	private double lastMouseY;
 
 	// ---- 视图与状态 ----
-	private boolean resultsView;                 // false=类型选择, true=搜索结果
+	private int view = VIEW_SEARCH;
 	private int category = SearchCategory.STRUCTURE;
 	private int pickScroll;
 	private int resScroll;
+	private int searchScroll;
 	private int lastPickHoverRow = 1;   // 类型列表末次所指行号（鼠标离列表时依此示之）
 	private int lastResHoverRow = 1;    // 结果列表末次所指行号（鼠标离列表时依此示之）
-	private List<Pickable> pickByCat = List.of();   // 当前维度该页面下的全部目标
-	private Pickable current;                       // 正在展示结果的目标
-	private boolean pending;                        // 等待服务端返回搜索结果
+	private int lastSearchHoverRow = 1; // 搜索列表末次所指行号
+	private List<Pickable> pickByCat = List.of();  // 当前维度该页面下的全部目标
+	private List<Pickable> searchPool = List.of(); // SEARCH 视图检索池（三类并集）
+	private List<Pickable> searchMatches = List.of(); // 匹配当前关键词的目标
+	private Pickable current;          // 正在展示结果的目标
+	private int resultsReturnView = VIEW_SEARCH; // 进入 RESULTS 前所处的视图，供返回键原路回退
+	private boolean pending;           // 等待服务端返回搜索结果
+	private boolean pendingPrev;       // 上一帧是否处于等待态（用于在「刚进入等待态」那一帧记录起始时刻）
+	private long pendingSinceMs;       // 本次等待的起始时刻（毫秒），仅用于长等待时显示「已 N 秒」
+	private boolean notInDimension;    // 服务端标记：目标在当前维度不可能存在
+	// ---- 「全域索引」按钮状态（由服务端进度包驱动）----
+	private int indexState = IndexBuildProgressPayload.STATE_IDLE;
+	private int indexPercent;
+	private int indexPhase;
 	private final List<ResultRow> rows = new ArrayList<>();
+
+	// 搜索框（支持中英文输入；仅 SEARCH 视图显示）
+	private EditBox searchBox;
 
 	/** 一个可选中的目标（名称经翻译键本地化显示）。 */
 	private static final class Pickable {
@@ -115,7 +158,34 @@ public class GuideSearchScreen extends Screen {
 		}
 
 		String localizedName() {
-			return Component.translatable(translationKey).getString();
+			String s = Component.translatable(translationKey).getString();
+			// 原版语言表没有此键时 translatable 会原样回退成键名，
+			// 此时改用一个可读英文名兜底，避免界面显示光秃秃的键名字符串。
+			if (s.equals(translationKey)) {
+				return readableFallback();
+			}
+			return s;
+		}
+
+		/** 兜底可读英文名：取翻译键最后一段 id，下划线换成空格并按空格首字母大写。 */
+		String readableFallback() {
+			String id = translationKey.substring(translationKey.lastIndexOf('.') + 1);
+			id = id.replace('_', ' ');
+			StringBuilder sb = new StringBuilder(id.length());
+			boolean cap = true;
+			for (int i = 0; i < id.length(); i++) {
+				char c = id.charAt(i);
+				if (c == ' ') {
+					sb.append(c);
+					cap = true;
+				} else if (cap) {
+					sb.append(Character.toUpperCase(c));
+					cap = false;
+				} else {
+					sb.append(c);
+				}
+			}
+			return sb.toString();
 		}
 	}
 
@@ -123,11 +193,14 @@ public class GuideSearchScreen extends Screen {
 	private static final class ResultRow {
 		final int x;
 		final int z;
+		/** 命中的探测高度（方块 Y）；{@link GeoIndexService#NO_Y} 表示未知（该行不显示 Y）。 */
+		final int y;
 		boolean marked;
 
-		ResultRow(int x, int z, boolean marked) {
+		ResultRow(int x, int z, int y, boolean marked) {
 			this.x = x;
 			this.z = z;
+			this.y = y;
 			this.marked = marked;
 		}
 	}
@@ -137,32 +210,95 @@ public class GuideSearchScreen extends Screen {
 		this.dollEntityId = dollEntityId;
 	}
 
-	/** 构造类型列表：仅保留当前维度可搜索的目标（村庄仅主世界）。 */
+	/** 某分类的目标池：直接读官方注册表的<b>全部</b>条目（注册键排序，序号即目标索引，与对端一致）。 */
 	private List<Pickable> buildPickablesFor(int cat) {
-		ResourceKey<Level> dim = Minecraft.getInstance().level.dimension();
-		List<Pickable> list = new ArrayList<>();
-		switch (cat) {
-			case SearchCategory.STRUCTURE -> {
-				for (StructureSearchType t : StructureSearchType.forDimension(dim)) {
-					list.add(new Pickable(SearchCategory.STRUCTURE, t.getIndex(), t.getIcon(), t.translationKey()));
-				}
-			}
-			case SearchCategory.BIOME -> {
-				for (BiomeSearchType t : BiomeSearchType.forDimension(dim)) {
-					list.add(new Pickable(SearchCategory.BIOME, t.getIndex(), t.getIcon(), t.translationKey()));
-				}
-			}
-			case SearchCategory.VILLAGE -> {
-				if (dim.equals(Level.OVERWORLD)) {
-					for (VillageSearchType t : VillageSearchType.all()) {
-						list.add(new Pickable(SearchCategory.VILLAGE, t.getIndex(), t.getIcon(), t.translationKey()));
-					}
-				}
-			}
-			default -> {
+		return switch (cat) {
+			case SearchCategory.STRUCTURE -> registryStructures(false);
+			case SearchCategory.BIOME -> registryBiomes();
+			case SearchCategory.VILLAGE -> registryStructures(true);
+			default -> List.of();
+		};
+	}
+
+	/** 全部生物群系（主世界/下界/末地均列出，所属维度由实际搜索判定）。 */
+	private List<Pickable> registryBiomes() {
+		Registry<Biome> reg = Minecraft.getInstance().level.registryAccess().lookupOrThrow(Registries.BIOME);
+		List<Identifier> ids = new ArrayList<>(reg.keySet());
+		ids.sort(Comparator.comparing(Identifier::toString));
+		List<Pickable> out = new ArrayList<>(ids.size());
+		for (int i = 0; i < ids.size(); i++) {
+			Identifier id = ids.get(i);
+			out.add(new Pickable(SearchCategory.BIOME, i, genericIcon(SearchCategory.BIOME),
+				"biome." + id.getNamespace() + "." + id.getPath()));
+		}
+		return out;
+	}
+
+	/** 全部结构；villageOnly=true 只取村庄类结构（与二级菜单「结构」「村庄」两页一致，避免重复）。
+	 *  结构清单由服务端进服时推送（客户端不加载结构注册表），域名取注册键字符串。 */
+	private List<Pickable> registryStructures(boolean villagesOnly) {
+		List<Identifier> ids = new ArrayList<>();
+		for (String s : DollClientNetworking.getStructureCatalog()) {
+			Identifier id = Identifier.parse(s);
+			if (id.getPath().startsWith("village_") == villagesOnly) {
+				ids.add(id);
 			}
 		}
-		return list;
+		ids.sort(Comparator.comparing(Identifier::toString));
+		List<Pickable> out = new ArrayList<>(ids.size());
+		for (int i = 0; i < ids.size(); i++) {
+			Identifier id = ids.get(i);
+			int cat = villagesOnly ? SearchCategory.VILLAGE : SearchCategory.STRUCTURE;
+			String key = villagesOnly
+				? "village.doll-mod." + id.getPath().substring("village_".length())
+				: "structure." + id.getNamespace() + "." + id.getPath();
+			out.add(new Pickable(cat, i, genericIcon(cat), key));
+		}
+		return out;
+	}
+
+	/** 注册表条目无专属图标，按分类给统一示意图标。 */
+	private static ItemStack genericIcon(int cat) {
+		return new ItemStack(switch (cat) {
+			case SearchCategory.STRUCTURE -> Items.COMPASS;
+			case SearchCategory.VILLAGE -> Items.VILLAGER_SPAWN_EGG;
+			default -> Items.OAK_SAPLING;
+		});
+	}
+
+	/** SEARCH 视图检索池：当前维度三类目标并集。 */
+	private List<Pickable> buildSearchPool() {
+		List<Pickable> pool = new ArrayList<>();
+		pool.addAll(buildPickablesFor(SearchCategory.STRUCTURE));
+		pool.addAll(buildPickablesFor(SearchCategory.BIOME));
+		pool.addAll(buildPickablesFor(SearchCategory.VILLAGE));
+		return pool;
+	}
+
+	/** 依当前关键词筛出匹配目标（中英文均可：比较本地化名与英文 id/文案）。 */
+	private List<Pickable> filterMatches(String query) {
+		if (query == null || query.isBlank()) {
+			return List.of();
+		}
+		String norm = normalize(query);
+		if (norm.isEmpty()) {
+			return List.of();
+		}
+		List<Pickable> out = new ArrayList<>();
+		for (Pickable p : searchPool) {
+			String zh = normalize(p.localizedName());
+			String enId = p.translationKey.substring(p.translationKey.lastIndexOf('.') + 1);
+			String enRead = normalize(p.readableFallback());
+			if (zh.contains(norm) || enId.contains(norm) || enRead.contains(norm)) {
+				out.add(p);
+			}
+		}
+		return out;
+	}
+
+	/** 归一化关键词与目标名（转小写、去空格/下划线），便于中英文/英文 id 模糊匹配。 */
+	private static String normalize(String s) {
+		return s.toLowerCase(Locale.ROOT).replace("_", "").replace(" ", "").replace("-", "");
 	}
 
 	@Override
@@ -170,11 +306,110 @@ public class GuideSearchScreen extends Screen {
 		this.leftPos = (this.width - PANEL_W) / 2;
 		this.topPos = (this.height - PANEL_H) / 2;
 		this.pickByCat = buildPickablesFor(category);
+		this.searchPool = buildSearchPool();
+
+		// 搜索框（自定义深色底由 extractBackground 绘制，EditBox 只画文字/光标/候选）
+		this.searchBox = new EditBox(this.font,
+			searchBoxX() + 1, topPos + 7, searchBoxW() - 1, SEARCH_BOX_H,
+			Component.translatable("gui." + DollModConstants.MOD_ID + ".search_box_hint"));
+		this.searchBox.setBordered(false);
+		this.searchBox.setTextColor(COLOR_NAME);
+		this.searchBox.setTextColorUneditable(COLOR_HINT);
+		this.searchBox.setHint(Component.translatable("gui." + DollModConstants.MOD_ID + ".search_box_hint"));
+		this.searchBox.setMaxLength(32);
+		this.searchBox.setResponder(q -> {
+			this.searchMatches = filterMatches(q);
+			this.searchScroll = 0;
+			this.lastSearchHoverRow = 1;
+		});
+		this.searchBox.setVisible(true);
+		this.searchBox.setCanLoseFocus(true);
+		this.addRenderableWidget(this.searchBox);
+		// 保守策略：打开搜索界面默认不启用搜索栏（无键入光标），由玩家点击后再输入。
+		// 避免自动聚焦在该版本焦点系统下不可靠而出现"光标在闪却打不出字"。
+		blurSearchBox();
+
+		if (view != VIEW_SEARCH) {
+			view = VIEW_SEARCH;
+		}
+		this.resultsReturnView = VIEW_SEARCH;   // 与上面的视图复位保持一致
+		this.searchMatches = filterMatches(this.searchBox.getValue());
+	}
+
+	private int searchBoxX() {
+		return leftPos + MENU_BTN_W + 8;   // 紧跟在最左侧「☰」按钮右侧
+	}
+
+	/** 右上角「全域索引」按钮的 X（与左侧「☰」左右对称）。 */
+	private int indexBtnX() {
+		return leftPos + PANEL_W - 4 - INDEX_BTN_W;
+	}
+
+	/**
+	 * 搜索框宽度：面板右侧要给「全域索引」按钮让位，故比"面板剩余宽度"再减去
+	 * {@code INDEX_BTN_W + 4}。背景（{@code extractBackground}）与控件（{@code init} 的 EditBox）
+	 * 都用它，避免两处各写一份宽度而错位。
+	 */
+	private int searchBoxW() {
+		return PANEL_W - (searchBoxX() - leftPos) - 6 - (INDEX_BTN_W + 4);
 	}
 
 	@Override
 	public boolean isPauseScreen() {
 		return false;
+	}
+
+	/** 
+	 * 重写无参 setInitialFocus 钩子：Screen.init(width,height) 在调用本屏 init() 之后还会调用它，
+	 * 当最后一次输入为键盘时，它可能用 Tab 遍历自动把焦点抢给搜索框（进而出现"光标在闪"）。
+	 * 保守策略要求打开界面时不启用搜索栏，故在合并搜索视图置空实现，阻止其自动聚焦；
+	 * 玩家需要输入时点击搜索框（super.mouseClicked 会负责聚焦）。
+	 */
+	@Override
+	protected void setInitialFocus() {
+		if (view == VIEW_SEARCH) {
+			blurSearchBox();
+		} else {
+			super.setInitialFocus();
+		}
+	}
+
+	/**
+	 * 把焦点从搜索框移开——<b>必须在「容器」层清，而不是只调控件的 {@code setFocused(false)}</b>。
+	 *
+	 * <p>坑：{@code AbstractContainerEventHandler.setFocused(GuiEventListener)} 的实现是
+	 * {@code if (this.focused == target) return;} 先判等——即"目标 == 当前焦点就直接返回，不会
+	 * 再调 {@code target.setFocused(true)}"。若只把控件本身失焦、容器的 {@code focused} 仍指着
+	 * 搜索框，那么之后玩家点击搜索框时，容器分发会调 {@code setFocused(搜索框)}，因判等成立**提前
+	 * 返回**，搜索框再也拿不回焦点——表现就是"点过搜索结果后，搜索栏变成只读、必须退出 GUI 重进
+	 * 才恢复"。这里改为在容器层置空，保证控件与容器两侧焦点始终同步。
+	 */
+	private void blurSearchBox() {
+		this.setFocused(null);
+	}
+
+	/** 切换回 SEARCH 视图（不自动聚焦搜索框，与"点击后再输入"一致）。 */
+	private void focusSearch() {
+		this.view = VIEW_SEARCH;
+		blurSearchBox();
+		this.searchMatches = filterMatches(this.searchBox.getValue());
+		this.searchScroll = 0;
+		this.lastSearchHoverRow = 1;
+	}
+
+	/**
+	 * 结果视图的返回键：回到进入结果前所处的那个视图，而不是一律回整合搜索。
+	 *
+	 * <p>PICK 视图的页签、目标列表与滚动位置在进入结果时并未清空，因此直接切回即可复原；
+	 * SEARCH 视图则需要重算匹配列表，故复用 {@link #focusSearch()}。
+	 */
+	private void returnToResultsOrigin() {
+		if (resultsReturnView == VIEW_PICK) {
+			this.view = VIEW_PICK;
+			blurSearchBox();
+			return;
+		}
+		focusSearch();
 	}
 
 	// ---- 事件 ----
@@ -188,16 +423,22 @@ public class GuideSearchScreen extends Screen {
 
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double hDelta, double vDelta) {
-		if (resultsView) {
+		if (view == VIEW_RESULTS) {
 			int max = rows.size() - RES_ROWS;
 			if (rows.size() > RES_ROWS) {
 				resScroll = Math.max(0, Math.min(max, resScroll + (vDelta > 0 ? -1 : 1)));
 				return true;
 			}
-		} else {
+		} else if (view == VIEW_PICK) {
 			int max = pickByCat.size() - PICK_ROWS;
 			if (pickByCat.size() > PICK_ROWS) {
 				pickScroll = Math.max(0, Math.min(max, pickScroll + (vDelta > 0 ? -1 : 1)));
+				return true;
+			}
+		} else {
+			int max = searchMatches.size() - SEARCH_ROWS;
+			if (searchMatches.size() > SEARCH_ROWS) {
+				searchScroll = Math.max(0, Math.min(max, searchScroll + (vDelta > 0 ? -1 : 1)));
 				return true;
 			}
 		}
@@ -206,46 +447,103 @@ public class GuideSearchScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean bl) {
+		// 焦点同步防御：见 blurSearchBox() 的说明——一旦出现"控件已失焦、容器仍记着它"的不同步，
+		// 容器在本帧分发点击时会因判等提前返回，搜索框就永远点不进去。分发前先清掉这种陈旧焦点。
+		if (this.getFocused() != null && !this.getFocused().isFocused()) {
+			this.setFocused(null);
+		}
 		if (event.button() == 0) {
 			int mx = (int) event.x();
 			int my = (int) event.y();
-			if (resultsView) {
+			if (view == VIEW_RESULTS) {
 				if (handleResultsClick(mx, my)) {
 					return true;
 				}
-			} else {
+			} else if (view == VIEW_PICK) {
 				if (handlePickClick(mx, my)) {
+					return true;
+				}
+			} else {
+				if (handleSearchClick(mx, my)) {
 					return true;
 				}
 			}
 		}
-		// 未命中任何自定义控件：交回给 super 处理
+		// 未命中任何自定义控件：交回给 super 处理（含搜索框聚焦与文字输入）
 		return super.mouseClicked(event, bl);
 	}
 
 	@Override
 	public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
-		// E 键（打开物品栏）关闭搜索面板，与原版容器行为一致
-		if (Minecraft.getInstance().options.keyInventory.matches(event)) {
+		// E 键（打开物品栏）关闭搜索面板，与原版容器行为一致；
+		// 但当搜索框正在输入时按键应交由输入框（输入 e 应录入而非关屏）。
+		if (!this.searchBox.isFocused() && Minecraft.getInstance().options.keyInventory.matches(event)) {
 			this.onClose();
 			return true;
 		}
 		return super.keyPressed(event);
 	}
 
+	// ---- SEARCH 视图点击 ----
+
+	private boolean handleSearchClick(int mx, int my) {
+		// 最左侧「☰」按钮 → 打开二级分类菜单
+		if (isHovering(leftPos + 4, topPos + 6, MENU_BTN_W, MENU_BTN_H, mx, my)) {
+			playClick();
+			view = VIEW_PICK;
+			blurSearchBox();
+			pickScroll = 0;
+			lastPickHoverRow = 1;
+			return true;
+		}
+		// 右上角「全域索引」按钮：空闲/已完成 → 发起构建；构建中 → 取消
+		if (isHovering(indexBtnX(), topPos + 6, INDEX_BTN_W, INDEX_BTN_H, mx, my)) {
+			playClick();
+			if (indexState == IndexBuildProgressPayload.STATE_RUNNING) {
+				DollClientNetworking.sendIndexBuild(dollEntityId, true);
+				// 乐观更新：先置回空闲，等服务端的「已取消」包确认（收到后同样是空闲态）
+				indexState = IndexBuildProgressPayload.STATE_IDLE;
+			} else {
+				DollClientNetworking.sendIndexBuild(dollEntityId, false);
+				indexState = IndexBuildProgressPayload.STATE_RUNNING;
+			}
+			indexPercent = 0;
+			indexPhase = 0;
+			return true;
+		}
+		// 匹配目标行
+		int visible = Math.min(SEARCH_ROWS, searchMatches.size());
+		for (int i = 0; i < visible; i++) {
+			Pickable p = searchMatches.get(searchScroll + i);
+			int ry = topPos + SEARCH_TOP + i * SEARCH_ROW;
+			if (isHovering(leftPos + 4, ry, PANEL_W - 8, SEARCH_ROW - 1, mx, my)) {
+				playClick();
+				startSearch(p);
+				return true;
+			}
+		}
+		return false;
+	}
+
 	// ---- PICK 视图点击 ----
 
 	private boolean handlePickClick(int mx, int my) {
+		// 返回整合搜索视图
+		if (isHovering(leftPos + 6, topPos + 6, 24, 16, mx, my)) {
+			playClick();
+			focusSearch();
+			return true;
+		}
 		// 页签
 		for (int i = 0; i < TAB_CATS.length; i++) {
 			if (isHovering(tabX(i), topPos + 22, tabW(), TAB_H, mx, my)) {
 				playClick();
 				if (category != TAB_CATS[i]) {
-						category = TAB_CATS[i];
-						pickByCat = buildPickablesFor(category);
-						pickScroll = 0;
-						lastPickHoverRow = 1;
-					}
+					category = TAB_CATS[i];
+					pickByCat = buildPickablesFor(category);
+					pickScroll = 0;
+					lastPickHoverRow = 1;
+				}
 				return true;
 			}
 		}
@@ -266,25 +564,25 @@ public class GuideSearchScreen extends Screen {
 	// ---- RESULTS 视图点击 ----
 
 	private boolean handleResultsClick(int mx, int my) {
-		// 返回按钮
+		// 返回按钮 → 原路回退（由筛选进入则回筛选列表，由整合搜索进入则回搜索）
 		if (isHovering(leftPos + 6, topPos + 6, 24, 16, mx, my)) {
 				playClick();
-				resultsView = false;
 				pending = false;
 				rows.clear();
-				lastPickHoverRow = 1;
+				returnToResultsOrigin();
 				return true;
 			}
 		// 刷新按钮：以玩家当前位置为中心强制重新搜索（服务端覆盖缓存）
 		if (isHovering(refreshBtnX(), topPos + 6, REFRESH_BTN_W, REFRESH_BTN_H, mx, my)) {
 			playClick();
 			if (current != null) {
-					this.pending = true;
-					this.rows.clear();
-					this.resScroll = 0;
-					this.lastResHoverRow = 1;
-					DollClientNetworking.sendSearch(dollEntityId, current.category, current.targetIndex, true);
-				}
+						this.pending = true;
+						this.rows.clear();
+						this.notInDimension = false;
+						this.resScroll = 0;
+						this.lastResHoverRow = 1;
+						DollClientNetworking.sendSearch(dollEntityId, current.category, current.targetIndex, true);
+					}
 			return true;
 		}
 		int visible = Math.min(RES_ROWS, rows.size());
@@ -308,9 +606,12 @@ public class GuideSearchScreen extends Screen {
 		this.current = p;
 		this.pending = true;
 		this.rows.clear();
+		this.notInDimension = false;
 		this.resScroll = 0;
 		this.lastResHoverRow = 1;
-		this.resultsView = true;
+		this.resultsReturnView = this.view;   // 记下来路：SEARCH 或 PICK
+		this.view = VIEW_RESULTS;
+		blurSearchBox();
 		// refresh=false：服务端有缓存时直接回放上次结果，不重复搜索
 		DollClientNetworking.sendSearch(dollEntityId, p.category, p.targetIndex, false);
 	}
@@ -324,11 +625,40 @@ public class GuideSearchScreen extends Screen {
 		}
 		this.rows.clear();
 		for (SearchResultsPayload.Entry e : payload.results()) {
-			this.rows.add(new ResultRow(e.x(), e.z(), e.marked()));
+			this.rows.add(new ResultRow(e.x(), e.z(), e.y(), e.marked()));
 		}
+		this.notInDimension = payload.notInDimension();
 		this.pending = false;
 		this.resScroll = 0;
 		this.lastResHoverRow = 1;
+	}
+
+	/**
+	 * 「全域索引」进度回调（由 DollClientNetworking 路由进来）。
+	 *
+	 * <p>「已取消」与「空闲」在界面上是同一个样子（都是"可以点它开始建"），故此处把前者<b>归一成空闲态</b>
+	 * ——否则按钮会停在"构建中"再也点不动。
+	 */
+	public void receiveIndexProgress(IndexBuildProgressPayload payload) {
+		this.indexPercent = payload.percent();
+		this.indexPhase = payload.phase();
+		this.indexState = payload.state() == IndexBuildProgressPayload.STATE_CANCELLED
+			? IndexBuildProgressPayload.STATE_IDLE
+			: payload.state();
+	}
+
+	/**
+	 * 当前构建阶段对应的翻译键后缀（用于进度提示里的阶段名）。
+	 * 阶段编号与服务端 {@code GeoIndexBuildJob.PHASE_*} 一一对应：0=结构 1=村庄 2=群系 3=村庄预确认。
+	 */
+	private String indexPhaseKey() {
+		if (indexPhase >= 3) {
+			return "index_phase_confirm";
+		}
+		if (indexPhase == 2) {
+			return "index_phase_biome";
+		}
+		return indexPhase == 1 ? "index_phase_village" : "index_phase_structure";
 	}
 
 	// ---- 渲染 ----
@@ -341,24 +671,149 @@ public class GuideSearchScreen extends Screen {
 		g.fill(leftPos, topPos, leftPos + 1, topPos + PANEL_H, COLOR_PANEL_EDGE);
 		g.fill(leftPos + PANEL_W - 1, topPos, leftPos + PANEL_W, topPos + PANEL_H, COLOR_PANEL_EDGE);
 		g.fill(leftPos, topPos + PANEL_H - 1, leftPos + PANEL_W, topPos + PANEL_H, COLOR_PANEL_EDGE);
+
+		// 最左侧「☰」按钮底（仅 SEARCH 视图；PICK/RESULTS 视图该位置为「返回」按钮，二者互斥避免叠加）
+		if (view == VIEW_SEARCH) {
+			int bmX = leftPos + 4;
+			boolean mHover = isHovering(bmX, topPos + 6, MENU_BTN_W, MENU_BTN_H, lastMouseX, lastMouseY);
+			g.fill(bmX, topPos + 6, bmX + MENU_BTN_W, topPos + 6 + MENU_BTN_H, mHover ? COLOR_ROW_HOVER : COLOR_ROW_BG);
+			g.fill(bmX, topPos + 6, bmX + MENU_BTN_W, topPos + 7, COLOR_EDGE_LIGHT);
+			g.fill(bmX, topPos + 6, bmX + 1, topPos + 6 + MENU_BTN_H, COLOR_EDGE_LIGHT);
+			g.fill(bmX + MENU_BTN_W - 1, topPos + 6, bmX + MENU_BTN_W, topPos + 6 + MENU_BTN_H, COLOR_EDGE_DARK);
+			g.fill(bmX, topPos + 6 + MENU_BTN_H - 1, bmX + MENU_BTN_W, topPos + 6 + MENU_BTN_H, COLOR_EDGE_DARK);
+		}
+
+		// 搜索框底（仅 SEARCH 视图：自定义深色输入框底）
+		if (view == VIEW_SEARCH) {
+			int sx = searchBoxX();
+			int sy = topPos + 6;
+			int sw = searchBoxW();
+			g.fill(sx, sy, sx + sw, sy + SEARCH_BOX_H, COLOR_ROW_BG);
+			g.fill(sx, sy, sx + sw, sy + 1, COLOR_EDGE_LIGHT);
+			g.fill(sx, sy, sx + 1, sy + SEARCH_BOX_H, COLOR_EDGE_LIGHT);
+			g.fill(sx + sw - 1, sy, sx + sw, sy + SEARCH_BOX_H, COLOR_EDGE_DARK);
+			g.fill(sx, sy + SEARCH_BOX_H - 1, sx + sw, sy + SEARCH_BOX_H, COLOR_EDGE_DARK);
+		}
 	}
 
 	@Override
 	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
+		this.searchBox.setVisible(view == VIEW_SEARCH);
 		super.extractRenderState(g, mouseX, mouseY, partialTick);
-		if (resultsView) {
+		if (view == VIEW_RESULTS) {
 			if (current == null) {
-				resultsView = false;   // 防御：无常驻目标则回类型选择
+				view = VIEW_SEARCH;   // 防御：无常驻目标则回整合搜索
 				return;
 			}
 			renderResults(g);
-		} else {
+		} else if (view == VIEW_PICK) {
 			renderPick(g);
+		} else {
+			renderSearch(g);
+		}
+	}
+
+	private void renderSearch(GuiGraphicsExtractor g) {
+		// 最左侧「☰」按钮符号
+		g.centeredText(this.font, "☰", leftPos + 4 + MENU_BTN_W / 2, topPos + 6 + 4, COLOR_NAME);
+		if (isHovering(leftPos + 4, topPos + 6, MENU_BTN_W, MENU_BTN_H, lastMouseX, lastMouseY)) {
+			g.setTooltipForNextFrame(this.font,
+				Component.translatable("gui." + DollModConstants.MOD_ID + ".category_menu"),
+				(int) lastMouseX, (int) lastMouseY);
+		}
+
+		// 右上角「全域索引」按钮：空闲→发起；构建中→显示百分比且可点取消；已完成→显示「已建立」
+		// （放在"关键词为空则只剩提示"的早退之前——否则刚进界面还没输入时按钮不会画出来）
+		int ibx = indexBtnX();
+		boolean ibHover = isHovering(ibx, topPos + 6, INDEX_BTN_W, INDEX_BTN_H, lastMouseX, lastMouseY);
+		boolean ibRunning = indexState == IndexBuildProgressPayload.STATE_RUNNING;
+		boolean ibDone = indexState == IndexBuildProgressPayload.STATE_DONE;
+		g.fill(ibx, topPos + 6, ibx + INDEX_BTN_W, topPos + 6 + INDEX_BTN_H,
+			ibDone ? 0xFF2A5A2A : (ibHover ? COLOR_ROW_HOVER : COLOR_ROW_BG));
+		if (ibRunning) {
+			// 进度填充：从左往右，宽度按百分比
+			int pw = Math.max(0, Math.min(INDEX_BTN_W - 2, (INDEX_BTN_W - 2) * indexPercent / 100));
+			g.fill(ibx + 1, topPos + 7, ibx + 1 + pw, topPos + 6 + INDEX_BTN_H - 1, 0xFF2F4A6B);
+		}
+		g.fill(ibx, topPos + 6, ibx + INDEX_BTN_W, topPos + 7, COLOR_EDGE_LIGHT);
+		g.fill(ibx, topPos + 6, ibx + 1, topPos + 6 + INDEX_BTN_H, COLOR_EDGE_LIGHT);
+		g.fill(ibx + INDEX_BTN_W - 1, topPos + 6, ibx + INDEX_BTN_W, topPos + 6 + INDEX_BTN_H, COLOR_EDGE_DARK);
+		g.fill(ibx, topPos + 6 + INDEX_BTN_H - 1, ibx + INDEX_BTN_W, topPos + 6 + INDEX_BTN_H, COLOR_EDGE_DARK);
+		String ibLabel;
+		if (ibRunning) {
+			ibLabel = indexPercent + "%";
+		} else if (ibDone) {
+			ibLabel = Component.translatable("gui." + DollModConstants.MOD_ID + ".index_build_done").getString();
+		} else {
+			ibLabel = Component.translatable("gui." + DollModConstants.MOD_ID + ".index_build_button").getString();
+		}
+		g.centeredText(this.font, ibLabel, ibx + INDEX_BTN_W / 2, topPos + 10, COLOR_NAME);
+		if (ibHover) {
+			if (ibRunning) {
+				// 进度提示带上「当前阶段」：光一个百分比玩家不知道在等什么
+				g.setTooltipForNextFrame(this.font,
+					Component.translatable("gui." + DollModConstants.MOD_ID + ".index_build_cancel_hint",
+						Component.translatable("gui." + DollModConstants.MOD_ID + "." + indexPhaseKey())),
+					(int) lastMouseX, (int) lastMouseY);
+			} else {
+				String tip = ibDone ? "index_build_rebuild_hint" : "index_build_hint";
+				g.setTooltipForNextFrame(this.font,
+					Component.translatable("gui." + DollModConstants.MOD_ID + "." + tip),
+					(int) lastMouseX, (int) lastMouseY);
+			}
+		}
+
+		// 初始为空（无关键词）时仅提示
+		String query = this.searchBox.getValue();
+		if (query == null || query.isBlank()) {
+			g.centeredText(this.font,
+				Component.translatable("gui." + DollModConstants.MOD_ID + ".search_default_hint"),
+				leftPos + PANEL_W / 2, topPos + PANEL_H / 2, COLOR_HINT);
+			return;
+		}
+		if (searchMatches.isEmpty()) {
+			g.centeredText(this.font,
+				Component.translatable("gui." + DollModConstants.MOD_ID + ".search_no_match"),
+				leftPos + PANEL_W / 2, topPos + PANEL_H / 2, COLOR_HINT);
+			return;
+		}
+		int visible = Math.min(SEARCH_ROWS, searchMatches.size());
+		for (int i = 0; i < visible; i++) {
+			Pickable p = searchMatches.get(searchScroll + i);
+			int ry = topPos + SEARCH_TOP + i * SEARCH_ROW;
+			boolean hover = isHovering(leftPos + 4, ry, PANEL_W - 8, SEARCH_ROW - 1, lastMouseX, lastMouseY);
+			g.fill(leftPos + 2, ry, leftPos + PANEL_W - 2, ry + SEARCH_ROW - 1, hover ? COLOR_ROW_HOVER : COLOR_ROW_BG);
+			g.item(p.icon, leftPos + 10, ry + 4);
+			g.text(this.font, p.localizedName(), leftPos + 32, ry + 7, COLOR_NAME, true);
+			// 右下角类别标识
+			String cat = tabLabelFor(p.category);
+			int catW = this.font.width(cat);
+			g.text(this.font, cat, leftPos + PANEL_W - 8 - catW, ry + 7, COLOR_HINT, true);
+			if (hover) {
+				lastSearchHoverRow = searchScroll + i + 1;
+				g.setTooltipForNextFrame(this.font,
+					Component.translatable("gui." + DollModConstants.MOD_ID + ".search_pick_hint"),
+					(int) lastMouseX, (int) lastMouseY);
+			}
+		}
+		if (searchMatches.size() > SEARCH_ROWS) {
+			int curRow = Math.min(lastSearchHoverRow, searchMatches.size());
+			String info = curRow + "/" + searchMatches.size();
+			g.text(this.font, info, leftPos + PANEL_W - 8 - this.font.width(info), topPos + SEARCH_TOP + SEARCH_ROWS * SEARCH_ROW + 8,
+				COLOR_HINT, true);
 		}
 	}
 
 	private void renderPick(GuiGraphicsExtractor g) {
-		// 标题
+		// 返回整合搜索按钮
+		boolean backHover = isHovering(leftPos + 6, topPos + 6, 24, 16, lastMouseX, lastMouseY);
+		g.fill(leftPos + 6, topPos + 6, leftPos + 30, topPos + 22, backHover ? COLOR_ROW_HOVER : COLOR_ROW_BG);
+		g.fill(leftPos + 6, topPos + 6, leftPos + 30, topPos + 7, COLOR_EDGE_LIGHT);
+		g.fill(leftPos + 6, topPos + 6, leftPos + 7, topPos + 22, COLOR_EDGE_LIGHT);
+		g.fill(leftPos + 29, topPos + 6, leftPos + 30, topPos + 22, COLOR_EDGE_DARK);
+		g.fill(leftPos + 6, topPos + 21, leftPos + 30, topPos + 22, COLOR_EDGE_DARK);
+		g.centeredText(this.font, "◀", leftPos + 18, topPos + 10, COLOR_NAME);
+		// 分类标题
 		g.centeredText(this.font, Component.translatable("screen." + DollModConstants.MOD_ID + ".guide_search"),
 			leftPos + PANEL_W / 2, topPos + 12, COLOR_NAME);
 		// 页签
@@ -404,7 +859,7 @@ public class GuideSearchScreen extends Screen {
 	}
 
 	private void renderResults(GuiGraphicsExtractor g) {
-		// 返回按钮
+		// 返回整合搜索按钮
 		boolean backHover = isHovering(leftPos + 6, topPos + 6, 24, 16, lastMouseX, lastMouseY);
 		g.fill(leftPos + 6, topPos + 6, leftPos + 30, topPos + 22, backHover ? COLOR_ROW_HOVER : COLOR_ROW_BG);
 		g.fill(leftPos + 6, topPos + 6, leftPos + 30, topPos + 7, COLOR_EDGE_LIGHT);
@@ -430,13 +885,31 @@ public class GuideSearchScreen extends Screen {
 				(int) lastMouseX, (int) lastMouseY);
 		}
 
+		// 进入等待态的那一帧记录起始时刻——单点维护，免得三处发起搜索的地方各写一遍、漏一处就显示错。
+		if (pending && !pendingPrev) {
+			pendingSinceMs = System.currentTimeMillis();
+		}
+		pendingPrev = pending;
 		if (pending) {
-			g.centeredText(this.font, Component.translatable("gui." + DollModConstants.MOD_ID + ".search_pending"),
-				leftPos + PANEL_W / 2, topPos + PANEL_H / 2, COLOR_HINT);
+			long waitedSec = Math.max(0L, System.currentTimeMillis() - pendingSinceMs) / 1000L;
+			// 秒数会跳动 → 界面不会像卡死；超过 2 秒再补一行说明。
+			// （结构/村庄的首次搜索要在服务端做「生成校验」，可能持续数秒；实测平原村庄约 6 秒。群系没有这层，不提示。）
+			Component waitLine = waitedSec >= 2L
+				? Component.translatable("gui." + DollModConstants.MOD_ID + ".search_pending_slow", waitedSec)
+				: Component.translatable("gui." + DollModConstants.MOD_ID + ".search_pending");
+			g.centeredText(this.font, waitLine, leftPos + PANEL_W / 2, topPos + PANEL_H / 2, COLOR_HINT);
+			if (waitedSec >= 2L && current != null && current.category != SearchCategory.BIOME) {
+				g.centeredText(this.font,
+					Component.translatable("gui." + DollModConstants.MOD_ID + ".search_verifying_hint"),
+					leftPos + PANEL_W / 2, topPos + PANEL_H / 2 + 14, COLOR_HINT);
+			}
 			return;
 		}
 		if (rows.isEmpty()) {
-			g.centeredText(this.font, Component.translatable("gui." + DollModConstants.MOD_ID + ".search_no_result"),
+			// 目标在当前维度不可能存在 → 提示「该维度不存在此结构或群系」；
+			// 否则（存在但搜索范围内未搜到）→ 显示「搜索范围内未找到目标」。
+			String key = notInDimension ? "search_not_in_dim" : "search_no_result";
+			g.centeredText(this.font, Component.translatable("gui." + DollModConstants.MOD_ID + "." + key),
 				leftPos + PANEL_W / 2, topPos + PANEL_H / 2, COLOR_HINT);
 			return;
 		}
@@ -455,8 +928,11 @@ public class GuideSearchScreen extends Screen {
 			g.item(current.icon, leftPos + 8, ry + 5);
 			String name = current.localizedName();
 			g.text(this.font, name, leftPos + 30, ry + 4, COLOR_NAME, true);
-			// 坐标（第二行）
-			String coord = Component.translatable("gui." + DollModConstants.MOD_ID + ".search_coord", r.x, r.z).getString();
+			// 坐标（第二行）：群系搜索额外带出「命中的探测高度 Y」——同一 (x,z) 列的地表与地下
+			// 可能是不同群系，没有 Y 玩家不知道该挖到/爬到哪一层；结构/村庄无可靠 Y，按原样只显示 X,Z。
+			String coord = (r.y != GeoIndexService.NO_Y)
+				? Component.translatable("gui." + DollModConstants.MOD_ID + ".search_coord_y", r.x, r.z, r.y).getString()
+				: Component.translatable("gui." + DollModConstants.MOD_ID + ".search_coord", r.x, r.z).getString();
 			g.text(this.font, coord, leftPos + 30, ry + 15, COLOR_COORD, true);
 			// 水平距离（第一行右侧）
 			long dist = longDistSq(px, pz, r.x, r.z);
@@ -498,6 +974,15 @@ public class GuideSearchScreen extends Screen {
 
 	private String tabLabel(int i) {
 		String key = switch (TAB_CATS[i]) {
+			case SearchCategory.STRUCTURE -> "cat_structure";
+			case SearchCategory.BIOME -> "cat_biome";
+			default -> "cat_village";
+		};
+		return Component.translatable("gui." + DollModConstants.MOD_ID + "." + key).getString();
+	}
+
+	private String tabLabelFor(int cat) {
+		String key = switch (cat) {
 			case SearchCategory.STRUCTURE -> "cat_structure";
 			case SearchCategory.BIOME -> "cat_biome";
 			default -> "cat_village";

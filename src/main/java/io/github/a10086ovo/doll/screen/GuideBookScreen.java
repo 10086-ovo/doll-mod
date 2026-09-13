@@ -84,6 +84,9 @@ public class GuideBookScreen extends Screen {
 	private int selectedCategory = -1;   // -1 = 首页
 	private int selectedEntry = -1;      // -1 = 条目列表
 	private int currentPage = 0;
+	/** 正文页滚动行偏移（正文超出可视高度时的滚轮滚动；切换条目/页码时自动归零） */
+	private int entryTextScroll = 0;
+	private String entryTextKey = "";    // 上次滚动的「条目:页码:语言」键，变更即归零 offset
 	// ---- 条目列表滚动 ----
 	private int entryScrollOffset = 0;
 	private boolean scrollbarDragging = false;
@@ -96,20 +99,28 @@ public class GuideBookScreen extends Screen {
 	private int footerY;
 	private double lastMouseX, lastMouseY;
 
-	// ---- Tips 轮换 ----
+	// ---- 底部冷知识（每次打开书随机显示一条）----
 		private static final String[] TIPS_CN = {
-			"人偶的坐标搜索在工作线程中执行，多人同服也不卡",
-			"野生幽匿人偶的出场动画是纯代码手写的缓动曲线",
-			"本模组代码 100% 由 AI 完成"
+			"人偶是消耗品：死亡会连同背包与配置一起丢失，贵重装备记得先右键回收",
+			"任意人偶副手装备荆棘盾，就能把受到的伤害 100% 反弹给攻击者",
+			"手持绑定过人偶的召唤蛋再次右键地面，可把人偶远程召回到你身边",
+			"潮汐护腿：下落时按住 Shift 蹲下，脚下会涌出水垫，陆地摔落也能免伤",
+			"向导的登山镐：你手持时（主手或副手）即可平滑翻越一格高的方块",
+			"盾构机掘进遇到水或悬崖会自动停下，不会带着人偶一起冲进去"
 		};
 		private static final String[] TIPS_EN = {
-			"Coordinate search runs in a worker thread — no lag on multiplayer servers.",
-			"The Wild Warden Doll's emergence animation uses hand-coded easing curves.",
-			"100% of this mod's code was written by AI."
+			"Dolls are consumable: death wipes their inventory and setup — right-click to recycle the valuable ones first.",
+			"Any doll with a Thorns Shield in its off-hand reflects 100% of the damage it takes back at the attacker.",
+			"Hold a spawn egg bound to a doll and right-click the ground to recall it to your side from afar.",
+			"Tidal Leggings: hold Shift while falling to conjure a water cushion underfoot — no fall damage on land either.",
+			"Guide's Pickaxe: just hold it (main or off hand) to smoothly step up one-block ledges.",
+			"The tunnel drill halts on its own at water or cliffs — it won't drag your doll in."
 		};
 		private String[] TIPS = TIPS_CN;
 		private String currentTip = TIPS_CN[0];
 		private int lastTipIndex = -1;
+		/** 当前界面语言是否为中文（用字段记录，避免依赖 TIPS == TIPS_CN 的引用相等）。 */
+		private boolean zh;
 
 	// ---- 渲染缓存（避免每帧分配对象，init 时清空）----
 	private final Map<String, ItemStack> iconCache = new HashMap<>();
@@ -119,6 +130,7 @@ public class GuideBookScreen extends Screen {
 			super(Component.literal("Doll Guide Book"));
 			String lang = net.minecraft.client.Minecraft.getInstance().getLanguageManager().getSelected();
 			boolean isZh = "zh_cn".equals(lang) || "zh_tw".equals(lang) || "zh_hk".equals(lang);
+			this.zh = isZh;
 			TIPS = isZh ? TIPS_CN : TIPS_EN;
 			pickRandomTip();
 		}
@@ -147,6 +159,8 @@ public class GuideBookScreen extends Screen {
 		// 重新打开时重置滚动
 		this.entryScrollOffset = 0;
 		this.scrollbarDragging = false;
+		this.entryTextScroll = 0;
+		this.entryTextKey = "";
 		// 清空渲染缓存（内容可能在资源重载后变化）
 		this.iconCache.clear();
 		this.wrapCache.clear();
@@ -162,6 +176,14 @@ public class GuideBookScreen extends Screen {
 			if (maxOffset > 0) {
 				int delta = vDelta > 0 ? -1 : 1;
 				entryScrollOffset = Math.clamp(entryScrollOffset + delta, 0, maxOffset);
+				return true;
+			}
+		}
+		// 正文页：超长文本滚轮滚动（与条目列表互斥，selectedEntry >= 0 时必不在列表视图）
+		if (selectedEntry >= 0) {
+			int max = entryTextMaxOffset();
+			if (max > 0) {
+				entryTextScroll = Math.clamp(entryTextScroll + (vDelta > 0 ? -1 : 1), 0, max);
 				return true;
 			}
 		}
@@ -195,9 +217,18 @@ public class GuideBookScreen extends Screen {
 		return super.mouseDragged(event, dragX, dragY);
 	}
 
-	/** 条目列表可见行数 */
+	/**
+	 * 条目列表可见行数。
+	 * 必须按「列表实际起首」动态计算：标题/描述换行行数越多，列表起首越靠下，
+	 * 旧的固定预算 (contentH - 30) 会把最后一行（连同滚动条）顶出内容区下边框
+	 * ——英文分类描述换 3 行时必现（中文紧凑一行时看不出来，属潜伏 bug）。
+	 */
 	private int getVisibleEntryRows() {
-		return Math.max(1, (contentH - 30) / ENTRY_ROW_H);
+		if (book == null) {
+			return Math.max(1, (contentH - 30) / ENTRY_ROW_H);
+		}
+		int bottom = contentY + contentH - 2;
+		return Math.max(1, (bottom - getEntryListStartY()) / ENTRY_ROW_H);
 	}
 
 	/** 条目列表起始 Y（标题与描述多行后之实际起首；渲染与判定共用同一计算，防阴阳错位） */
@@ -408,7 +439,7 @@ public class GuideBookScreen extends Screen {
 	public void extractRenderState(GuiGraphicsExtractor g, int mouseX, int mouseY, float partialTick) {
 		super.extractRenderState(g, mouseX, mouseY, partialTick);
 		if (book == null) {
-			String err = (TIPS == TIPS_CN) ? "[指南书加载失败]" : "[Guide book failed to load]";
+			String err = zh ? "[指南书加载失败]" : "[Guide book failed to load]";
 			g.centeredText(this.font, err, leftPos + PANEL_W / 2, topPos + PANEL_H / 2, 0xFFFF5555);
 			return;
 		}
@@ -479,7 +510,7 @@ public class GuideBookScreen extends Screen {
 
 			// 欢迎文字（一句话概括 + 提示）
 			String landing = book.landingText.isEmpty()
-				? (TIPS == TIPS_CN ? "右键任意人偶开始你的旅程。" : "Right-click any doll to begin your journey.") : book.landingText;
+				? (zh ? "右键任意人偶开始你的旅程。" : "Right-click any doll to begin your journey.") : book.landingText;
 			String[] parts = landing.split("\n", 2);
 			String summary = parts[0];
 			String hint = parts.length > 1 ? parts[1] : "";
@@ -550,7 +581,7 @@ public class GuideBookScreen extends Screen {
 			// 页数指示
 			int pageCount = entry.pages.size();
 			if (pageCount > 1) {
-				String pages = (TIPS == TIPS_CN) ? pageCount + " 页" : pageCount + " pages";
+				String pages = zh ? pageCount + " 页" : pageCount + " pages";
 				int pagesW = this.font.width(pages);
 				g.text(this.font, pages, contentX + rowWidth - 8 - pagesW, rowY + 7, C_HINT, true);
 			}
@@ -594,6 +625,12 @@ public class GuideBookScreen extends Screen {
 			currentPage = 0;
 		}
 		GuidePage page = entry.pages.get(currentPage);
+		// 条目/页码/语言任一变化即归零正文滚动（自愈式，免去追所有 mutation 点）
+		String textKey = selectedEntry + ":" + currentPage + ":" + (zh ? 1 : 0);
+		if (!textKey.equals(entryTextKey)) {
+			entryTextKey = textKey;
+			entryTextScroll = 0;
+		}
 
 		// 页面副标题已删，正文自内容区顶部偏下起
 		int bodyY = contentY + 10;
@@ -601,7 +638,7 @@ public class GuideBookScreen extends Screen {
 			case "text" -> renderTextPage(g, page, bodyY);
 			case "item" -> renderItemPage(g, page, bodyY);
 			case "crafting" -> renderCraftingPage(g, entry, page, bodyY);
-			default -> g.text(this.font, (TIPS == TIPS_CN) ? "[未知页面类型: " + page.type + "]" : "[Unknown page type: " + page.type + "]", contentX + 8, bodyY, 0xFFFF5555, true);
+			default -> g.text(this.font, zh ? "[未知页面类型: " + page.type + "]" : "[Unknown page type: " + page.type + "]", contentX + 8, bodyY, 0xFFFF5555, true);
 		}
 
 		// 页码
@@ -610,13 +647,65 @@ public class GuideBookScreen extends Screen {
 		g.centeredText(this.font, pageInfo, contentX + contentW / 2, pageY, C_HINT);
 	}
 
-	private void renderTextPage(GuiGraphicsExtractor g, GuidePage page, int startY) {
-		List<String> lines = wrapText(page.text, contentW - 16);
+	/** 正文可用底边：页码行之上 */
+	private int entryTextBottom() {
+		return contentY + contentH - 18;
+	}
+
+	/** 正文换行宽度：右缘让出滚动条轨道，避免长行被滚动条压住 */
+	private int bodyWrapWidth() {
+		return contentW - 16 - SCROLLBAR_W;
+	}
+
+	/**
+	 * 正文统一绘制（带滚动条机制）：换行后的行数超出可视高度时只画可视部分，
+	 * 右缘画细滚动条，滚轮滚动（见 mouseScrolled）。
+	 * 修复英文长文按行画到底、直接画穿下边框压住翻页按钮的问题（中文行数少恰好装下，属潜伏 bug）。
+	 */
+	private void renderBodyLines(GuiGraphicsExtractor g, List<String> lines, int startY) {
+		int lineH = this.font.lineHeight + 1;
+		int bottom = entryTextBottom();
+		int visible = Math.max(1, (bottom - startY) / lineH);
+		int maxOffset = Math.max(0, lines.size() - visible);
+		if (entryTextScroll > maxOffset) entryTextScroll = maxOffset;
+		if (entryTextScroll < 0) entryTextScroll = 0;
 		int y = startY;
-		for (String line : lines) {
-			g.text(this.font, line, contentX + 8, y, C_BODY, true);
-			y += this.font.lineHeight + 1;
+		for (int i = entryTextScroll; i < lines.size() && i < entryTextScroll + visible; i++) {
+			g.text(this.font, lines.get(i), contentX + 8, y, C_BODY, true);
+			y += lineH;
 		}
+		if (maxOffset > 0) {
+			int sbX = contentX + contentW - SCROLLBAR_W - 1;
+			int trackH = bottom - startY;
+			g.fill(sbX, startY, sbX + SCROLLBAR_W, startY + trackH, 0xFF0A090D);
+			int thumbH = Math.max(12, trackH * visible / lines.size());
+			int thumbTop = startY + (int) ((float) entryTextScroll / maxOffset * (trackH - thumbH));
+			g.fill(sbX, thumbTop, sbX + SCROLLBAR_W, thumbTop + thumbH, C_GOLD);
+		}
+	}
+
+	/** 当前正文页的滚动行数上限（0 = 无需滚动）；与渲染共用同一几何，防阴阳错位 */
+	private int entryTextMaxOffset() {
+		if (book == null || selectedEntry < 0) return 0;
+		var entries = book.categories.get(selectedCategory).entries;
+		if (currentPage >= entries.get(selectedEntry).pages.size()) return 0;
+		GuidePage page = entries.get(selectedEntry).pages.get(currentPage);
+		if (page.text == null || page.text.isEmpty()) return 0;
+		int startY;
+		String type = page.type.toLowerCase(java.util.Locale.ROOT);
+		switch (type) {
+			case "item" -> startY = contentY + 10 + 22;
+			case "crafting" -> startY = contentY + 10 + 3 * 18 + 8;
+			default -> startY = contentY + 10;
+		}
+		int lineH = this.font.lineHeight + 1;
+		int visible = Math.max(1, (entryTextBottom() - startY) / lineH);
+		return Math.max(0, wrapText(page.text, bodyWrapWidth()).size() - visible);
+	}
+
+	private void renderTextPage(GuiGraphicsExtractor g, GuidePage page, int startY) {
+		renderBodyLines(g, page.text == null || page.text.isEmpty()
+			? List.of() : wrapText(page.text, bodyWrapWidth()), startY);
 	}
 
 	private void renderItemPage(GuiGraphicsExtractor g, GuidePage page, int startY) {
@@ -625,13 +714,9 @@ public class GuideBookScreen extends Screen {
 		int iconX = contentX + contentW / 2 - 8;
 		g.item(icon, iconX, startY);
 
-		// 描述（副标题栏已尽去，正文自图标下方直接起）
-		List<String> lines = wrapText(page.text, contentW - 16);
-		int y = startY + 22;
-		for (String line : lines) {
-			g.text(this.font, line, contentX + 8, y, C_BODY, true);
-			y += this.font.lineHeight + 1;
-		}
+		// 描述（副标题栏已尽去，正文自图标下方直接起；超长走滚动条）
+		renderBodyLines(g, page.text == null || page.text.isEmpty()
+			? List.of() : wrapText(page.text, bodyWrapWidth()), startY + 22);
 	}
 
 		private void renderCraftingPage(GuiGraphicsExtractor g, GuideEntry entry, GuidePage page, int startY) {
@@ -673,15 +758,10 @@ public class GuideBookScreen extends Screen {
 			g.item(resultStack, resultX + 1, resultY + 1);
 		}
 
-		// 描述
+		// 描述（超长走滚动条）
 		if (page.text != null && !page.text.isEmpty()) {
-				List<String> lines = wrapText(page.text, contentW - 16);
-				int y = gridY + 3 * 18 + 8;
-				for (String line : lines) {
-					g.text(this.font, line, contentX + 8, y, C_BODY, true);
-					y += this.font.lineHeight + 1;
-				}
-			}
+			renderBodyLines(g, wrapText(page.text, bodyWrapWidth()), gridY + 3 * 18 + 8);
+		}
 	}
 
 	// ---- 底栏 ----
@@ -690,7 +770,7 @@ public class GuideBookScreen extends Screen {
 		if (selectedEntry < 0) {
 			// 底部温馨提示：自动换行完整显示，全文毕显无遗，不复截断
 			int maxW = PANEL_W - 16;
-			String prefix = (TIPS == TIPS_CN) ? "你知道吗？ " : "Do U know? ";
+			String prefix = zh ? "你知道吗？ " : "Did You Know? ";
 			List<String> tipLines = wrapText(prefix + currentTip, maxW);
 			if (tipLines.size() > 3) tipLines = tipLines.subList(0, 3); // 兜底
 			int tipH = tipLines.size() * this.font.lineHeight;
@@ -706,16 +786,16 @@ public class GuideBookScreen extends Screen {
 
 		// 上一页按钮
 			boolean prevEnabled = currentPage > 0;
-			String prevLabel = (TIPS == TIPS_CN) ? "< 上一页" : "< Prev";
+			String prevLabel = zh ? "< 上一页" : "< Prev";
 			drawButton(g, leftPos + 8, footerY + 4, 60, 16, prevLabel, prevEnabled);
 
 		// 返回按钮
-			String backLabel = (TIPS == TIPS_CN) ? "返回" : "Back";
+			String backLabel = zh ? "返回" : "Back";
 			drawButton(g, leftPos + PANEL_W / 2 - 24, footerY + 4, 48, 16, backLabel, true);
 
 			// 下一页按钮
 			boolean nextEnabled = currentPage < entry.pages.size() - 1;
-			String nextLabel = (TIPS == TIPS_CN) ? "下一页 >" : "Next >";
+			String nextLabel = zh ? "下一页 >" : "Next >";
 			drawButton(g, leftPos + PANEL_W - 68, footerY + 4, 60, 16, nextLabel, nextEnabled);
 		}
 

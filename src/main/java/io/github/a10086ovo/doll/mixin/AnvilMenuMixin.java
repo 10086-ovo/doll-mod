@@ -36,9 +36,11 @@ public class AnvilMenuMixin {
 	/**
 	 * 跳过原版 onTake 里对石砧的“随机 12% 损伤”处理，避免和上面的确定性计数叠加。
 	 * 创造模式下不取消，让原版照常播放音效（且不消耗）。
+	 * <p>⚠ Forge 侧签名差异：Forge 补丁在 onTake 里插入了 ForgeEventFactory.onAnvilRepair(...)，
+	 * 把 AnvilRepairEvent.getBreakChance()（float）捕获进 lambda，故目标描述符比 Fabric 侧多一个 F。
 	 */
-	@Inject(method = "lambda$onTake$0(Lnet/minecraft/world/entity/player/Player;Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;)V", at = @At("HEAD"), cancellable = true)
-	private static void dollMod$skipVanillaRockAnvilDamage(Player player, Level level, BlockPos pos, CallbackInfo ci) {
+	@Inject(method = "lambda$onTake$0(Lnet/minecraft/world/entity/player/Player;FLnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;)V", at = @At("HEAD"), cancellable = true)
+	private static void dollMod$skipVanillaRockAnvilDamage(Player player, float breakChance, Level level, BlockPos pos, CallbackInfo ci) {
 		if (player.hasInfiniteMaterials()) return;
 		BlockState state = level.getBlockState(pos);
 		if (state.getBlock() instanceof RockAnvilBlock) {

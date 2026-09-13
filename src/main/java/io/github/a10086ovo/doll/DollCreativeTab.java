@@ -55,6 +55,7 @@ public class DollCreativeTab {
 			output.accept(DollMod.GUIDE_DOLL_EGG);
 			output.accept(DollMod.GUIDE_DOLL_HEAD);
 			output.accept(DollMod.GUIDE_BOOK_ITEM);
+			output.accept(DollMod.GUIDE_PICKAXE_ITEM);
 			output.accept(DollMod.ROCK_ANVIL_ITEM);
 			output.accept(DollMod.CHIPPED_ROCK_ANVIL_ITEM);
 			output.accept(DollMod.DAMAGED_ROCK_ANVIL_ITEM);

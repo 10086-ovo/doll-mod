@@ -2,10 +2,27 @@ plugins { id 'java'; id 'net.minecraftforge.gradle' version '[7.0.17,8)' }
 version = '1.0.0-r15'
 group = 'io.github.a10086ovo'
 base { archivesName = 'doll-mod' }
-java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+java.toolchain.languageVersion = JavaLanguageVersion.of(26)
 minecraft {
     runs {
-        configureEach { workingDir = layout.projectDirectory.dir('run') }
+        configureEach {
+            workingDir = layout.projectDirectory.dir('run')
+            mods { dollmod { source sourceSets.main } }
+            // 与 Fabric/Loom 对齐：Loom 的 DefaultRunConfigurationSettings 默认就带前两条
+            //（Loom 1.17.20 字节码中可见）。
+            // ⚠ 属性名是 jvmArgs（不是 jvmArguments，后者会让 run 配置创建失败）。
+            jvmArgs.add('--enable-native-access=ALL-UNNAMED')
+            // 实测有效：压掉 JDK 26 对 sun.misc.Unsafe::objectFieldOffset 的 4 行
+            // "terminally deprecated" 警告（Forge 自己的 UnsafeHacks 会踩）。
+            jvmArgs.add('--sun-misc-unsafe-memory-access=allow')
+            // ⚠ 第三条是 Forge 专属（2026-09-13 实测结论）：
+            // Forge/ModLauncher 把 lwjgl / jna / jline 装进 JPMS 具名模块，而 ALL-UNNAMED
+            // 只覆盖类路径——具名模块下它一条也压不掉。压 JEP 472 的 native-access 警告
+            // 只能靠逐模块具名枚举，或这条全局开关。枚举漏一个就继续红、写错一个就多一行
+            // "Unknown module"，所以这里用全局开关。
+            // 代价：它是 JDK 24 起的过渡开关，未来某版若被移除需改回具名枚举。
+            jvmArgs.add('--illegal-native-access=allow')
+        }
         register('client')
         register('server') { args '--nogui' }
     }
@@ -17,11 +34,37 @@ repositories {
     mavenCentral()
 }
 dependencies { implementation minecraft.dependency('net.minecraftforge:forge:26.2-65.1.0') }
-tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8'; options.release = 25 }
 processResources {
-    def props = [mod_id: 'doll-mod', mod_name: '人偶模组', mod_version: project.version,
+    def props = [mod_id: 'dollmod', mod_name: '人偶模组', mod_version: project.version,
                  minecraft_version: '26.2', forge_version: '65.1.0']
     inputs.properties props
     filteringCharset = 'UTF-8'
     filesMatching('META-INF/mods.toml') { expand props }
+}
+
+// ---- Mixin 配置装载（Forge 26.2 专属机制）----
+// 整个 FML/mixin 栈没有任何组件消费 mods.toml 的 [[mixins]] 表，也不会自动发现 *.mixins.json。
+// 唯一入口：容器 manifest 的 MixinConfigs 属性（MixinPlatformAgentDefault → MainAttributes.getDirAttributes）。
+// dev 下 mod 容器是目录（merge-source-sets 后 = build/sourceSets/main），所以要在该目录写 MANIFEST.MF；
+// 生产 jar 由 jar 任务自己的 manifest 提供。
+def writeDevMixinManifest = tasks.register('writeDevMixinManifest') {
+    def mixinConfigs = 'doll-mod-common.mixins.json,doll-mod-client.mixins.json'
+    def manifestFile = layout.buildDirectory.file('sourceSets/main/META-INF/MANIFEST.MF')
+    inputs.property('mixinConfigs', mixinConfigs)
+    outputs.file(manifestFile)
+    doLast {
+        def f = manifestFile.get().asFile
+        f.parentFile.mkdirs()
+        f.text = "Manifest-Version: 1.0\r\nMixinConfigs: ${mixinConfigs}\r\n"
+    }
+}
+tasks.matching { it.name in ['runClient', 'runServer', 'runGameTestServer'] }.configureEach {
+    dependsOn writeDevMixinManifest
+}
+tasks.named('jar') {
+    manifest { attributes('MixinConfigs': 'doll-mod-common.mixins.json,doll-mod-client.mixins.json') }
+    // dev manifest 任务会把 MANIFEST.MF 写进合并输出目录，jar 内容里排除它，
+    // 以 jar 任务生成的 manifest（含 MixinConfigs 属性）为准
+    exclude 'META-INF/MANIFEST.MF'
 }

@@ -1,11 +1,14 @@
 package io.github.a10086ovo.doll.network;
 
 import io.github.a10086ovo.doll.network.payload.DollSnapshot;
+import io.github.a10086ovo.doll.network.payload.IndexBuildProgressPayload;
 import io.github.a10086ovo.doll.network.payload.OpenDollControlPanelPayload;
 import io.github.a10086ovo.doll.network.payload.RecallDollPayload;
+import io.github.a10086ovo.doll.network.payload.RequestIndexBuildPayload;
 import io.github.a10086ovo.doll.network.payload.RequestSearchPayload;
 import io.github.a10086ovo.doll.network.payload.SearchResultsPayload;
 import io.github.a10086ovo.doll.network.payload.SelectDollModePayload;
+import io.github.a10086ovo.doll.network.payload.StructureCatalogPayload;
 import io.github.a10086ovo.doll.network.payload.ToggleMarkPayload;
 import io.github.a10086ovo.doll.network.payload.UpdateDollSnapshotPayload;
 import net.minecraftforge.event.network.CustomPayloadEvent;
@@ -48,11 +51,25 @@ public final class DollClientNetworking {
 		DollNetworking.sendToServer(new ToggleMarkPayload(category, targetIndex, x, z));
 	}
 
+	/** 客户端 -> 服务端：请求为<b>当前维度</b>构建「全域索引」；{@code cancel=true} 则取消正在进行的构建。 */
+	public static void sendIndexBuild(int dollEntityId, boolean cancel) {
+		DollNetworking.sendToServer(new RequestIndexBuildPayload(dollEntityId, cancel));
+	}
+
 	// ---- 客户端收包委托（消费者由客户端初始化时注入） ----
+
+	/** 由服务端推送的本世界全部结构注册键清单（客户端无结构注册表）。仅客户端线程读写。 */
+	private static volatile List<String> structureCatalog = List.of();
+
+	/** 供搜索界面构建「结构/村庄」目标池使用（进服时由服务端推送一次）。 */
+	public static List<String> getStructureCatalog() {
+		return structureCatalog;
+	}
 
 	private static Consumer<List<DollSnapshot>> openPanelConsumer;
 	private static Consumer<DollSnapshot> snapshotConsumer;
 	private static Consumer<SearchResultsPayload> searchResultsConsumer;
+	private static Consumer<IndexBuildProgressPayload> indexBuildProgressConsumer;
 
 	/** 由客户端入口注入三个 clientbound 包的处理回调（实现含客户端屏幕类，仅存在于客户端）。 */
 	public static void setClientHandlers(Consumer<List<DollSnapshot>> openPanel,
@@ -60,6 +77,11 @@ public final class DollClientNetworking {
 		openPanelConsumer = openPanel;
 		snapshotConsumer = snapshot;
 		searchResultsConsumer = results;
+	}
+
+	/** 由客户端入口注入全域索引构建进度回调（搜索屏据此刷新进度条）。 */
+	public static void setIndexBuildProgressConsumer(Consumer<IndexBuildProgressPayload> consumer) {
+		indexBuildProgressConsumer = consumer;
 	}
 
 	/** 服务端 -> 客户端：打开人偶控制面板。 */
@@ -78,5 +100,17 @@ public final class DollClientNetworking {
 	public static void handleSearchResults(SearchResultsPayload payload, CustomPayloadEvent.Context context) {
 		if (searchResultsConsumer == null) return;
 		context.enqueueWork(() -> searchResultsConsumer.accept(payload));
+	}
+
+	/** 服务端 -> 客户端：本世界全部结构注册键清单（进服推送一次，缓存供搜索屏构建目标池）。 */
+	public static void handleStructureCatalog(StructureCatalogPayload payload, CustomPayloadEvent.Context context) {
+		List<String> ids = payload.structureIds();
+		context.enqueueWork(() -> structureCatalog = ids);
+	}
+
+	/** 服务端 -> 客户端：全域索引构建进度广播（搜索屏打开时刷新进度条，其余情况丢弃）。 */
+	public static void handleIndexBuildProgress(IndexBuildProgressPayload payload, CustomPayloadEvent.Context context) {
+		if (indexBuildProgressConsumer == null) return;
+		context.enqueueWork(() -> indexBuildProgressConsumer.accept(payload));
 	}
 }

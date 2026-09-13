@@ -35,6 +35,10 @@ public record DollSnapshot(int entityId, String uuid, String name, int level, in
 	public static final StreamCodec<ByteBuf, DollSnapshot> STREAM_CODEC = new StreamCodec<>() {
 		@Override
 		public DollSnapshot decode(ByteBuf buf) {
+			// NetDebug: 临时诊断 update_doll_snapshot 越界读（定位后删除）
+			io.github.a10086ovo.doll.DollMod.LOGGER.info(
+				"[NetDebug] DollSnapshot.decode 进入: ridx={} widx={} readable={}",
+				buf.readerIndex(), buf.writerIndex(), buf.readableBytes());
 			return new DollSnapshot(
 				ByteBufCodecs.VAR_INT.decode(buf),
 				decodeUuid(buf),
@@ -54,6 +58,9 @@ public record DollSnapshot(int entityId, String uuid, String name, int level, in
 
 		@Override
 		public void encode(ByteBuf buf, DollSnapshot v) {
+			// NetDebug: 临时诊断（定位后删除）
+			io.github.a10086ovo.doll.DollMod.LOGGER.info(
+				"[NetDebug] DollSnapshot.encode: ridx={} widx={}", buf.readerIndex(), buf.writerIndex());
 			ByteBufCodecs.VAR_INT.encode(buf, v.entityId);
 			encodeUuid(buf, v.uuid);
 			ByteBufCodecs.STRING_UTF8.encode(buf, v.name);

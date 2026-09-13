@@ -1,0 +1,23 @@
+{
+  "required": true,
+  "package": "io.github.a10086ovo.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "client": [
+    "DollEntityClientMixin",
+    "SeaWaterFogMixin",
+    "SkullBlockRendererMixin",
+    "WitherSkullRenderStateMixin",
+    "AvatarRendererDollMixin",
+    "MinecraftUseItemOnDollMixin",
+    "SpecialModelRenderersMixin",
+    "MinecraftStopUseItemMixin",
+    "WitherSkullRendererMixin",
+    "ClientPacketListenerMixin",
+    "GuiSetScreenMixin",
+    "AbstractContainerMenuMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

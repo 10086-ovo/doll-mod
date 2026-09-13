@@ -5,6 +5,7 @@ import io.github.a10086ovo.doll.DollModConstants;
 import io.github.a10086ovo.doll.inventory.DollInventory;
 import io.github.a10086ovo.doll.item.DollSpawnEggItem;
 import io.github.a10086ovo.doll.item.EnderAxeItem;
+import io.github.a10086ovo.doll.item.GuidePickaxeItem;
 import io.github.a10086ovo.doll.item.NetherSwordItem;
 import io.github.a10086ovo.doll.item.SeaArmorItem;
 import io.github.a10086ovo.doll.mode.DollMode;
@@ -793,11 +794,45 @@ public class DollEntity extends Avatar {
 			if (i == OFFHAND_SLOT) {
 				continue; // 副手格独立渲染，不作主手武器来源
 			}
-			if (isMeleeWeapon(inventory.getItem(i))) {
+			if (isMeleeWeaponForDoll(inventory.getItem(i))) {
 				return i;
 			}
 		}
 		return -1;
+	}
+
+	/** 是否为向导人偶变体。 */
+	public boolean isGuideDoll() {
+		return getDollVariant() == DollVariant.GUIDE;
+	}
+
+	/**
+	 * 向导人偶的近战武器判据：通用近战武器之外，向导变体还把「向导的登山镐」认作近战武器
+	 * （玩家能挥它打架，向导人偶也该能挥它作战）。其它变体行为与 {@link #isMeleeWeapon} 一致。
+	 */
+	private boolean isMeleeWeaponForDoll(ItemStack stack) {
+		if (isMeleeWeapon(stack)) {
+			return true;
+		}
+		return isGuideDoll() && stack.getItem() instanceof GuidePickaxeItem;
+	}
+
+	/**
+	 * 向导人偶当前主手是否正拿着登山镐（盾构机 3×3 断面与侧向探矿加成的开关）。
+	 * 判据是 {@link #getItemBySlot} 在主手走 {@link #findToolForMode}，挖矿模式下即
+	 * {@link #findPickaxeStack} 先选中的那把镐），并且仅限向导人偶变体。
+	 *
+	 * 因此：
+	 * - 塞在背包/存储区里不算，绝不触发；
+	 * - 放在副手不算（副手挖不了方块），绝不触发；
+	 * - 普通镐与登山镐并存时，以主手先选中的那把为准；普通镐被移走/耗尽后主手自动接上
+	 *   登山镐，宽断面与无视重力随之生效（切换自然发生，无需额外逻辑）。
+	 */
+	private boolean isHoldingGuidePickaxe() {
+		if (!isGuideDoll()) {
+			return false;
+		}
+		return getItemBySlot(EquipmentSlot.MAINHAND).getItem() instanceof GuidePickaxeItem;
 	}
 
 	/**
@@ -5996,7 +6031,13 @@ public class DollEntity extends Avatar {
 		}
 		// 打开菜单的玩家即视为主人
 		setOwner(player);
-		player.openMenu(provider);
+		if (player instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+			// Forge openMenu 重载：附加数据写人偶实体 ID，客户端 DollScreenHandler.create 据此恢复 owner。
+			// 不写的话客户端菜单 owner 恒为 null，背包界面所有按钮（模式/翻页/搜索/血条）全部消失。
+			serverPlayer.openMenu(provider, buf -> buf.writeVarInt(this.getId()));
+		} else {
+			player.openMenu(provider);
+		}
 		return InteractionResult.SUCCESS_SERVER;
 	}
 
@@ -6905,9 +6946,30 @@ public class DollEntity extends Avatar {
 		BlockPos here = blockPosition();
 		BlockPos ahead = here.offset(tunnelDir.getStepX(), 0, tunnelDir.getStepZ());
 		int tunnelY = tunnelEntry.getY();
-		// 前方要挖的两格（隧道 1 宽 × 2 高）
+		// 向导人偶"主手正持有并使用"登山镐：盾构机断面扩为 3 宽 × 3 高（每次掘进 9 格）。
+		// 判据是主手实际手持（见 isHoldingGuidePickaxe）：背包里、副手都不算。
+		// 其它人偶、或向导人偶主手拿的是普通镐，维持原 1 宽 × 2 高（2 格）。
+		// 中心列保留 dig1/dig2 用于落点定位，其它 7 格拼成完整 3×3 断面。
+		boolean wideTunnel = isHoldingGuidePickaxe();
 		BlockPos dig1 = new BlockPos(ahead.getX(), tunnelY, ahead.getZ());
 		BlockPos dig2 = new BlockPos(ahead.getX(), tunnelY + 1, ahead.getZ());
+		List<BlockPos> digAll = new ArrayList<>();
+		digAll.add(dig1);
+		digAll.add(dig2);
+		if (wideTunnel) {
+			for (int dx = -1; dx <= 1; dx++) {
+				for (int dz = -1; dz <= 1; dz++) {
+					if (dx == 0 && dz == 0) {
+						continue; // 中心列已由 dig1/dig2 表示
+					}
+					for (int dy = 0; dy < 3; dy++) {
+						digAll.add(new BlockPos(ahead.getX() + dx, tunnelY + dy, ahead.getZ() + dz));
+					}
+				}
+			}
+			// 中心列顶层（tunnelY+2）补 1 格，构成完整 3×3
+			digAll.add(new BlockPos(ahead.getX(), tunnelY + 2, ahead.getZ()));
+		}
 
 		// 停止条件 1：前方是悬崖。允许最多 MAX_SAFE_FALL_BLOCKS 的落差（与 DollNavigator
 		// 下坡能力同一口径），只有下方是真·深坑才判悬崖。
@@ -6919,20 +6981,23 @@ public class DollEntity extends Avatar {
 			stopTunneling("mine_stop_cliff");
 			return;
 		}
-		// 停止条件 2：前方两格本身或周围 ±2 格有岩浆
-		if (isLavaNear(serverLevel, dig1) || isLavaNear(serverLevel, dig2)) {
-			stopTunneling("mine_stop_lava");
-			return;
-		}
-		// 停止条件 3：前方是重力方块（沙砾/沙子）
-		if (isFallingBlock(serverLevel, dig1) || isFallingBlock(serverLevel, dig2)) {
-			stopTunneling("mine_stop_gravity");
-			return;
-		}
-		// 停止条件 4：前方两格有水（盾构机不游泳，遇水停下避免窒息）
-		if (isWaterBlock(serverLevel, dig1) || isWaterBlock(serverLevel, dig2)) {
-			stopTunneling("mine_stop_water");
-			return;
+		// 停止条件 2~4：前方断面任一格周围有岩浆 / 是重力方块 / 有水，立即停止。
+		// 向导人偶持镐时断面为 3×3，统一按断面遍历（原 1×2 走原 2 格循环）。
+		// 3×3 断面下重力方块判定范围随之变大，会频繁误停，故宽断面模式直接无视
+		// 沙砾/沙子（规则：宽断面 = 更强掘进能力，代价自担）；岩浆与水仍会停止。
+		for (BlockPos dig : digAll) {
+			if (isLavaNear(serverLevel, dig)) {
+				stopTunneling("mine_stop_lava");
+				return;
+			}
+			if (!wideTunnel && isFallingBlock(serverLevel, dig)) {
+				stopTunneling("mine_stop_gravity");
+				return;
+			}
+			if (isWaterBlock(serverLevel, dig)) {
+				stopTunneling("mine_stop_water");
+				return;
+			}
 		}
 		// 停止条件 5：前方是需要分级工具、但当前镐挖不动的方块（钻石矿/黑曜石等）。
 		// 统一走 canPickaxeMine——旧写法额外要求 ds.is(MINEABLE_WITH_PICKAXE)，
@@ -6940,7 +7005,7 @@ public class DollEntity extends Avatar {
 		// 当普通路障空手挖掉（方块消失、零掉落）。
 		// 是否有"任意一把镐"用于开挖前预检（耗尽即停）。实际每格用哪把镐在下面按等级挑选。
 		ItemStack pickaxe = findBestPickaxeStack();
-		for (BlockPos dig : new BlockPos[] { dig1, dig2 }) {
+		for (BlockPos dig : digAll) {
 			BlockState ds = serverLevel.getBlockState(dig);
 			if (requiresTieredTool(ds) && !canPickaxeMine(ds)) {
 				stopTunneling("mine_stop_unbreakable");
@@ -6962,7 +7027,7 @@ public class DollEntity extends Avatar {
 		// 挖前方两格（掉落进背包），前进一格；
 		// 路障空手挖不耗镐耐久，需要分级工具的方块（矿石/黑曜石）才用镐。
 		// 前方挖到矿石时连锁采集同族矿脉（继承普通挖矿模式的连锁能力）
-		for (BlockPos dig : new BlockPos[] { dig1, dig2 }) {
+		for (BlockPos dig : digAll) {
 			BlockState digState = serverLevel.getBlockState(dig);
 			if (digState.isAir()) {
 				continue;
@@ -6987,13 +7052,15 @@ public class DollEntity extends Avatar {
 				return;
 			}
 		}
-		// 挖完后验证实际开挖的隧道两格（dig1/dig2，固定 tunnelY 高度）是否已挖通（空气），
+		// 挖完后验证实际开挖的隧道断面（digAll：原 1×2 或向导持镐的 3×3）是否已挖通（空气），
 		// 否则停止——防止几何异常/液体残留导致人偶被传送进实心方块或水中窒息。
-		// 注意必须校验 dig1/dig2 而非"人偶当前高度"的 ahead：人偶掉进洞穴/被推动后
+		// 注意必须校验 digAll 而非"人偶当前高度"的 ahead：人偶掉进洞穴/被推动后
 		// 高度可能偏离 tunnelY，校验从未开挖的方块会触发无端的"前方挖不通"。
-		if (!serverLevel.getBlockState(dig1).isAir() || !serverLevel.getBlockState(dig2).isAir()) {
-			stopTunneling("mine_stop_blocked");
-			return;
+		for (BlockPos dig : digAll) {
+			if (!serverLevel.getBlockState(dig).isAir()) {
+				stopTunneling("mine_stop_blocked");
+				return;
+			}
 		}
 		// 前进并把落脚点锚定到隧道列（tunnelY 固定高度），防止人偶高度漂移
 		// （掉进洞穴/被玩家推动/地面沉降）后，下一周期从错误高度继续掘进或误判停止
@@ -7011,14 +7078,19 @@ public class DollEntity extends Avatar {
 		}
 	}
 
-	/** 扫描人偶周围（XZ ±3、Y -2~+3）最近的矿石，用于盾构机侧向探矿。 */
+	/** 扫描人偶周围（XZ ±3、Y -2~+3；向导持镐加宽为 ±6、-3~+4）最近的矿石，用于盾构机侧向探矿。 */
 	private BlockPos scanNearbyOre(ServerLevel level) {
 		BlockPos center = blockPosition();
 		BlockPos best = null;
 		double bestDist = Double.MAX_VALUE;
-		for (int y = center.getY() - 2; y <= center.getY() + 3; y++) {
-			for (int x = center.getX() - 3; x <= center.getX() + 3; x++) {
-				for (int z = center.getZ() - 3; z <= center.getZ() + 3; z++) {
+		// 向导人偶主手正持登山镐：扫描半径扩大到 XZ ±6、Y −3..+4，覆盖 3×3 宽断面外缘暴露矿石。
+		boolean wide = isHoldingGuidePickaxe();
+		int xzR = wide ? 6 : 3;
+		int yLow = wide ? -3 : -2;
+		int yHigh = wide ? 4 : 3;
+		for (int y = center.getY() + yLow; y <= center.getY() + yHigh; y++) {
+			for (int x = center.getX() - xzR; x <= center.getX() + xzR; x++) {
+				for (int z = center.getZ() - xzR; z <= center.getZ() + xzR; z++) {
 					BlockPos p = new BlockPos(x, y, z);
 					if (!isOreBlock(p)) {
 						continue;

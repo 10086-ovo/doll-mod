@@ -1,29 +1,29 @@
 {
-	"name": "Ender Axe",
-	"icon": "doll-mod:ender_axe",
-	"category": "items",
-	"sortnum": 6,
-	"pages": [
-		{
-			"type": "text",
-			"title": "Overview",
-			"text": "Hybrid melee/thrown weapon. Attack speed 1.6. Melee attacks are guaranteed critical hits (jump-crit sound & particles).\n\n• Melee damage: 10 (netherite-axe tier). Can strip logs.\n• Guaranteed melee crit: final damage ×1.5 (single multiplier, no stacking).\n• Thrown: hold right-click to charge, release to throw. Base damage 10 on hit. Retrievable.\n• 80% dodge chance while held (main or offhand).\n• Executes mobs below 30% HP.\n\nRepair: gold ingots.\n\nThe doll can wield this axe in melee or throw it, and a thrown axe also executes at 30% HP. While a doll wields it, the execute threshold takes the higher of the two values (25% base / 30% axe = 30%)."
-		},
-		{
-			"type": "crafting",
-			"title": "Crafting Recipe",
-			"pattern": [
-				"GE",
-				"GS",
-				" S"
-			],
-			"keys": {
-				"G": "minecraft:gold_ingot",
-				"E": "minecraft:ender_pearl",
-				"S": "minecraft:stick"
-			},
-			"result": "doll-mod:ender_axe",
-			"text": "2 gold ingots + 1 ender pearl + 1 stick."
-		}
-	]
+  "name": "Ender Axe",
+  "icon": "doll-mod:ender_axe",
+  "category": "items",
+  "sortnum": 6,
+  "pages": [
+    {
+      "type": "text",
+      "title": "Overview",
+      "text": "Hybrid melee/thrown weapon. Attack speed 1.6. Melee attacks are guaranteed critical hits (jump-crit sound & particles).\n\n• Melee damage: 10. Can strip logs.\n• Guaranteed melee crit: final damage ×1.5 (single multiplier, no stacking).\n• Thrown: hold right-click to charge, release to throw. Base damage 10 on hit. Retrievable.\n• Any holder (player or doll) executes melee targets below 30% HP.\n• 80% dodge while held (main or offhand) — player only.\n\nRepair: ender pearls. Both melee and thrown attacks execute at 30% HP for players and dolls alike; the Ender doll's talent execute also uses the 30% threshold while wielding this axe. Dodge stays player-only — dolls keep their own variant dodge, never stacking."
+    },
+    {
+      "type": "crafting",
+      "title": "Crafting Recipe",
+      "pattern": [
+        "GE",
+        "GS",
+        " S"
+      ],
+      "keys": {
+        "G": "minecraft:gold_ingot",
+        "E": "minecraft:ender_pearl",
+        "S": "minecraft:stick"
+      },
+      "result": "doll-mod:ender_axe",
+      "text": "2 gold ingots + 1 ender pearl + 1 stick."
+    }
+  ]
 }

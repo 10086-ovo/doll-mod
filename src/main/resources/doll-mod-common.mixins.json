@@ -1,0 +1,30 @@
+{
+  "required": true,
+  "package": "io.github.a10086ovo.doll.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "minVersion": "0.8",
+  "mixins": [
+    "MobMixin",
+    "LivingEntityVulnerabilityMixin",
+    "LivingEntityDodgeMixin",
+    "PlayerGuideBookMixin",
+    "AbstractArrowMixin",
+    "ThornsShieldMixin",
+    "LivingEntityFearAuraMixin",
+    "EnchantmentHelperMixin",
+    "NetherSwordHealthMixin",
+    "ItemCombinerMenuAccessor",
+    "EnderAxeCriticalMixin",
+    "LiquidBlockWaterWalkMixin",
+    "EntityLavaSpeedMixin",
+    "WitherSkullMixin",
+    "PlayerEnderAxeMixin",
+    "AnvilMenuMixin",
+    "AnvilBlockMixin",
+    "EntityOnGroundAccessor",
+    "GuidePickaxeSmoothStepMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

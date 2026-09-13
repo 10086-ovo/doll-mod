@@ -5,10 +5,13 @@ import io.github.a10086ovo.doll.entity.DollEntity;
 import io.github.a10086ovo.doll.entity.DollVariant;
 import io.github.a10086ovo.doll.mode.DollMode;
 import io.github.a10086ovo.doll.network.DollClientNetworking;
+import io.github.a10086ovo.doll.network.DollNetworking;
+import io.github.a10086ovo.doll.network.payload.RequestDollInvSyncPayload;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
@@ -71,6 +74,10 @@ public class DollInventoryScreen extends AbstractContainerScreen<DollScreenHandl
 	@Override
 	protected void init() {
 		super.init();
+		// Forge 自愈（见 RequestDollInvSyncPayload 注释）：Forge 的 OpenContainer 包与初始内容包
+		// 走两条不同队列，竞态下初始 81 槽同步被丢弃 → 背包屏打开是空的（蛋回收→再召唤后必现）。
+		// 屏幕建好后向服务端要一次全量重同步；重定向/窗口 resize 触发 init 重跑时多要一次，无害。
+		DollNetworking.sendToServer(RequestDollInvSyncPayload.INSTANCE);
 		this.leftPos = (this.width - this.imageWidth) / 2;
 		this.topPos = (this.height - this.imageHeight) / 2;
 		this.titleLabelX = 8;
@@ -112,7 +119,7 @@ public class DollInventoryScreen extends AbstractContainerScreen<DollScreenHandl
 				int searchY = topPos + 80;
 				if (isHovering(searchX, searchY, 20, 20, mx, my)) {
 					playClick();
-					Minecraft.getInstance().setScreenAndShow(new GuideSearchScreen(owner.getId()));
+					openGuideSearch(owner.getId());
 					return true;
 				}
 			}
@@ -142,6 +149,28 @@ public class DollInventoryScreen extends AbstractContainerScreen<DollScreenHandl
 			}
 		}
 		return super.mouseClicked(event, bl);
+	}
+
+	/**
+	/**
+	 * 打开向导搜索屏（纯客户端 {@code Screen}）。
+	 *
+	 * <p><b>为什么要在这里手动关容器：</b>本屏是<b>容器屏</b>（服务端开着 81 格菜单等同步），
+	 * 而搜索屏是<b>纯客户端屏</b>，服务端不知道它存在。切屏时原版
+	 * {@code AbstractContainerScreen.removed()} 只调 {@code menu.removed(player)}，
+	 * <b>不发 {@code ServerboundContainerClosePacket}</b>——服务端会继续往客户端推 46~80 号槽位，
+	 * 之后进创造物品栏时触发原版的越界写槽而断线（详见 {@code GuiSetScreenMixin} 的类注释）。
+	 *
+	 * <p>所以这里在切屏前<b>主动</b>补发关容器包，把「离开背包去搜索」这件事的语义说清楚。
+	 * {@code Gui.setScreen} 上的兜底守卫仍然保留，用来兜住其它意外的顶替路径；
+	 * 但正常路径不该再走到它那里（它的日志已降为 debug）。
+	 */
+	private void openGuideSearch(int dollEntityId) {
+		LocalPlayer player = Minecraft.getInstance().player;
+		if (player != null && player.containerMenu != player.inventoryMenu) {
+			player.closeContainer();
+		}
+		Minecraft.getInstance().setScreenAndShow(new GuideSearchScreen(dollEntityId));
 	}
 
 	/**

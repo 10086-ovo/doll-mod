@@ -20,5 +20,5 @@ versionRange="[${minecraft_version}]"
 ordering="NONE"
 side="BOTH"
 
-[[mixins]]
-config="${mod_id}.mixins.json"
+# 注意：Forge 26.2 的加载栈不消费 [[mixins]]（mods.toml mixins 表是无效语法）。
+# mixin 配置经容器 manifest 的 MixinConfigs 属性装载（见 build.gradle writeDevMixinManifest / jar.manifest）。

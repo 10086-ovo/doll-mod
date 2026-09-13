@@ -25,6 +25,7 @@ import io.github.a10086ovo.doll.item.SeaDollHeadItem;
 import io.github.a10086ovo.doll.item.ForestDollHeadItem;
 import io.github.a10086ovo.doll.item.GuideDollHeadItem;
 import io.github.a10086ovo.doll.item.GuideBookItem;
+import io.github.a10086ovo.doll.item.GuidePickaxeItem;
 import io.github.a10086ovo.doll.item.SeaArmorItem;
 import io.github.a10086ovo.doll.network.DollNetworking;
 import io.github.a10086ovo.doll.recipe.DollUpgradeRecipe;
@@ -58,6 +59,7 @@ import io.github.a10086ovo.doll.item.ThornsShieldItem;
 import net.minecraft.core.Holder;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.tags.BlockTags;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.equipment.ArmorMaterial;
 import net.minecraft.world.item.equipment.ArmorType;
@@ -75,8 +77,8 @@ import net.minecraftforge.eventbus.api.listener.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 
-@Mod(DollModConstants.MOD_ID)
-@Mod.EventBusSubscriber(modid = DollModConstants.MOD_ID)
+@Mod(DollModConstants.FORGE_MOD_ID)
+@Mod.EventBusSubscriber(modid = DollModConstants.FORGE_MOD_ID)
 public class DollMod {
 
 	public static final Logger LOGGER = LoggerFactory.getLogger(DollModConstants.MOD_ID);
@@ -127,6 +129,7 @@ public class DollMod {
 	private static final Identifier THORNS_SHIELD_KEY = id(DollModConstants.THORNS_SHIELD_ID);
 	private static final Identifier NETHER_SWORD_KEY = id(DollModConstants.NETHER_SWORD_ID);
 	private static final Identifier GUIDE_BOOK_KEY = id(DollModConstants.GUIDE_BOOK_ID);
+	private static final Identifier GUIDE_PICKAXE_KEY = id(DollModConstants.GUIDE_PICKAXE_ID);
 	private static final Identifier SEA_HELMET_KEY = id(DollModConstants.SEA_HELMET_ID);
 	private static final Identifier SEA_CHESTPLATE_KEY = id(DollModConstants.SEA_CHESTPLATE_ID);
 	private static final Identifier SEA_LEGGINGS_KEY = id(DollModConstants.SEA_LEGGINGS_ID);
@@ -142,6 +145,9 @@ public class DollMod {
 	public static ThornsShieldItem THORNS_SHIELD_ITEM;
 	public static NetherSwordItem NETHER_SWORD_ITEM;
 	public static Item GUIDE_BOOK_ITEM;
+	public static GuidePickaxeItem GUIDE_PICKAXE_ITEM;
+	public static ToolMaterial GUIDE_PICKAXE_MATERIAL;
+	public static TagKey<Item> GUIDE_PICKAXE_REPAIR_TAG;
 	public static PaleBowItem PALE_BOW_ITEM;
 	public static ArmorMaterial SEA_ARMOR_MATERIAL;
 	public static TagKey<Item> SEA_ARMOR_REPAIR_TAG;
@@ -449,13 +455,16 @@ public class DollMod {
 	}
 
 	private static void registerMenu(net.minecraftforge.registries.RegisterEvent event) {
+		// 用 IForgeMenuType.create：客户端经 Forge OpenContainer 包重建菜单时，
+		// 附加数据（人偶实体 ID）会交给 IContainerFactory，由 DollScreenHandler.create 恢复 owner。
+		// 旧写法 (windowId, inv) -> new DollInventory(null) 导致客户端 owner 恒为 null，
+		// 界面上血条/搜索按钮/模式标签/翻页按钮全部消失。
 		DOLL_SCREEN_HANDLER = Registry.register(
 			BuiltInRegistries.MENU,
 			DOLL_SCREEN_KEY,
-			new net.minecraft.world.inventory.MenuType<>(
-				(windowId, inv) -> new DollScreenHandler(windowId, inv,
-					new io.github.a10086ovo.doll.inventory.DollInventory(null)),
-				net.minecraft.world.flag.FeatureFlags.VANILLA_SET)
+			net.minecraftforge.common.extensions.IForgeMenuType.create(
+				(net.minecraftforge.network.IContainerFactory<DollScreenHandler>) (windowId, inv, data) ->
+					DollScreenHandler.create(windowId, inv, data.readVarInt()))
 		);
 	}
 
@@ -662,6 +671,17 @@ public class DollMod {
 			DAMAGED_ROCK_ANVIL_KEY,
 			new BlockItem(DAMAGED_ROCK_ANVIL_BLOCK,
 				new Item.Properties().setId(ResourceKey.create(Registries.ITEM, DAMAGED_ROCK_ANVIL_KEY)))
+		);
+
+		// ---- 向导的登山镐（向导人偶专属；数值与 Fabric 侧完全一致）----
+		GUIDE_PICKAXE_REPAIR_TAG = TagKey.create(Registries.ITEM, id("guide_pickaxe_repair"));
+		GUIDE_PICKAXE_MATERIAL = new ToolMaterial(
+			BlockTags.INCORRECT_FOR_NETHERITE_TOOL, 2031, 9.0F, 4.0F, 15, GUIDE_PICKAXE_REPAIR_TAG);
+		GUIDE_PICKAXE_ITEM = Registry.register(
+			BuiltInRegistries.ITEM,
+			GUIDE_PICKAXE_KEY,
+			new GuidePickaxeItem(GUIDE_PICKAXE_MATERIAL, 1.0f, -2.8f,
+				new Item.Properties().setId(ResourceKey.create(Registries.ITEM, GUIDE_PICKAXE_KEY)))
 		);
 
 		SEA_ARMOR_REPAIR_TAG = TagKey.create(Registries.ITEM, id("sea_armor_repair"));
