@@ -9,13 +9,15 @@ import io.github.a10086ovo.doll.entity.DollEntity;
  * 变体天赋策略接口（DollTalent）。
  * <p>
  * 每只人偶按 {@code DollVariant} 持有一个天赋实例（惰性缓存于 {@code DollEntity}），
- * 由 {@code DollEntity.tick()} 的固定生命周期钩子驱动。当前已抽取的天赋纵切面：
+ * 由 {@code DollEntity.tick()} 的固定生命周期钩子驱动。三条天赋纵切面均已抽取完毕：
  * <ul>
  *   <li>{@link #tickPermanentEffects(DollEntity)}——每 tick 的常驻药效补漏（原 tickPermanentEffects）；</li>
  *   <li>{@link #tickAura(DollEntity)}——每 tick 的变体光环（原 tickVariantAuras）。
  *       光环中心登记表（pale/nether）属引擎职责，由 DollEntity 另行维护。</li>
+ *   <li>{@link #tickCombat(DollEntity)}——近战/射手模式下的变体战斗技能
+ *       （音波/WARDEN、烈焰弹/NETHER、末影弹+原地处决/ENDER、海洋激光/SEA）。</li>
  * </ul>
- * 后续波次将按同一切缝迁入战斗技能（音波/烈焰弹/末影弹/处决/激光）等纵切面。
+ * {@code DollEntity} 已不再内联任何变体技能实现，只保留常量供天赋读取。
  * <p>
  * 天赋实例持有自身 tick 冷却字段，因此每只人偶独立创建（不可跨实体共享单例）。
  */
