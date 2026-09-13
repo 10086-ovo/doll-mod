@@ -1,0 +1,14 @@
+{
+  "layers": {
+    "humanoid": [
+      {
+        "texture": "dollmod:sea"
+      }
+    ],
+    "humanoid_leggings": [
+      {
+        "texture": "dollmod:sea"
+      }
+    ]
+  }
+}

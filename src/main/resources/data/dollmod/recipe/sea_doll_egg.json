@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "key": {
+    "H": "dollmod:sea_doll_head",
+    "K": "minecraft:kelp"
+  },
+  "pattern": [
+    "KKK",
+    "KHK",
+    "KKK"
+  ],
+  "result": {
+    "id": "dollmod:sea_doll_egg"
+  }
+}

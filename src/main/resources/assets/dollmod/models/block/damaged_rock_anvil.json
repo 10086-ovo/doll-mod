@@ -1,0 +1,6 @@
+{
+  "parent": "dollmod:block/template_rock_anvil",
+  "textures": {
+    "top": "dollmod:block/damaged_rock_anvil_top"
+  }
+}

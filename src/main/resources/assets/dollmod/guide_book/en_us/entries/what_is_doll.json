@@ -1,0 +1,18 @@
+{
+	"name": "What Is a Doll",
+	"icon": "dollmod:doll_egg_s1",
+	"category": "getting_started",
+	"sortnum": 0,
+	"pages": [
+		{
+			"type": "text",
+			"title": "What Is a Doll",
+			"text": "A Doll is a companion that wears your skin, follows you, and assists with combat, mining, woodcutting, farming, and fishing.\n\nEach Doll has its own inventory and equipment slots.\n\nSummon via a Doll Egg. Right-click ground with the egg to teleport the doll there. Right-click the doll with the egg to retrieve it. Each egg is permanently bound to its doll."
+		},
+		{
+			"type": "text",
+			"title": "Doll Variants",
+			"text": "Two categories:\n\nNormal: Tier 1 to 5. Higher tiers = more health and better regen. Max health: 100.\n\nSpecial: Pale, Nether, Ender, Sea, Forest, Guide. Each has a unique aura and ability. Unified health: 120.\n\nWarden Doll: the highest-stat variant (200 HP). Obtained via shrine ritual.\n\nAll variants can use all 8 work modes. Differences are stats and auras only."
+		}
+	]
+}

@@ -1,0 +1,16 @@
+build/
+.gradle/
+run/
+logs/
+*.class
+
+# IDE
+.idea/
+*.iml
+
+# Gradle wrapper 外的本地缓存
+.gradle-home/
+
+# OS
+Thumbs.db
+.DS_Store

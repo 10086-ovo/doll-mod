@@ -1,0 +1,27 @@
+plugins { id 'java'; id 'net.minecraftforge.gradle' version '[7.0.17,8)' }
+version = '1.0.0-r15'
+group = 'io.github.a10086ovo'
+base { archivesName = 'doll-mod' }
+java.toolchain.languageVersion = JavaLanguageVersion.of(25)
+minecraft {
+    runs {
+        configureEach { workingDir = layout.projectDirectory.dir('run') }
+        register('client')
+        register('server') { args '--nogui' }
+    }
+}
+repositories {
+    minecraft.mavenizer(it)
+    maven fg.forgeMaven
+    maven fg.minecraftLibsMaven
+    mavenCentral()
+}
+dependencies { implementation minecraft.dependency('net.minecraftforge:forge:26.2-65.1.0') }
+tasks.withType(JavaCompile).configureEach { options.encoding = 'UTF-8' }
+processResources {
+    def props = [mod_id: 'dollmod', mod_name: '人偶模组', mod_version: project.version,
+                 minecraft_version: '26.2', forge_version: '65.1.0']
+    inputs.properties props
+    filteringCharset = 'UTF-8'
+    filesMatching('META-INF/mods.toml') { expand props }
+}
