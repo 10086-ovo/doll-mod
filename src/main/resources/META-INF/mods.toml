@@ -1,12 +1,14 @@
 modLoader="javafml"
 loaderVersion="[65,)"
-license="All Rights Reserved"
+license="CC0-1.0"
 [[mods]]
 modId="${mod_id}"
 version="${mod_version}"
 displayName="${mod_name}"
-authors="AutoMods"
-description='''把模组移植到forge，游戏版本不变'''
+authors="人没事就好"
+displayURL="https://github.com/10086-ovo/doll-mod"
+logoFile="assets/doll-mod/icon.png"
+description='''一个普普通通的 Minecraft 模组：召唤可命名的人偶，配武器盔甲，用 8 种行为模式指挥它们干活。'''
 [[dependencies.${mod_id}]]
 modId="forge"
 mandatory=true

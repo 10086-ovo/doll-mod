@@ -229,21 +229,26 @@ public class WildWardenDollEntity extends Monster {
 		serverLevel.playSound(null, target.getX(), target.getY(), target.getZ(),
 			SoundEvents.WARDEN_SONIC_BOOM, this.getSoundSource(), 3.0f, 1.0f);
 
-		// 粒子：从人偶到玩家画一条音波线
-		double stepX = dx / 10.0;
-		double stepZ = dz / 10.0;
-		for (int i = 0; i < 10; i++) {
-			double px = target.getX() + stepX * i;
-			double pz = target.getZ() + stepZ * i;
+		// 粒子：以「野生幽匿人偶」为射线起点，沿「人偶眼位 → 玩家眼位」逐格铺满整条线。
+		// 旧写法把起点写成了 target（玩家自身）、再朝人偶方向铺 90%，且 y 恒取玩家腰部高度
+		// ——于是音波看起来从玩家身上冒出来，且人偶站高站低都完全不影响这条线的位置。
+		Vec3 source = this.getEyePosition();
+		Vec3 endPos = target.getEyePosition();
+		Vec3 ray = endPos.subtract(source);
+		double rayLen = ray.length();
+		Vec3 dir = ray.scale(1.0 / rayLen);
+		int steps = (int) rayLen;
+		for (int i = 1; i <= steps; i++) {
+			Vec3 p = source.add(dir.scale(i));
 			serverLevel.sendParticles(
 				ParticleTypes.SONIC_BOOM,
-				px, target.getY() + 0.5, pz,
+				p.x, p.y, p.z,
 				1, 0, 0, 0, 0);
 		}
-		// 玩家位置额外爆一下
+		// 玩家眼位额外爆一下
 		serverLevel.sendParticles(
 			ParticleTypes.SONIC_BOOM,
-			target.getX(), target.getY() + 0.5, target.getZ(),
+			endPos.x, endPos.y, endPos.z,
 			5, 0.3, 0.3, 0.3, 0);
 
 		// 拉扯玩家：向人偶方向拉一半距离

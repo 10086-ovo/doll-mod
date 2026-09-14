@@ -22,6 +22,7 @@
     "AnvilMenuMixin",
     "AnvilBlockMixin",
     "EntityOnGroundAccessor",
+    "FishingHookOpenWaterAccessor",
     "GuidePickaxeSmoothStepMixin"
   ],
   "injectors": {

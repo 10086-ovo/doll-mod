@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:chest",
+  "pools": [
+    {
+      "rolls": 1.0,
+      "entries": [
+        {
+          "type": "minecraft:loot_table",
+          "value": "doll-mod:chests/buried_treasure_sea_armor_parts/sea_helmet"
+        }
+      ]
+    },
+    {
+      "rolls": 1.0,
+      "entries": [
+        {
+          "type": "minecraft:loot_table",
+          "value": "doll-mod:chests/buried_treasure_sea_armor_parts/sea_leggings"
+        }
+      ]
+    }
+  ]
+}

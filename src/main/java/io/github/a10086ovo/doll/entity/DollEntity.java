@@ -8,6 +8,7 @@ import io.github.a10086ovo.doll.item.EnderAxeItem;
 import io.github.a10086ovo.doll.item.GuidePickaxeItem;
 import io.github.a10086ovo.doll.item.NetherSwordItem;
 import io.github.a10086ovo.doll.item.SeaArmorItem;
+import io.github.a10086ovo.doll.mixin.FishingHookOpenWaterAccessor;
 import io.github.a10086ovo.doll.mode.DollMode;
 import io.github.a10086ovo.doll.network.DollNetworking;
 import io.github.a10086ovo.doll.network.payload.DollSnapshot;
@@ -41,9 +42,11 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.Entity.RemovalReason;
 import net.minecraft.world.entity.EntityDimensions;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.EntityTypes;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.entity.projectile.ProjectileUtil;
 import net.minecraft.world.entity.projectile.arrow.AbstractArrow;
 import net.minecraft.world.entity.projectile.hurtingprojectile.WitherSkull;
@@ -1142,6 +1145,27 @@ public class DollEntity extends Avatar {
 		updateNetherAuraCenter();
 	}
 
+	/**
+	 * 人偶装备逐件 tick 驱动：人偶没有玩家的背包 tick 链路（Inventory.tick），
+	 * 装备在 DollInventory 里的盔甲件永远不会收到 Item.inventoryTick。
+	 * 这里对人偶 4 个盔甲槽逐件补发，使海洋套装（SeaArmorItem）的单件效果
+	 * （头盔补氧/胸甲水中夜视/靴子水面免摔）与四件套抗性对人偶同样生效
+	 * ——与玩家逐件 tick 的语义对齐（用户 2026-09-09 定案：全套件效果都给人偶）。
+	 * 护腿"落地水"（蹲踞触发）对非 ServerPlayer 空操作，人偶侧不受影响。
+	 */
+	private void tickEquippedSeaArmor() {
+		if (!(this.level() instanceof ServerLevel serverLevel)) {
+			return;
+		}
+		EquipmentSlot[] armorSlots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
+		for (EquipmentSlot slot : armorSlots) {
+			ItemStack stack = getItemBySlot(slot);
+			if (stack.getItem() instanceof SeaArmorItem seaArmor) {
+				seaArmor.inventoryTick(stack, serverLevel, this, slot);
+			}
+		}
+	}
+
 	public void tick() {
 		boolean serverSide = !this.level().isClientSide() && this.isAlive();
 		float healthBefore = serverSide ? getHealth() : 0;
@@ -1178,6 +1202,7 @@ public class DollEntity extends Avatar {
 			updateModeMinds(modeIdx);
 			tickSpecialAttacks(modeIdx);
 			tickAuraCenterRegistration();
+			tickEquippedSeaArmor();
 			talent().tickAura(this);
 			// 登记当前位置，供"刷怪蛋右键召回"在人偶区块未加载时定位（降频至每 100 tick）
 			if (recallRegistryCooldown-- <= 0) {
@@ -1615,10 +1640,25 @@ public class DollEntity extends Avatar {
 	/** 水平转向 + 输入写入（统一原 moveToPosition 中各分支的重复代码）。 */
 	private void steerAndMove(Vec3 moveTarget, float moveSpeed) {
 		smoothFaceTowards(moveTarget.x, moveTarget.z);
+		levelPitchWhileMoving();
 		this.xxa = 0.0f;
 		this.zza = 1.0f;
 		setSpeed(moveSpeed);
 		this.setSprinting(true);
+	}
+
+	/**
+	 * 移动时把俯仰角（抬头/低头）平缓回平到水平。steerAndMove 只做水平转向，
+	 * 若不由跑动回平，上一次工作的仰/低头角会残留到抵达目标才被 smoothLookAt 纠正，
+	 * 表现为"跑向主人时头仰着/看地面，接近主人才看向主人"。
+	 */
+	private void levelPitchWhileMoving() {
+		if (this.getXRot() == 0.0f) {
+			return;
+		}
+		float diff = -this.getXRot(); // 目标俯仰=水平(0)
+		float clamped = Mth.clamp(diff, -ROTATION_SPEED_PER_TICK * 1.8f, ROTATION_SPEED_PER_TICK * 1.8f);
+		this.setXRot(Mth.clamp(this.getXRot() + clamped, -90.0f, 90.0f));
 	}
 
 	/** 海洋人偶专属：仅 isInWater 时按目标 Y 做竖直跟随，陆地与其他人偶不触发。 */
@@ -4501,7 +4541,7 @@ public class DollEntity extends Avatar {
 		}
 		// 跟随模式只挖当前直接够得着的矿：目标一旦够不着就放弃，绝不导航（避免狭长隧道卡死）
 		if (isFollowEnabled()
-			&& !(canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasLineOfSight(mineTargetPos))) {
+			&& !(canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasVisibleExposedFace(mineTargetPos))) {
 			mineTargetPos = null;
 			mineStandPos = null;
 			mineNavTarget = null;
@@ -4509,7 +4549,7 @@ public class DollEntity extends Avatar {
 			return;
 		}
 		// 已能直接挖到（距离+视线通畅）→ 停下交给 updateMineMind 动手
-		if (canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasLineOfSight(mineTargetPos)) {
+		if (canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasVisibleExposedFace(mineTargetPos)) {
 			clearMovementInput();
 			return;
 		}
@@ -4602,7 +4642,7 @@ public class DollEntity extends Avatar {
 		// 跟随模式只挖当前直接够得着的矿：目标一旦够不着（主人走开/地形变化）就放弃，
 		// 不做站立点导航——否则在狭长隧道里 A* 走不通会反复尝试把人偶卡死（用户实测反馈）
 		if (isFollowEnabled() && mineTargetPos != null
-			&& !(canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasLineOfSight(mineTargetPos))) {
+			&& !(canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasVisibleExposedFace(mineTargetPos))) {
 			mineTargetPos = null;
 			mineStandPos = null;
 			mineNavTarget = null;
@@ -4631,7 +4671,7 @@ public class DollEntity extends Avatar {
 				return;
 			}
 		}
-		if (canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasLineOfSight(mineTargetPos)) {
+		if (canReachBlockPos(mineTargetPos, MINE_REACH_SQR) && hasVisibleExposedFace(mineTargetPos)) {
 			clearMovementInput();
 			smoothFaceTowards(mineTargetPos.getX() + 0.5, mineTargetPos.getZ() + 0.5);
 			if (mineActionCooldown <= 0) {
@@ -4690,11 +4730,8 @@ public class DollEntity extends Avatar {
 					if (!isOreBlock(mpos) || !passesMineEdgeChecks(mpos)) {
 						continue;
 					}
-					if (!hasAdjacentAir(mpos)) {
-						continue; // 埋藏矿：不掘进（与跟随"顺路捡"同口径）
-					}
-					if (!canReachBlockPos(mpos, MINE_REACH_SQR) || !hasLineOfSight(mpos)) {
-						continue; // 只挖当前直接够得着的矿
+					if (!canReachBlockPos(mpos, MINE_REACH_SQR) || !hasVisibleExposedFace(mpos)) {
+						continue; // 只挖当前够得着、暴露面可见的矿；埋藏矿不掘进
 					}
 					if (!canPickaxeMine(level().getBlockState(mpos))) {
 						continue; // 镐等级不足：不浪费
@@ -4729,21 +4766,24 @@ public class DollEntity extends Avatar {
 			if (!passesMineEdgeChecks(ore)) {
 				continue;
 			}
-			// 跟随模式（机会式顺路捡）：只挖人偶行进路线附近暴露在空气里、当前直接够得着的矿。
+			// 跟随模式（机会式顺路捡）：只挖人偶行进路线附近、当前够得着且暴露面可见的矿。
 			// 埋藏矿不掘进、远矿不绕路、够不着不做站立点导航——否则在狭长隧道里
 			// A* 会"成功"却走不通（死胡同/转不了身），反复尝试把人偶卡死（用户实测反馈）。
 			if (following) {
 				if (ore.distSqr(this.blockPosition()) > MINE_FOLLOW_MAX_TARGET_DIST_SQR) {
 					continue;
 				}
-				if (!hasAdjacentAir(ore)) {
-					continue; // 埋藏矿：不掘进
+				if (!canReachBlockPos(ore, MINE_REACH_SQR) || !hasVisibleExposedFace(ore)) {
+					continue; // 只挖当前直接够得着且暴露面可见的矿
 				}
-				if (!canReachBlockPos(ore, MINE_REACH_SQR) || !hasLineOfSight(ore)) {
-					continue; // 只挖当前直接够得着的矿
+			} else {
+				// 非跟随对齐砍树：只采附近暴露面可见的矿，没有就原地不动；埋藏/隔墙矿不掘进
+				if (ore.distSqr(this.blockPosition()) > MINE_TARGET_MAX_DIST_SQR) {
+					continue; // 距人偶过远的矿不选，只会反复寻路失败被拉黑
 				}
-			} else if (ore.distSqr(this.blockPosition()) > MINE_TARGET_MAX_DIST_SQR) {
-				continue; // 非跟随：距人偶过远的矿直接不选，只会反复寻路失败被拉黑
+				if (!hasVisibleExposedFace(ore)) {
+					continue; // 埋藏/隔墙矿：不掘进、不隔墙挖
+				}
 			}
 			BlockState oreState = level().getBlockState(ore);
 			if (!canPickaxeMine(oreState)) {
@@ -4765,34 +4805,10 @@ public class DollEntity extends Avatar {
 				best = ore;
 			}
 		}
-		// 记录选中矿的站立点（供 applyMineInput 导航；直接够得着时为 null）
-		mineStandPos = best != null ? findMineStandPos(best) : null;
+		// 只采暴露面可见的矿：不再计算站立点导航（避免"回到起点/墙边干等"类副作用），
+		// 够得着且看得见就原地采，够不着就由 applyMineInput 直线/绕路走近再采
+		mineStandPos = null;
 		return best;
-	}
-
-	/**
-	 * 找矿的可站立点：返回人偶站到后能挖到该矿的空气格；矿当前直接够得着时返回 null。
-	 * 站立格要求：空气、下方有支撑、上方也空（人偶 2 格高）。
-	 * 仅非跟随模式使用（跟随模式只挖直接够得着的矿，不做站立点导航）。
-	 */
-	private BlockPos findMineStandPos(BlockPos ore) {
-		if (canReachBlockPos(ore, MINE_REACH_SQR) && hasLineOfSight(ore)) {
-			return null;
-		}
-		for (Direction dir : Direction.values()) {
-			BlockPos adj = ore.relative(dir);
-			if (!level().getBlockState(adj).isAir()) {
-				continue;
-			}
-			if (level().getBlockState(adj.below()).isAir()) {
-				continue; // 下方无支撑
-			}
-			if (!level().getBlockState(adj.above()).isAir()) {
-				continue; // 上方高度不够（人偶 2 格高）
-			}
-			return adj; // 从站立格中心到矿：水平 1 格、垂直 0，必然够得着
-		}
-		return null;
 	}
 
 	/** 从人偶眼睛到目标块中心是否无实心方块阻挡（隔墙矿不可挖）。 */
@@ -4801,6 +4817,26 @@ public class DollEntity extends Avatar {
 		Vec3 to = Vec3.atCenterOf(pos);
 		BlockHitResult hit = level().clip(new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
 		return hit.getType() == HitResult.Type.MISS || hit.getBlockPos().equals(pos);
+	}
+
+	/**
+	 * 「暴露面可见」判定：正中心视线已通，或该矿任一面朝向的相邻格是空气、且从那一侧看得见。
+	 * 用于挖矿选目标——贴着一面露出（其余面被包住）的矿也算可采，而非只看方块中心的直线视线。
+	 */
+	private boolean hasVisibleExposedFace(BlockPos ore) {
+		if (hasLineOfSight(ore)) {
+			return true; // 正中心视线已通：直接可见可采
+		}
+		for (Direction dir : Direction.values()) {
+			BlockPos adj = ore.relative(dir);
+			if (!level().getBlockState(adj).isAir()) {
+				continue; // 该面被方块封住，不是暴露面
+			}
+			if (hasLineOfSight(adj)) {
+				return true; // 正对某暴露面的空旷侧可见，从该面即可采到
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -5239,10 +5275,22 @@ public class DollEntity extends Avatar {
 				this.playSound(SoundEvents.FISHING_BOBBER_RETRIEVE, 1.0f,
 					0.4f / (this.getRandom().nextFloat() * 0.4f + 0.8f));
 				ItemStack rod = findFishingRodStack();
+				// 合成一个"浮漂"作为 THIS_ENTITY：顶层 FISHING 表里 treasure 子表条目带
+				// entity_properties(type_specific/fishing_hook, in_open_water=true) 条件，
+				// 只有 THIS_ENTITY 是 FishingHook 且 openWater 为真时宝藏子表才参与权重抽取。
+				// 人偶没有真实抛竿实体，这里直接把 openWater 置真——口径定为「能进入钓鱼模式
+				// 即视为开放水域」（2026-09-14 定案）：原版 calculateOpenWater 要求浮漂所在水面
+				// 5×5 全是水，而人偶只能站岸上钓（钓点必然紧邻陆地），照搬该判定会恒为 false，
+				// 使宝藏子表永远被条件拦下、竿上的海之眷顾完全失效。
+				// 顺带把浮漂坐标放到鱼漂水面位置，使 ORIGIN/位置类条件与原版语义一致。
+				FishingHook bobber = new FishingHook(EntityTypes.FISHING_BOBBER, serverLevel);
+				bobber.setPos(x, y, z);
+				((FishingHookOpenWaterAccessor) bobber)
+					.dollMod$setOpenWater(true);
 				LootParams.Builder builder = new LootParams.Builder(serverLevel)
 					.withParameter(LootContextParams.ORIGIN, new Vec3(x, y, z))
 					.withParameter(LootContextParams.TOOL, rod)
-					.withOptionalParameter(LootContextParams.THIS_ENTITY, this);
+					.withParameter(LootContextParams.THIS_ENTITY, bobber);
 				if (!rod.isEmpty()) {
 					// 与原版 FishingHook 一致：海之眷顾附魔 + 实体幸运属性（人偶被泼幸运药水后叠加生效）
 					builder.withLuck(EnchantmentHelper.getFishingLuckBonus(serverLevel, rod, this) + this.getLuck());
@@ -5270,6 +5318,11 @@ public class DollEntity extends Avatar {
 		fishNavTarget = null;
 		fishActionCooldown = FISH_ACTION_COOLDOWN;
 	}
+
+	// 说明：这里曾按原版口径复刻过 openWater 判定（isFishingOpenWater / fishingAreaType /
+	// fishingBlockType + FISH_OPEN_* 常量）。2026-09-14 定案改为「能进入钓鱼模式即视为开放水域」
+	// 后已删除——原版判定要求浮漂所在水面 5×5 全为水，与人偶「只能站岸上钓（钓点必然紧邻陆地）」
+	// 逻辑互斥，实际恒为 false，会让宝藏子表永远被拦、竿上海之眷顾完全失效。改动前请先复盘该结论。
 
 	/**
 	 * 射手模式决策：指挥棒指定的强制目标优先（无距离限制），否则正常搜寻。
