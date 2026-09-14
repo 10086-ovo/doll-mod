@@ -5294,13 +5294,15 @@ public class DollEntity extends Avatar {
 				// 合成一个"浮漂"作为 THIS_ENTITY：顶层 FISHING 表里 treasure 子表条目带
 				// entity_properties(type_specific/fishing_hook, in_open_water=true) 条件，
 				// 只有 THIS_ENTITY 是 FishingHook 且 openWater 为真时宝藏子表才参与权重抽取。
-				// 人偶没有真实抛竿实体，这里按原版 FishingHook.calculateOpenWater 的判定复刻
-				// 开放水域结果写入合成浮漂的 openWater 字段（FishingHookOpenWaterAccessor）。
+				// 人偶没有真实抛竿实体，这里直接把 openWater 置真——口径定为「能进入钓鱼模式
+				// 即视为开放水域」（2026-09-14 定案）：原版 calculateOpenWater 要求浮漂所在水面
+				// 5×5 全是水，而人偶只能站岸上钓（钓点必然紧邻陆地），照搬该判定会恒为 false，
+				// 使宝藏子表永远被条件拦下、竿上的海之眷顾完全失效。
 				// 顺带把浮漂坐标放到鱼漂水面位置，使 ORIGIN/位置类条件与原版语义一致。
 				FishingHook bobber = new FishingHook(EntityTypes.FISHING_BOBBER, serverLevel);
 				bobber.setPos(x, y, z);
 				((FishingHookOpenWaterAccessor) bobber)
-					.dollMod$setOpenWater(isFishingOpenWater(serverLevel, fishTargetWater));
+					.dollMod$setOpenWater(true);
 				LootParams.Builder builder = new LootParams.Builder(serverLevel)
 					.withParameter(LootContextParams.ORIGIN, new Vec3(x, y, z))
 					.withParameter(LootContextParams.TOOL, rod)
@@ -5333,72 +5335,10 @@ public class DollEntity extends Avatar {
 		fishActionCooldown = FISH_ACTION_COOLDOWN;
 	}
 
-	// ---- 开放水域判定（复刻原版 FishingHook.calculateOpenWater） ----
-	/** 单格水域类型：0=上方空气/睡莲(ABOVE_WATER)，1=源水且无碰撞(INSIDE_WATER)，2=无效(INVALID)。 */
-	private static final int FISH_OPEN_ABOVE_WATER = 0;
-	private static final int FISH_OPEN_INSIDE_WATER = 1;
-	private static final int FISH_OPEN_INVALID = 2;
-
-	/**
-	 * 复刻原版 FishingHook.calculateOpenWater：以水面浮漂所在方块为中心，
-	 * 竖直 dy=-1..2 共 4 层、每层水平 5×5（x/z 各 -2..2）采样。
-	 * 语义：最底层须为整片源水；向上可整片空气/睡莲收尾；任一层内格子类型
-	 * 不一致(INVALID)即判非开放水域；出现"空气层之下又有水层"的上下翻转也判否。
-	 */
-	private boolean isFishingOpenWater(ServerLevel level, BlockPos center) {
-		int type = FISH_OPEN_INVALID;
-		for (int dy = -1; dy <= 2; dy++) {
-			int area = fishingAreaType(level, center.offset(-2, dy, -2), center.offset(2, dy, 2));
-			switch (area) {
-				case FISH_OPEN_INVALID -> { return false; }
-				case FISH_OPEN_ABOVE_WATER -> {
-					if (type == FISH_OPEN_INVALID) {
-						return false;
-					}
-				}
-				case FISH_OPEN_INSIDE_WATER -> {
-					if (type == FISH_OPEN_ABOVE_WATER) {
-						return false;
-					}
-				}
-				default -> { }
-			}
-			type = area;
-		}
-		return true;
-	}
-
-	/** 复刻原版 getOpenWaterTypeForArea：区域内所有格子类型一致才返回该类型，否则 INVALID。 */
-	private int fishingAreaType(Level level, BlockPos min, BlockPos max) {
-		int common = FISH_OPEN_INVALID;
-		for (int y = min.getY(); y <= max.getY(); y++) {
-			for (int x = min.getX(); x <= max.getX(); x++) {
-				for (int z = min.getZ(); z <= max.getZ(); z++) {
-					int t = fishingBlockType(level, new BlockPos(x, y, z));
-					if (common == FISH_OPEN_INVALID) {
-						common = t;
-					} else if (common != t) {
-						return FISH_OPEN_INVALID;
-					}
-				}
-			}
-		}
-		return common;
-	}
-
-	/** 复刻原版 getOpenWaterTypeForBlock：空气/睡莲→ABOVE_WATER；源水且方块无碰撞→INSIDE_WATER；否则 INVALID。 */
-	private int fishingBlockType(Level level, BlockPos pos) {
-		BlockState state = level.getBlockState(pos);
-		if (state.isAir() || state.is(Blocks.LILY_PAD)) {
-			return FISH_OPEN_ABOVE_WATER;
-		}
-		if (state.getFluidState().is(FluidTags.WATER)
-			&& state.getFluidState().isSource()
-			&& state.getCollisionShape(level, pos).isEmpty()) {
-			return FISH_OPEN_INSIDE_WATER;
-		}
-		return FISH_OPEN_INVALID;
-	}
+	// 说明：这里曾按原版口径复刻过 openWater 判定（isFishingOpenWater / fishingAreaType /
+	// fishingBlockType + FISH_OPEN_* 常量）。2026-09-14 定案改为「能进入钓鱼模式即视为开放水域」
+	// 后已删除——原版判定要求浮漂所在水面 5×5 全为水，与人偶「只能站岸上钓（钓点必然紧邻陆地）」
+	// 逻辑互斥，实际恒为 false，会让宝藏子表永远被拦、竿上海之眷顾完全失效。改动前请先复盘该结论。
 
 	/**
 	 * 射手模式决策：指挥棒指定的强制目标优先（无距离限制），否则正常搜寻。

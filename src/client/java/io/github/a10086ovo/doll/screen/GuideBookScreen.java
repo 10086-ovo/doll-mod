@@ -84,6 +84,9 @@ public class GuideBookScreen extends Screen {
 	private int selectedCategory = -1;   // -1 = 首页
 	private int selectedEntry = -1;      // -1 = 条目列表
 	private int currentPage = 0;
+	/** 正文页滚动行偏移（正文超出可视高度时的滚轮滚动；切换条目/页码时自动归零） */
+	private int entryTextScroll = 0;
+	private String entryTextKey = "";    // 上次滚动的「条目:页码:语言」键，变更即归零 offset
 	// ---- 条目列表滚动 ----
 	private int entryScrollOffset = 0;
 	private boolean scrollbarDragging = false;
@@ -156,6 +159,8 @@ public class GuideBookScreen extends Screen {
 		// 重新打开时重置滚动
 		this.entryScrollOffset = 0;
 		this.scrollbarDragging = false;
+		this.entryTextScroll = 0;
+		this.entryTextKey = "";
 		// 清空渲染缓存（内容可能在资源重载后变化）
 		this.iconCache.clear();
 		this.wrapCache.clear();
@@ -171,6 +176,14 @@ public class GuideBookScreen extends Screen {
 			if (maxOffset > 0) {
 				int delta = vDelta > 0 ? -1 : 1;
 				entryScrollOffset = Math.clamp(entryScrollOffset + delta, 0, maxOffset);
+				return true;
+			}
+		}
+		// 正文页：超长文本滚轮滚动（与条目列表互斥，selectedEntry >= 0 时必不在列表视图）
+		if (selectedEntry >= 0) {
+			int max = entryTextMaxOffset();
+			if (max > 0) {
+				entryTextScroll = Math.clamp(entryTextScroll + (vDelta > 0 ? -1 : 1), 0, max);
 				return true;
 			}
 		}
@@ -204,9 +217,18 @@ public class GuideBookScreen extends Screen {
 		return super.mouseDragged(event, dragX, dragY);
 	}
 
-	/** 条目列表可见行数 */
+	/**
+	 * 条目列表可见行数。
+	 * 必须按「列表实际起首」动态计算：标题/描述换行行数越多，列表起首越靠下，
+	 * 旧的固定预算 (contentH - 30) 会把最后一行（连同滚动条）顶出内容区下边框
+	 * ——英文分类描述换 3 行时必现（中文紧凑一行时看不出来，属潜伏 bug）。
+	 */
 	private int getVisibleEntryRows() {
-		return Math.max(1, (contentH - 30) / ENTRY_ROW_H);
+		if (book == null) {
+			return Math.max(1, (contentH - 30) / ENTRY_ROW_H);
+		}
+		int bottom = contentY + contentH - 2;
+		return Math.max(1, (bottom - getEntryListStartY()) / ENTRY_ROW_H);
 	}
 
 	/** 条目列表起始 Y（标题与描述多行后之实际起首；渲染与判定共用同一计算，防阴阳错位） */
@@ -603,6 +625,12 @@ public class GuideBookScreen extends Screen {
 			currentPage = 0;
 		}
 		GuidePage page = entry.pages.get(currentPage);
+		// 条目/页码/语言任一变化即归零正文滚动（自愈式，免去追所有 mutation 点）
+		String textKey = selectedEntry + ":" + currentPage + ":" + (zh ? 1 : 0);
+		if (!textKey.equals(entryTextKey)) {
+			entryTextKey = textKey;
+			entryTextScroll = 0;
+		}
 
 		// 页面副标题已删，正文自内容区顶部偏下起
 		int bodyY = contentY + 10;
@@ -619,13 +647,65 @@ public class GuideBookScreen extends Screen {
 		g.centeredText(this.font, pageInfo, contentX + contentW / 2, pageY, C_HINT);
 	}
 
-	private void renderTextPage(GuiGraphicsExtractor g, GuidePage page, int startY) {
-		List<String> lines = wrapText(page.text, contentW - 16);
+	/** 正文可用底边：页码行之上 */
+	private int entryTextBottom() {
+		return contentY + contentH - 18;
+	}
+
+	/** 正文换行宽度：右缘让出滚动条轨道，避免长行被滚动条压住 */
+	private int bodyWrapWidth() {
+		return contentW - 16 - SCROLLBAR_W;
+	}
+
+	/**
+	 * 正文统一绘制（带滚动条机制）：换行后的行数超出可视高度时只画可视部分，
+	 * 右缘画细滚动条，滚轮滚动（见 mouseScrolled）。
+	 * 修复英文长文按行画到底、直接画穿下边框压住翻页按钮的问题（中文行数少恰好装下，属潜伏 bug）。
+	 */
+	private void renderBodyLines(GuiGraphicsExtractor g, List<String> lines, int startY) {
+		int lineH = this.font.lineHeight + 1;
+		int bottom = entryTextBottom();
+		int visible = Math.max(1, (bottom - startY) / lineH);
+		int maxOffset = Math.max(0, lines.size() - visible);
+		if (entryTextScroll > maxOffset) entryTextScroll = maxOffset;
+		if (entryTextScroll < 0) entryTextScroll = 0;
 		int y = startY;
-		for (String line : lines) {
-			g.text(this.font, line, contentX + 8, y, C_BODY, true);
-			y += this.font.lineHeight + 1;
+		for (int i = entryTextScroll; i < lines.size() && i < entryTextScroll + visible; i++) {
+			g.text(this.font, lines.get(i), contentX + 8, y, C_BODY, true);
+			y += lineH;
 		}
+		if (maxOffset > 0) {
+			int sbX = contentX + contentW - SCROLLBAR_W - 1;
+			int trackH = bottom - startY;
+			g.fill(sbX, startY, sbX + SCROLLBAR_W, startY + trackH, 0xFF0A090D);
+			int thumbH = Math.max(12, trackH * visible / lines.size());
+			int thumbTop = startY + (int) ((float) entryTextScroll / maxOffset * (trackH - thumbH));
+			g.fill(sbX, thumbTop, sbX + SCROLLBAR_W, thumbTop + thumbH, C_GOLD);
+		}
+	}
+
+	/** 当前正文页的滚动行数上限（0 = 无需滚动）；与渲染共用同一几何，防阴阳错位 */
+	private int entryTextMaxOffset() {
+		if (book == null || selectedEntry < 0) return 0;
+		var entries = book.categories.get(selectedCategory).entries;
+		if (currentPage >= entries.get(selectedEntry).pages.size()) return 0;
+		GuidePage page = entries.get(selectedEntry).pages.get(currentPage);
+		if (page.text == null || page.text.isEmpty()) return 0;
+		int startY;
+		String type = page.type.toLowerCase(java.util.Locale.ROOT);
+		switch (type) {
+			case "item" -> startY = contentY + 10 + 22;
+			case "crafting" -> startY = contentY + 10 + 3 * 18 + 8;
+			default -> startY = contentY + 10;
+		}
+		int lineH = this.font.lineHeight + 1;
+		int visible = Math.max(1, (entryTextBottom() - startY) / lineH);
+		return Math.max(0, wrapText(page.text, bodyWrapWidth()).size() - visible);
+	}
+
+	private void renderTextPage(GuiGraphicsExtractor g, GuidePage page, int startY) {
+		renderBodyLines(g, page.text == null || page.text.isEmpty()
+			? List.of() : wrapText(page.text, bodyWrapWidth()), startY);
 	}
 
 	private void renderItemPage(GuiGraphicsExtractor g, GuidePage page, int startY) {
@@ -634,13 +714,9 @@ public class GuideBookScreen extends Screen {
 		int iconX = contentX + contentW / 2 - 8;
 		g.item(icon, iconX, startY);
 
-		// 描述（副标题栏已尽去，正文自图标下方直接起）
-		List<String> lines = wrapText(page.text, contentW - 16);
-		int y = startY + 22;
-		for (String line : lines) {
-			g.text(this.font, line, contentX + 8, y, C_BODY, true);
-			y += this.font.lineHeight + 1;
-		}
+		// 描述（副标题栏已尽去，正文自图标下方直接起；超长走滚动条）
+		renderBodyLines(g, page.text == null || page.text.isEmpty()
+			? List.of() : wrapText(page.text, bodyWrapWidth()), startY + 22);
 	}
 
 		private void renderCraftingPage(GuiGraphicsExtractor g, GuideEntry entry, GuidePage page, int startY) {
@@ -682,15 +758,10 @@ public class GuideBookScreen extends Screen {
 			g.item(resultStack, resultX + 1, resultY + 1);
 		}
 
-		// 描述
+		// 描述（超长走滚动条）
 		if (page.text != null && !page.text.isEmpty()) {
-				List<String> lines = wrapText(page.text, contentW - 16);
-				int y = gridY + 3 * 18 + 8;
-				for (String line : lines) {
-					g.text(this.font, line, contentX + 8, y, C_BODY, true);
-					y += this.font.lineHeight + 1;
-				}
-			}
+			renderBodyLines(g, wrapText(page.text, bodyWrapWidth()), gridY + 3 * 18 + 8);
+		}
 	}
 
 	// ---- 底栏 ----
