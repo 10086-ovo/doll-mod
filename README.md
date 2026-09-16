@@ -11,8 +11,8 @@
 </p>
 
 <p align="center">
-  <a href="https://fabricmc.net/"><img src="https://img.shields.io/badge/Minecraft-26.2-1976d2?style=for-the-badge&logo=badgr" alt="Minecraft 26.2"/></a>
-  <img src="https://img.shields.io/badge/Fabric-Loader%200.19.3+-1976d2?style=for-the-badge&logo=fabricmc" alt="Fabric Loader 0.19.3+"/>
+  <a href="https://fabricmc.net/"><img src="https://img.shields.io/badge/Minecraft-26.3-1976d2?style=for-the-badge&logo=badgr" alt="Minecraft 26.3"/></a>
+  <img src="https://img.shields.io/badge/Fabric-Loader%200.19.5+-1976d2?style=for-the-badge&logo=fabricmc" alt="Fabric Loader 0.19.5+"/>
   <img src="https://img.shields.io/badge/Java-25+-1976d2?style=for-the-badge&logo=openjdk" alt="Java 25+"/>
   <img src="https://img.shields.io/badge/License-CC0--1.0-1976d2?style=for-the-badge" alt="CC0-1.0"/>
   <img src="https://img.shields.io/badge/Platform-Client%20%2B%20Server-1976d2?style=for-the-badge" alt="双端"/>
@@ -53,7 +53,7 @@
 
 ## 📦 安装
 
-1. 安装 [Fabric Loader](https://fabricmc.net/use/) 与 [Fabric API](https://modrinth.com/mod/fabric-api)（需匹配 Minecraft 26.2）。
+1. 安装 [Fabric Loader](https://fabricmc.net/use/) 与 [Fabric API](https://modrinth.com/mod/fabric-api)（需匹配 Minecraft 26.3）。
 2. 将模组 jar 放入 `.minecraft/mods` 文件夹。
 3. 启动游戏，创造模式物品栏会出现「人偶」标签页。
 
@@ -74,7 +74,7 @@
 ./gradlew runDatagen    # 运行数据生成器
 ```
 
-> 基于 Fabric + Minecraft 26.2 + Mojang 映射 + Loom 1.17，需 JDK 25+。源码结构与核心类说明见 [DEV_NOTES.md](DEV_NOTES.md)。
+> 基于 Fabric + Minecraft 26.3 + Mojang 映射 + Loom 1.17，需 JDK 25+。源码结构与核心类说明见 [DEV_NOTES.md](DEV_NOTES.md)。
 
 ## ⚠️ 兼容性与已知问题
 

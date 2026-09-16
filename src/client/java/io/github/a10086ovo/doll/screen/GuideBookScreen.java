@@ -1,5 +1,6 @@
 package io.github.a10086ovo.doll.screen;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import io.github.a10086ovo.doll.guide.GuideBook;
 import io.github.a10086ovo.doll.guide.GuideBookContent;
 import io.github.a10086ovo.doll.guide.GuideCategory;
@@ -192,7 +193,7 @@ public class GuideBookScreen extends Screen {
 
 	@Override
 	public boolean mouseReleased(MouseButtonEvent event) {
-		if (event.button() == 0) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
 			this.scrollbarDragging = false;
 		}
 		return super.mouseReleased(event);
@@ -201,7 +202,7 @@ public class GuideBookScreen extends Screen {
 	@Override
 	public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
 		if (book == null) return super.mouseDragged(event, dragX, dragY);
-		if (event.button() == 0 && this.scrollbarDragging && selectedEntry < 0 && selectedCategory >= 0) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT && this.scrollbarDragging && selectedEntry < 0 && selectedCategory >= 0) {
 				GuideCategory cat = book.categories.get(selectedCategory);
 				int visibleRows = getVisibleEntryRows();
 				int maxOffset = Math.max(0, cat.entries.size() - visibleRows);
@@ -268,7 +269,7 @@ public class GuideBookScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean bl) {
-		if (event.button() == 0) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
 			int mx = (int) event.x();
 			int my = (int) event.y();
 			if (handleSidebarClick(mx, my)) return true;

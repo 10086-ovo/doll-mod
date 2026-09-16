@@ -2,7 +2,6 @@ package io.github.a10086ovo.doll.block;
 
 import io.github.a10086ovo.doll.DollMod;
 import io.github.a10086ovo.doll.entity.WildWardenDollEntity;
-import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
@@ -41,11 +40,6 @@ public class SculkShrineBlock extends BaseEntityBlock {
 	public SculkShrineBlock(Properties properties) {
 		super(properties);
 		this.registerDefaultState(this.stateDefinition.any().setValue(TRIGGERED, false));
-	}
-
-	@Override
-	protected MapCodec<? extends BaseEntityBlock> codec() {
-		return simpleCodec(SculkShrineBlock::new);
 	}
 
 	@Override

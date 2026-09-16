@@ -13,7 +13,7 @@
     },
     "has_the_recipe": {
       "conditions": {
-        "recipe": "doll-mod:pale_bow"
+        "recipes": "doll-mod:pale_bow"
       },
       "trigger": "minecraft:recipe_unlocked"
     }

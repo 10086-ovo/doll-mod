@@ -1,6 +1,5 @@
 package io.github.a10086ovo.doll.block;
 
-import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.stats.Stats;
@@ -38,7 +37,6 @@ import org.jetbrains.annotations.Nullable;
  */
 public class RockAnvilBlock extends FallingBlock {
 
-	public static final MapCodec<RockAnvilBlock> CODEC = simpleCodec(RockAnvilBlock::new);
 	public static final EnumProperty<Direction> FACING = BlockStateProperties.HORIZONTAL_FACING;
 
 	/** 当前阶段已使用的次数（0~2）。每个阶段可用 3 次，第 3 次用完后切换到下一损伤阶段。 */
@@ -76,11 +74,6 @@ public class RockAnvilBlock extends FallingBlock {
 		this.registerDefaultState(this.stateDefinition.any()
 			.setValue(FACING, Direction.NORTH)
 			.setValue(USES, 0));
-	}
-
-	@Override
-	protected MapCodec<? extends RockAnvilBlock> codec() {
-		return CODEC;
 	}
 
 	@Override

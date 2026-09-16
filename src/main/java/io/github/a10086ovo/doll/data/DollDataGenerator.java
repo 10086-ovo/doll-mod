@@ -11,8 +11,10 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.recipes.RecipeCategory;
-import net.minecraft.data.recipes.RecipeOutput;
+import net.minecraft.advancements.Advancement;
 import net.minecraft.data.recipes.RecipeProvider;
+import net.minecraft.data.worldgen.BootstrapContext;
+import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.data.recipes.ShapedRecipeBuilder;
 import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
@@ -83,12 +85,13 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 
 		@Override
 		public RecipeProvider createRecipeProvider(HolderLookup.Provider registryLookup,
-				RecipeOutput output) {
-			return new RecipeProvider(registryLookup, output) {
+				BootstrapContext<Recipe<?>> bootstrapContext,
+				BootstrapContext<Advancement> advancementOutput) {
+			return new RecipeProvider(bootstrapContext, advancementOutput) {
 		@Override
 		public void buildRecipes() {
 			// 人偶指挥棒：右上角到左下角对角线三根木棍（法杖造型）
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.TOOLS, item(DOLL_BATON_ID))
 				.pattern("  S")
 				.pattern(" S ")
@@ -99,7 +102,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 						Identifier.fromNamespaceAndPath(MOD_ID, DOLL_BATON_ID)));
 
 			// 人偶遥控器：铁 + 红石 + 铁（控制面板造型）
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.TOOLS, item(DOLL_CONTROL_PANEL_ID))
 				.pattern("I")
 				.pattern("R")
@@ -111,7 +114,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 						Identifier.fromNamespaceAndPath(MOD_ID, DOLL_CONTROL_PANEL_ID)));
 
 			// 一阶蛋：上下左右四个工作台 + 中间箱子（十字形）
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 							RecipeCategory.MISC, item(DOLL_TIER1_EGG_ID))
 						.pattern(" W ")
 						.pattern("WCW")
@@ -123,7 +126,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 						Identifier.fromNamespaceAndPath(MOD_ID, DOLL_TIER1_EGG_ID)));
 
 				// 幽匿人偶蛋：8 幽匿块围一圈，中间幽匿人偶头颅
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.MISC, item(WARDEN_DOLL_EGG_ID))
 				.pattern("SSS")
 				.pattern("SHS")
@@ -135,7 +138,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 					Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.WARDEN_DOLL_EGG_ID)));
 
 				// 幽匿灵龛：8 深板岩石砖围 1 灵魂沙
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.DECORATIONS, block(SCULK_SHRINE_ID))
 				.pattern("DDD")
 				.pattern("DSD")
@@ -147,7 +150,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 					Identifier.fromNamespaceAndPath(MOD_ID, SCULK_SHRINE_ID)));
 
 			// 苍白人偶头颅：4 树脂砖 2×2 合成
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.MISC, block(PALE_DOLL_HEAD_ID))
 				.pattern("RR")
 				.pattern("RR")
@@ -157,7 +160,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 					Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.PALE_DOLL_HEAD_ID)));
 
 			// 苍白人偶蛋：8 苍白橡木原木围一圈，中间苍白人偶头颅
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.MISC, item(PALE_DOLL_EGG_ID))
 				.pattern("PPP")
 				.pattern("PHP")
@@ -169,7 +172,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 					Identifier.fromNamespaceAndPath(MOD_ID, PALE_DOLL_EGG_ID)));
 
 			// 下界人偶头颅：4 石英块 2×2 合成
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.MISC, block(NETHER_DOLL_HEAD_ID))
 				.pattern("QQ")
 				.pattern("QQ")
@@ -179,7 +182,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 					Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.NETHER_DOLL_HEAD_ID)));
 
 			// 下界人偶蛋：8 下界岩围一圈，中间下界人偶头颅
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.MISC, item(NETHER_DOLL_EGG_ID))
 				.pattern("NNN")
 				.pattern("NHN")
@@ -191,7 +194,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 					Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.NETHER_DOLL_EGG_ID)));
 
 			// 末影人偶头颅：4 紫珀块 2×2 合成
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.MISC, block(ENDER_DOLL_HEAD_ID))
 				.pattern("PP")
 				.pattern("PP")
@@ -201,7 +204,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 					Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.ENDER_DOLL_HEAD_ID)));
 
 			// 末影人偶蛋：8 末影石围一圈，中间末影人偶头颅
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.MISC, item(ENDER_DOLL_EGG_ID))
 				.pattern("EEE")
 				.pattern("EHE")
@@ -213,7 +216,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 					Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.ENDER_DOLL_EGG_ID)));
 
 			// 海洋人偶头颅：4 海晶石 2×2 合成
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.MISC, block(SEA_DOLL_HEAD_ID))
 				.pattern("PP")
 				.pattern("PP")
@@ -223,7 +226,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 					Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.SEA_DOLL_HEAD_ID)));
 
 			// 海洋人偶蛋：8 海带围一圈，中间海洋人偶头颅
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.MISC, item(SEA_DOLL_EGG_ID))
 				.pattern("KKK")
 				.pattern("KHK")
@@ -237,7 +240,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 			// 海洋套装无合成配方——仅通过埋藏宝藏战利品获取（见 SeaArmorLootInjector）
 
 			// 森林人偶头颅：4 苔石 2×2 合成
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.MISC, block(FOREST_DOLL_HEAD_ID))
 				.pattern("MM")
 				.pattern("MM")
@@ -247,7 +250,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 					Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.FOREST_DOLL_HEAD_ID)));
 
 			// 森林人偶蛋：8 橡木原木围一圈，中间森林人偶头颅
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.MISC, item(FOREST_DOLL_EGG_ID))
 				.pattern("OOO")
 				.pattern("OHO")
@@ -259,7 +262,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 				Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.FOREST_DOLL_EGG_ID)));
 
 			// 向导人偶头颅：4 指南针 2×2 合成
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.MISC, block(GUIDE_DOLL_HEAD_ID))
 				.pattern("CC")
 				.pattern("CC")
@@ -269,7 +272,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 					Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.GUIDE_DOLL_HEAD_ID)));
 
 			// 向导人偶蛋：8 纸围一圈，中间向导人偶头颅
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.MISC, item(GUIDE_DOLL_EGG_ID))
 				.pattern("PPP")
 				.pattern("PHP")
@@ -281,7 +284,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 					Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.GUIDE_DOLL_EGG_ID)));
 
 			// 石砧：三圆石 + 六圆石半砖
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.DECORATIONS, block(ROCK_ANVIL_ID))
 				.pattern("CCC")
 				.pattern(" S ")
@@ -301,7 +304,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 			//   G E
 			//   G S
 			//     S
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.TOOLS, item(ENDER_AXE_ID))
 				.pattern("GE")
 				.pattern("GS")
@@ -317,7 +320,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 			//   第一行：任意原木 / 铁块 / 任意原木
 			//   第二行：任意原木 / 任意原木 / 任意原木
 			//   第三行：空 / 任意原木 / 空
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.TOOLS, item(THORNS_SHIELD_ID))
 				.pattern("LIL")
 				.pattern("LLL")
@@ -330,7 +333,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 
 			// 下界剑：中间一列竖排——烈焰棒×2 + 木棍×1（下界主题近战武器，
 			// 基础伤害 8、攻击速度 2.0）
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.TOOLS, item(NETHER_SWORD_ID))
 				.pattern(" N ")
 				.pattern(" N ")
@@ -342,7 +345,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 				Identifier.fromNamespaceAndPath(MOD_ID, DollModConstants.NETHER_SWORD_ID)));
 
 			// 苍白弓：3 树脂砖 + 3 线，锯齿形布局（树脂砖替代木棍位置）
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.TOOLS, item(PALE_BOW_ID))
 				.pattern(" RS")
 				.pattern("R S")
@@ -357,7 +360,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 			//   第一行：铁锭 / 青金石 / 铁锭
 			//   第二行：红石
 			//   第三行：红石
-			ShapedRecipeBuilder.shaped(this.registries.lookupOrThrow(Registries.ITEM),
+			this.shaped(
 					RecipeCategory.TOOLS, item(DollModConstants.GUIDE_PICKAXE_ID))
 				.pattern("ILI")
 				.pattern(" R ")
@@ -386,6 +389,24 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 	 * {@code "structure." + namespace + "." + path} 取显示名，缺键就会直接显示原始键名。
 	 */
 	private static final String[][] STRUCTURE_DISPLAY_NAMES = {
+		{"abandoned_camp_bamboo_jungle", "竹林废弃营地", "Bamboo Jungle Abandoned Camp"},
+		{"abandoned_camp_birch_forest", "桦木森林废弃营地", "Birch Forest Abandoned Camp"},
+		{"abandoned_camp_cherry_grove", "樱花林废弃营地", "Cherry Grove Abandoned Camp"},
+		{"abandoned_camp_dappled_forest", "斑驳森林废弃营地", "Dappled Forest Abandoned Camp"},
+		{"abandoned_camp_flower_forest", "繁花森林废弃营地", "Flower Forest Abandoned Camp"},
+		{"abandoned_camp_forest", "森林废弃营地", "Forest Abandoned Camp"},
+		{"abandoned_camp_meadow", "草甸废弃营地", "Meadow Abandoned Camp"},
+		{"abandoned_camp_old_growth_birch_forest", "原始桦木森林废弃营地", "Old Growth Birch Forest Abandoned Camp"},
+		{"abandoned_camp_old_growth_pine_taiga", "原始松木针叶林废弃营地", "Old Growth Pine Taiga Abandoned Camp"},
+		{"abandoned_camp_old_growth_spruce_taiga", "原始云杉针叶林废弃营地", "Old Growth Spruce Taiga Abandoned Camp"},
+		{"abandoned_camp_pale_garden", "苍白花园废弃营地", "Pale Garden Abandoned Camp"},
+		{"abandoned_camp_savanna", "热带草原废弃营地", "Savanna Abandoned Camp"},
+		{"abandoned_camp_snowy_taiga", "积雪的针叶林废弃营地", "Snowy Taiga Abandoned Camp"},
+		{"abandoned_camp_sparse_jungle", "稀疏丛林废弃营地", "Sparse Jungle Abandoned Camp"},
+		{"abandoned_camp_swamp", "沼泽废弃营地", "Swamp Abandoned Camp"},
+		{"abandoned_camp_taiga", "针叶林废弃营地", "Taiga Abandoned Camp"},
+		{"abandoned_camp_windswept_forest", "风袭森林废弃营地", "Windswept Forest Abandoned Camp"},
+		{"abandoned_camp_wooded_badlands", "繁茂的恶地废弃营地", "Wooded Badlands Abandoned Camp"},
 		{"ancient_city", "远古城市", "Ancient City"},
 		{"bastion_remnant", "堡垒遗迹", "Bastion Remnant"},
 		{"buried_treasure", "埋藏的宝藏", "Buried Treasure"},
@@ -432,6 +453,7 @@ public class DollDataGenerator implements DataGeneratorEntrypoint {
 		{"cherry_grove", "樱花林", "Cherry Grove"},
 		{"cold_ocean", "冷水海洋", "Cold Ocean"},
 		{"crimson_forest", "绯红森林", "Crimson Forest"},
+		{"dappled_forest", "斑驳森林", "Dappled Forest"},
 		{"dark_forest", "黑森林", "Dark Forest"},
 		{"deep_cold_ocean", "冷水深海", "Deep Cold Ocean"},
 		{"deep_dark", "深暗之域", "Deep Dark"},

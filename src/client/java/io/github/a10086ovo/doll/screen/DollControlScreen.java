@@ -1,5 +1,6 @@
 package io.github.a10086ovo.doll.screen;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import io.github.a10086ovo.doll.DollModConstants;
 import io.github.a10086ovo.doll.mode.DollMode;
 import io.github.a10086ovo.doll.network.DollClientNetworking;
@@ -129,7 +130,7 @@ public class DollControlScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent event, boolean bl) {
-		if (event.button() == 0) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
 			int mx = (int) event.x();
 			int my = (int) event.y();
 			if (selected != null) {

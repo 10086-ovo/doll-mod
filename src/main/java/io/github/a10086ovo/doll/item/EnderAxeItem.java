@@ -34,14 +34,15 @@ import net.minecraft.world.level.block.state.BlockState;
  *       人偶不叠加——末影人偶保留自身变体闪避天赋</li>
  * </ul>
  */
-public class EnderAxeItem extends net.minecraft.world.item.AxeItem {
+public class EnderAxeItem extends net.minecraft.world.item.Item {
 
 	public static final int THROW_THRESHOLD_TIME = 10;
 	public static final float PROJECTILE_SHOOT_POWER = 2.5f;
 	private static final float EXECUTE_THRESHOLD = 0.3f;
 
 	public EnderAxeItem(ToolMaterial material, float attackDamage, float attackSpeed, Properties properties) {
-		super(material, attackDamage, attackSpeed, properties);
+		// 26.3 移除 AxeItem/DiggerItem 层级，工具属性并入 Item.Properties.axe() 工厂
+		super(properties.axe(material, attackDamage, attackSpeed));
 	}
 
 	// ===================== 投掷逻辑（复刻 TridentItem） =====================

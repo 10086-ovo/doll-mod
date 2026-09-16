@@ -3,6 +3,7 @@ package io.github.a10086ovo.doll;
 import io.github.a10086ovo.doll.block.RockAnvilBlock;
 import io.github.a10086ovo.doll.block.SculkShrineBlock;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.Prediction;
 import io.github.a10086ovo.doll.entity.DollEntity;
 import io.github.a10086ovo.doll.entity.DollRecallRegistry;
 import io.github.a10086ovo.doll.entity.DollRecallService;
@@ -885,7 +886,7 @@ public class DollMod implements ModInitializer {
 					}
 					ItemStack book = new ItemStack(GUIDE_BOOK_ITEM);
 					if (!player.getInventory().add(book)) {
-							player.drop(book, false);
+							player.drop(book, false, Prediction.SERVER_ONLY);
 					}
 					GuideBookGivenStore.set(id, true);
 					player.sendSystemMessage(Component.translatable("message.doll-mod.guide_book_received"));

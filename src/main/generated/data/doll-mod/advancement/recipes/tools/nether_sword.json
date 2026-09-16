@@ -13,7 +13,7 @@
     },
     "has_the_recipe": {
       "conditions": {
-        "recipe": "doll-mod:nether_sword"
+        "recipes": "doll-mod:nether_sword"
       },
       "trigger": "minecraft:recipe_unlocked"
     }

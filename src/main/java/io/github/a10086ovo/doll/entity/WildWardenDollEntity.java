@@ -8,6 +8,7 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.component.SwingAnimation;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -253,9 +254,7 @@ public class WildWardenDollEntity extends Monster {
 			0.3,
 			dz / distance * pull
 		);
-		target.hurtMarked = true;
-
-		// 造成伤害（穿甲音波）
+		// 造成伤害（穿甲音波，hurtServer 内部自动触发受击闪红）
 		target.hurtServer(serverLevel, this.damageSources().sonicBoom(this), SONIC_BOOM_DAMAGE);
 	}
 
@@ -280,7 +279,7 @@ public class WildWardenDollEntity extends Monster {
 		if (emergeTicks == 0) {
 			emergeStartY = this.getY();
 			this.setNoGravity(true);
-			this.setInvulnerable(true);
+			this.setPermanentlyInvulnerable(true);
 			this.playSound(SoundEvents.WARDEN_EMERGE, 3.0f, 1.0f);
 			if (this.level() instanceof ServerLevel serverLevel) {
 				spawnInitialBurst(serverLevel);
@@ -319,7 +318,7 @@ public class WildWardenDollEntity extends Monster {
 			emerging = false;
 			hasEmerged = true;
 			this.setNoGravity(false);
-			this.setInvulnerable(false);
+			this.setPermanentlyInvulnerable(false);
 			this.setPos(this.getX(), emergeStartY, this.getZ());
 			this.playSound(SoundEvents.WARDEN_ROAR, 3.0f, 1.0f);
 		}
@@ -409,7 +408,7 @@ public class WildWardenDollEntity extends Monster {
 	public boolean doHurtTarget(ServerLevel level, Entity target) {
 		boolean hit = super.doHurtTarget(level, target);
 		if (hit) {
-			this.swing(InteractionHand.MAIN_HAND);
+			this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 		}
 		return hit;
 	}

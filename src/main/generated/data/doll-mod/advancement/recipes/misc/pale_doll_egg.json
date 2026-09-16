@@ -13,7 +13,7 @@
     },
     "has_the_recipe": {
       "conditions": {
-        "recipe": "doll-mod:pale_doll_egg"
+        "recipes": "doll-mod:pale_doll_egg"
       },
       "trigger": "minecraft:recipe_unlocked"
     }

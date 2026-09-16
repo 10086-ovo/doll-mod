@@ -13,9 +13,11 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.biome.Biome;
+import net.minecraft.world.level.biome.BiomeResolver;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.biome.Climate;
 import net.minecraft.world.level.chunk.ChunkGeneratorStructureState;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureSet;
 import net.minecraft.world.level.levelgen.structure.placement.ConcentricRingsStructurePlacement;
@@ -421,7 +423,7 @@ public final class GeoIndexService {
 				return null;
 			}
 			BiomeSource source = level.getChunkSource().getGenerator().getBiomeSource();
-			Climate.Sampler sampler = level.getChunkSource().getGeneratorState().randomState().sampler();
+			Climate.Sampler sampler = level.getChunkSource().getGeneratorState().randomState().createClimateSampler(SamplerContext.EMPTY_UNCACHED);
 			if (source == null || sampler == null) {
 				return null;
 			}
@@ -469,8 +471,9 @@ public final class GeoIndexService {
 			try {
 				int qx = blockX >> 2;
 				int qz = blockZ >> 2;
+				BiomeResolver resolver = source.createResolver(sampler);
 				for (int qy : PROBE_QUART_YS) {
-					Holder<Biome> h = source.getNoiseBiome(qx, qy, qz, sampler);
+					Holder<Biome> h = resolver.getNoiseBiome(qx, qy, qz);
 					if (h != null && allowed.contains(h)) {
 						return true;
 					}
@@ -566,8 +569,9 @@ public final class GeoIndexService {
 		try {
 			int qx = blockX >> 2;
 			int qz = blockZ >> 2;
+			BiomeResolver resolver = source.createResolver(sampler);
 			for (int by : BIOME_PROBE_BLOCK_YS) {
-				Holder<Biome> h = source.getNoiseBiome(qx, by >> 2, qz, sampler);
+				Holder<Biome> h = resolver.getNoiseBiome(qx, by >> 2, qz);
 				if (h != null && h.is(target)) {
 					return by;
 				}
@@ -593,8 +597,9 @@ public final class GeoIndexService {
 		try {
 			int qx = blockX >> 2;
 			int qz = blockZ >> 2;
+			BiomeResolver resolver = source.createResolver(sampler);
 			for (int by : BIOME_PROBE_BLOCK_YS) {
-				Holder<Biome> h = source.getNoiseBiome(qx, by >> 2, qz, sampler);
+				Holder<Biome> h = resolver.getNoiseBiome(qx, by >> 2, qz);
 				if (h == null) {
 					continue;
 				}
@@ -645,7 +650,7 @@ public final class GeoIndexService {
 			try {
 				int s = Math.max(1, step);
 				BiomeSource source = level.getChunkSource().getGenerator().getBiomeSource();
-				Climate.Sampler sampler = level.getChunkSource().getGeneratorState().randomState().sampler();
+				Climate.Sampler sampler = level.getChunkSource().getGeneratorState().randomState().createClimateSampler(SamplerContext.EMPTY_UNCACHED);
 				if (source == null || sampler == null) {
 					return null;
 				}

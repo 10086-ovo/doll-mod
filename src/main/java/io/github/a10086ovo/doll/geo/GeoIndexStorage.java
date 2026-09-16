@@ -67,9 +67,13 @@ public final class GeoIndexStorage {
 	 *   <li>4：新增村庄「已确认」桶（键见 {@link GeoIndex#confirmedKey}）。建索引时会挑每类村庄最近的
 	 *       若干个做生成校验并存入该桶，搜索时免检直接回放。旧文件没有这个桶 → 若不废弃，村庄搜索
 	 *       仍要每次现装配（440~550ms/个），"代码修好了却看不到效果"。</li>
+	 *   <li>5：26.3 新增 18 个 {@code abandoned_camp_*} 结构（结构 34→52）与 1 个 {@code dappled_forest}
+	 *       群系。结构与群系列表都按注册键字符串排序、下标即 targetIndex，新条目按字母序插在表头，
+	 *       使既有下标<b>整体平移</b>（结构 +18、群系 +1）。旧桶里的坐标于是张冠李戴（把远古城市
+	 *       当"竹林废弃营地"报给你）且 {@link #BUILT_KEY} 为 true 会跳过重建、永不自愈。</li>
 	 * </ul>
 	 */
-	public static final int SCHEMA_VERSION = 4;
+	public static final int SCHEMA_VERSION = 5;
 
 	/** 版本号在文件根对象里的保留键；不含 {@code ':'}，不会与桶键相撞。 */
 	private static final String SCHEMA_KEY = "_schema";

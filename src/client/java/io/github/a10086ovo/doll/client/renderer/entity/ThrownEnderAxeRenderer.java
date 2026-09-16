@@ -56,19 +56,19 @@ public class ThrownEnderAxeRenderer extends EntityRenderer<ThrownEnderAxe, Throw
 			SubmitNodeCollector collector, net.minecraft.client.renderer.state.level.CameraRenderState cameraState) {
 		poseStack.pushPose();
 		// 旋转：与三叉戟完全一致，Y 轴 (yRot-90) + Z 轴 (xRot+90)
-		poseStack.mulPose(Axis.YP.rotationDegrees(state.yRot - 90.0f));
-		poseStack.mulPose(Axis.ZP.rotationDegrees(state.xRot + 90.0f));
+		poseStack.rotate(Axis.YP.rotationDegrees(state.yRot - 90.0f));
+		poseStack.rotate(Axis.ZP.rotationDegrees(state.xRot + 90.0f));
 
 		// 主模型
 		collector.order(0)
 			.submitModel(this.model, Unit.INSTANCE, poseStack, TEXTURE,
-				state.lightCoords, OverlayTexture.NO_OVERLAY, state.outlineColor, null);
+				state.lightCoords, OverlayTexture.NO_OVERLAY, state.outlineColor);
 
 		// 附魔光泽
 		if (state.isFoil) {
 			collector.order(1)
 				.submitModel(this.model, Unit.INSTANCE, poseStack,
-					RenderTypes.entityGlint(), state.lightCoords, OverlayTexture.NO_OVERLAY, state.outlineColor, null);
+					RenderTypes.entitySolidGlint(TEXTURE), state.lightCoords, OverlayTexture.NO_OVERLAY, state.outlineColor);
 		}
 
 		poseStack.popPose();

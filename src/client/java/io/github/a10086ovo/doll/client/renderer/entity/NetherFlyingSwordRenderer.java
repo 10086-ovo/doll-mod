@@ -113,19 +113,19 @@ public class NetherFlyingSwordRenderer extends EntityRenderer<NetherFlyingSwordE
 		//   align（绕 Z 把斜置剑身长轴对齐到模型 +Y）→ roll（绕 +Y 长轴自转）→
 		//   pitch（绕 X 仰俯：倾斜剑尖离轴）→ yaw（绕世界 Y 水平转向，最外层）
 		// yaw 必须在最外层：被 pitch 倾斜后的剑尖矢量经 yaw 才能转到目标水平方位。
-		poseStack.mulPose(Axis.YP.rotationDegrees(state.yaw));
-		poseStack.mulPose(Axis.XP.rotationDegrees(state.pitch));
-		poseStack.mulPose(Axis.YP.rotationDegrees(state.roll));
-		poseStack.mulPose(Axis.ZP.rotationDegrees(MODEL_ALIGN_DEG));
+		poseStack.rotate(Axis.YP.rotationDegrees(state.yaw));
+		poseStack.rotate(Axis.XP.rotationDegrees(state.pitch));
+		poseStack.rotate(Axis.YP.rotationDegrees(state.roll));
+		poseStack.rotate(Axis.ZP.rotationDegrees(MODEL_ALIGN_DEG));
 
 		collector.order(0)
 			.submitModel(this.model, Unit.INSTANCE, poseStack, TEXTURE,
-				state.lightCoords, OverlayTexture.NO_OVERLAY, state.outlineColor, null);
+				state.lightCoords, OverlayTexture.NO_OVERLAY, state.outlineColor);
 
 		if (state.isFoil) {
 			collector.order(1)
 				.submitModel(this.model, Unit.INSTANCE, poseStack,
-					RenderTypes.entityGlint(), state.lightCoords, OverlayTexture.NO_OVERLAY, state.outlineColor, null);
+					RenderTypes.entitySolidGlint(TEXTURE), state.lightCoords, OverlayTexture.NO_OVERLAY, state.outlineColor);
 		}
 
 		poseStack.popPose();

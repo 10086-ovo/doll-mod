@@ -13,7 +13,7 @@
     },
     "has_the_recipe": {
       "conditions": {
-        "recipe": "doll-mod:doll_baton"
+        "recipes": "doll-mod:doll_baton"
       },
       "trigger": "minecraft:recipe_unlocked"
     }

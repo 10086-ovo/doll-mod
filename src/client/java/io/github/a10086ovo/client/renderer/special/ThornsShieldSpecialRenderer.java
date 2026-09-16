@@ -42,7 +42,7 @@ public class ThornsShieldSpecialRenderer extends ShieldSpecialRenderer {
                        int light, int overlay, boolean hasEffect, int seed) {
         // 始终使用荆棘盾牌自定义纹理，不处理 banner pattern（荆棘盾牌不支持旗帜图案）
         collector.submitModel(model, Unit.INSTANCE, poseStack, light, overlay, -1,
-                THORNS_SHIELD_SPRITE, sprites, seed, (ModelFeatureRenderer.CrumblingOverlay) null);
+                THORNS_SHIELD_SPRITE, sprites, seed);
     }
 
     /**

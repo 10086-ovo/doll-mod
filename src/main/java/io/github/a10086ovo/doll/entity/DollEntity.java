@@ -72,11 +72,10 @@ import net.minecraft.world.entity.TamableAnimal;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.AxeItem;
 import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.HoeItem;
 import net.minecraft.world.item.FishingRodItem;
 import net.minecraft.world.item.TridentItem;
+import net.minecraft.world.item.component.SwingAnimation;
 import net.minecraft.world.item.MaceItem;
 import net.minecraft.world.item.equipment.Equippable;
 import net.minecraft.world.item.ArrowItem;
@@ -786,9 +785,9 @@ public class DollEntity extends Avatar {
 		if (stack.isEmpty()) {
 			return false;
 		}
-		return stack.is(ItemTags.SWORDS)
-			|| stack.is(ItemTags.SPEARS)
-			|| stack.getItem() instanceof AxeItem
+		return stack.typeHolder().is(ItemTags.SWORDS)
+			|| stack.typeHolder().is(ItemTags.SPEARS)
+			|| stack.typeHolder().is(ItemTags.AXES)
 			|| stack.getItem() instanceof TridentItem
 			|| stack.getItem() instanceof MaceItem;
 	}
@@ -1167,10 +1166,6 @@ public class DollEntity extends Avatar {
 		if (this.level().isClientSide()) {
 			this.setYHeadRot(this.getYRot());
 		}
-
-		// 挥臂：26.2 中 updateSwingTime() 只在 Player/Monster 的 aiStep 里被调用，
-		// Avatar/LivingEntity 分支不会推进 swingTime，这里手动补齐。
-		this.updateSwingTime();
 
 		if (serverSide) {
 			tickAutoJump();
@@ -2059,7 +2054,7 @@ public class DollEntity extends Avatar {
 			false // 不把骑乘者拉下坐骑
 		);
 		attackCooldown = ATTACK_COOLDOWN_TICKS;
-		this.swing(InteractionHand.MAIN_HAND); // 无论是否命中都挥臂，视觉反馈
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false); // 无论是否命中都挥臂，视觉反馈
 		if (hit && !weapon.isEmpty()) {
 			weapon.postHurtEnemy(target, this);
 		}
@@ -2604,8 +2599,8 @@ public class DollEntity extends Avatar {
 			return false;
 		}
 		level().setBlock(pos, target.defaultBlockState(), 3);
-		this.playSound(SoundEvents.HOE_TILL, 1.0f, 1.0f);
-		this.swing(InteractionHand.MAIN_HAND);
+		this.playSound(SoundEvents.HOE_TILL.value(), 1.0f, 1.0f);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 		ItemStack hoe = findHoeStack();
 		if (!hoe.isEmpty()) {
 			hoe.hurtAndBreak(1, this, EquipmentSlot.MAINHAND);
@@ -2639,7 +2634,7 @@ public class DollEntity extends Avatar {
 		// 消耗满水桶 → 空桶
 		inventory.setItem(bucketSlot, new ItemStack(Items.BUCKET));
 		farmWaterPlaced = true;
-		this.swing(InteractionHand.MAIN_HAND);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 		return true;
 	}
 
@@ -2663,7 +2658,7 @@ public class DollEntity extends Avatar {
 		level().setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
 		level().levelEvent(2001, pos, Block.getId(state));
 		this.playSound(SoundEvents.CROP_BREAK, 1.0f, 1.0f);
-		this.swing(InteractionHand.MAIN_HAND);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 		for (ItemStack drop : drops) {
 			addToDollInventory(drop);
 		}
@@ -2691,7 +2686,7 @@ public class DollEntity extends Avatar {
 		level().setBlock(cropPos, state, 3);
 		seed.shrink(1);
 		this.playSound(SoundEvents.CROP_PLANTED, 1.0f, 1.0f);
-		this.swing(InteractionHand.MAIN_HAND);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 		// 播种挥动期间主手临时显示种子（否则主手仍渲染锄头，视觉与动作不符）
 		plantSourceSlot = seedSlot;
 		plantSeedHandTicks = PLANT_SWING_TICKS;
@@ -2912,7 +2907,7 @@ public class DollEntity extends Avatar {
 			return;
 		}
 		consumable.onConsume(level(), player, food);
-		this.swing(InteractionHand.MAIN_HAND);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 		feedCooldown = FEED_ACTION_COOLDOWN;
 	}
 
@@ -3376,7 +3371,7 @@ public class DollEntity extends Avatar {
 		}
 		level().setBlock(pos, state, 3);
 		sapling.shrink(1);
-		this.swing(InteractionHand.MAIN_HAND);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 		this.playSound(SoundEvents.CROP_PLANTED, 1.0f, 1.0f);
 		return true;
 	}
@@ -3796,7 +3791,7 @@ public class DollEntity extends Avatar {
 		level().setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
 		level().levelEvent(2001, pos, Block.getId(state));
 		this.playSound(state.getSoundType().getBreakSound(), 1.0f, 1.0f);
-		this.swing(InteractionHand.MAIN_HAND);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 		for (ItemStack drop : drops) {
 			addToDollInventory(drop);
 		}
@@ -3974,7 +3969,7 @@ public class DollEntity extends Avatar {
 
 	private boolean hasAxeInHotbar() {
 		for (int i = 0; i < inventory.getContainerSize(); i++) {
-			if (inventory.getItem(i).getItem() instanceof AxeItem) {
+			if (inventory.getItem(i).typeHolder().is(ItemTags.AXES)) {
 				return true;
 			}
 		}
@@ -4312,7 +4307,7 @@ public class DollEntity extends Avatar {
 		}
 		if (placed) {
 			torch.shrink(1);
-			this.swing(InteractionHand.MAIN_HAND);
+			this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 			this.playSound(SoundEvents.WOOD_PLACE, 1.0f, 1.0f);
 			return true;
 		}
@@ -4976,7 +4971,7 @@ public class DollEntity extends Avatar {
 		level().setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
 		level().levelEvent(2001, pos, Block.getId(state));
 		this.playSound(state.getSoundType().getBreakSound(), 1.0f, 1.0f);
-		this.swing(InteractionHand.MAIN_HAND);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 		for (ItemStack drop : drops) {
 			addToDollInventory(drop);
 		}
@@ -5258,7 +5253,7 @@ public class DollEntity extends Avatar {
 		rod.hurtAndBreak(1, this, EquipmentSlot.MAINHAND);
 		this.playSound(SoundEvents.FISHING_BOBBER_THROW, 0.5f,
 			0.4f / (this.getRandom().nextFloat() * 0.4f + 0.8f));
-		this.swing(InteractionHand.MAIN_HAND);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 		fishCastActive = true;
 		int base = FISH_BITE_BASE_TICKS
 			+ this.getRandom().nextInt(FISH_BITE_MAX_TICKS - FISH_BITE_BASE_TICKS + 1);
@@ -5328,7 +5323,7 @@ public class DollEntity extends Avatar {
 					new ExperienceOrb(serverLevel, this.getX(), this.getY() + 0.5, this.getZ(), xp));
 			}
 		}
-		this.swing(InteractionHand.MAIN_HAND);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 		fishCastActive = false;
 		fishTargetWater = null;
 		fishNavTarget = null;
@@ -5444,7 +5439,7 @@ public class DollEntity extends Avatar {
 		serverLevel.playSound(null, this.getX(), this.getY(), this.getZ(),
 			SoundEvents.TRIDENT_THROW, this.getSoundSource(), 1.0f, 1.0f);
 		attackCooldown = AXE_THROW_COOLDOWN_TICKS;
-		this.swing(InteractionHand.MAIN_HAND);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 	}
 
 	/**
@@ -5480,7 +5475,7 @@ public class DollEntity extends Avatar {
 		serverLevel.playSound(null, this.getX(), this.getY(), this.getZ(),
 			SoundEvents.TRIDENT_THROW, this.getSoundSource(), 1.0f, 0.8f);
 		attackCooldown = NETHER_FLYING_SWORD_SUMMON_COOLDOWN_TICKS;
-		this.swing(InteractionHand.MAIN_HAND);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 	}
 
 	/**
@@ -5580,7 +5575,7 @@ public class DollEntity extends Avatar {
 		}
 		trackedArrows.put(arrow.getId(), rangedTarget.getId());
 		attackCooldown = BOW_SHOOT_COOLDOWN_TICKS;
-		this.swing(InteractionHand.MAIN_HAND);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 		weapon.hurtAndBreak(1, this, EquipmentSlot.MAINHAND);
 	}
 
@@ -5616,7 +5611,7 @@ public class DollEntity extends Avatar {
 			if (loadCrossbowProjectiles(crossbow)) {
 				endUsingRangedWeapon(); // 装填完成：退出使用状态，客户端切换为持弩瞄准姿势
 				this.playSound(SoundEvents.CROSSBOW_LOADING_END.value(), 1.0f, 1.0f);
-				this.swing(InteractionHand.MAIN_HAND);
+				this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 			}
 			crossbowLoadTicks = -1;
 		} else {
@@ -5641,7 +5636,7 @@ public class DollEntity extends Avatar {
 			return;
 		}
 		crossbow.set(DataComponents.CHARGED_PROJECTILES, ChargedProjectiles.EMPTY); // 消耗装填
-		List<ItemStack> ammos = loaded.itemCopies();
+		List<ItemStack> ammos = loaded.itemCopies().toList();
 		int count = ammos.size();
 		Vec3 aim = predictAim(rangedTarget, CrossbowItem.MOB_ARROW_POWER);
 		Vec3 spreadAxis = horizontalPerpendicular(aim); // 多重射击横向散开轴
@@ -5656,7 +5651,7 @@ public class DollEntity extends Avatar {
 		}
 		this.playSound(SoundEvents.CROSSBOW_SHOOT, 1.0f, 1.0f / (this.getRandom().nextFloat() * 0.4f + 0.8f));
 		attackCooldown = CROSSBOW_SHOOT_COOLDOWN_TICKS;
-		this.swing(InteractionHand.MAIN_HAND);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 		crossbow.hurtAndBreak(1, this, EquipmentSlot.MAINHAND);
 	}
 
@@ -6284,7 +6279,7 @@ public class DollEntity extends Avatar {
 
 	/** 判断物品是否是镐头（26.2 无 PickaxeItem 类，用官方工具标签判定）。 */
 	private boolean isPickaxe(ItemStack stack) {
-		return !stack.isEmpty() && stack.is(ItemTags.PICKAXES);
+		return !stack.isEmpty() && stack.typeHolder().is(ItemTags.PICKAXES);
 	}
 
 	/** 判断物品是否是钓鱼竿。 */
@@ -6335,7 +6330,7 @@ public class DollEntity extends Avatar {
 	private ItemStack findAxeStack() {
 		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
 			ItemStack stack = inventory.getItem(i);
-			if (!stack.isEmpty() && stack.getItem() instanceof AxeItem) {
+			if (!stack.isEmpty() && stack.typeHolder().is(ItemTags.AXES)) {
 				return stack;
 			}
 		}
@@ -6348,7 +6343,7 @@ public class DollEntity extends Avatar {
 			}
 			
 			ItemStack stack = inventory.getItem(i);
-			if (!stack.isEmpty() && stack.getItem() instanceof AxeItem) {
+			if (!stack.isEmpty() && stack.typeHolder().is(ItemTags.AXES)) {
 				return stack;
 			}
 		}
@@ -6359,7 +6354,7 @@ public class DollEntity extends Avatar {
 	private ItemStack findHoeStack() {
 		for (int i = DollMode.HOTBAR_SLOT_START; i < DollMode.HOTBAR_SLOT_START + 9; i++) {
 			ItemStack stack = inventory.getItem(i);
-			if (!stack.isEmpty() && stack.getItem() instanceof HoeItem) {
+			if (!stack.isEmpty() && stack.typeHolder().is(ItemTags.HOES)) {
 				return stack;
 			}
 		}
@@ -6371,7 +6366,7 @@ public class DollEntity extends Avatar {
 				continue; // 快捷栏已查过
 			}
 			ItemStack stack = inventory.getItem(i);
-			if (!stack.isEmpty() && stack.getItem() instanceof HoeItem) {
+			if (!stack.isEmpty() && stack.typeHolder().is(ItemTags.HOES)) {
 				return stack;
 			}
 		}
@@ -7220,7 +7215,7 @@ public class DollEntity extends Avatar {
 		level().setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
 		level().levelEvent(2001, pos, Block.getId(state));
 		this.playSound(state.getSoundType().getBreakSound(), 1.0f, 1.0f);
-		this.swing(InteractionHand.MAIN_HAND);
+		this.swing(InteractionHand.MAIN_HAND, SwingAnimation.DEFAULT, false);
 		for (ItemStack drop : drops) {
 			addToDollInventory(drop);
 		}

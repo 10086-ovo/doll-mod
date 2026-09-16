@@ -1,5 +1,6 @@
 package io.github.a10086ovo.doll.screen;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import io.github.a10086ovo.doll.DollModConstants;
 import io.github.a10086ovo.doll.entity.DollEntity;
 import io.github.a10086ovo.doll.entity.DollVariant;
@@ -101,7 +102,7 @@ public class DollInventoryScreen extends AbstractContainerScreen<DollScreenHandl
 		// MouseButtonEvent 的坐标是 GUI 相对坐标，转为绝对坐标以匹配所有位置变量
 		double mx = event.x() + this.leftPos;
 		double my = event.y() + this.topPos;
-		if (event.button() == 0) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
 			// 向导人偶统一搜索按钮（打开搜索二级菜单屏）
 			DollEntity owner = this.menu.getDollInventory().getOwner();
 			if (owner == null) {

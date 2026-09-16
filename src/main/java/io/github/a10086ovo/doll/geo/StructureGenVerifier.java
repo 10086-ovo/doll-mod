@@ -10,6 +10,7 @@ import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.RandomState;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
 import net.minecraft.world.level.levelgen.structure.Structure;
 import net.minecraft.world.level.levelgen.structure.StructureStart;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
@@ -80,7 +81,7 @@ public final class StructureGenVerifier {
 				return null;
 			}
 			return new Env(level.registryAccess(), generator, source, state.randomState(),
-				level.getStructureManager(), state.getLevelSeed(), level, level.dimension());
+				level.getStructureTemplateManager(), state.getLevelSeed(), level, level.dimension());
 		} catch (Throwable t) {
 			return null;
 		}
@@ -101,14 +102,15 @@ public final class StructureGenVerifier {
 		try {
 			Structure structure = holder.value();
 			// 参数顺序严格对齐原版 Structure.generate(selected, dimension, registryAccess,
-			// chunkGenerator, biomeSource, randomState, structureTemplateManager, seed,
-			// sourceChunkPos, references, heightAccessor, validBiome)——见 loom 源码 jar。
+			// chunkGenerator, biomeSource, climateSampler, randomState, structureTemplateManager,
+			// seed, sourceChunkPos, references, heightAccessor, validBiome)——见 loom 源码 jar。
 			StructureStart start = structure.generate(
 				holder,
 				env.dimension(),
 				env.registryAccess(),
 				env.generator(),
 				env.biomeSource(),
+				env.randomState().createClimateSampler(SamplerContext.EMPTY_UNCACHED),
 				env.randomState(),
 				env.templateManager(),
 				env.seed(),

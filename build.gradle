@@ -70,8 +70,7 @@ java {
 		withSourcesJar()
 
 		toolchain {
-			languageVersion = JavaLanguageVersion.of(25)
-			vendor = JvmVendorSpec.ADOPTIUM
+			languageVersion = JavaLanguageVersion.of(26)
 		}
 	}
 

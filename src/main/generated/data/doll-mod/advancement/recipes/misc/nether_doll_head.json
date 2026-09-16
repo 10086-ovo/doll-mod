@@ -13,7 +13,7 @@
     },
     "has_the_recipe": {
       "conditions": {
-        "recipe": "doll-mod:nether_doll_head"
+        "recipes": "doll-mod:nether_doll_head"
       },
       "trigger": "minecraft:recipe_unlocked"
     }

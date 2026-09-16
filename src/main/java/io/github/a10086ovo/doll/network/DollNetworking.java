@@ -39,6 +39,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.biome.Climate;
+import net.minecraft.world.level.levelgen.densityfunction.SamplerContext;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.level.levelgen.structure.Structure;
 
@@ -847,7 +848,7 @@ private static final ExecutorService STRUCTURE_VERIFY_EXECUTOR =
 		}
 		// 主线程取引用，避免工作线程首次访问触发 GeneratorState 懒初始化
 		BiomeSource source = level.getChunkSource().getGenerator().getBiomeSource();
-		Climate.Sampler sampler = level.getChunkSource().getGeneratorState().randomState().sampler();
+		Climate.Sampler sampler = level.getChunkSource().getGeneratorState().randomState().createClimateSampler(SamplerContext.EMPTY_UNCACHED);
 		BlockPos playerPos = player.blockPosition();
 		UUID playerUuid = player.getUUID();
 		int category = payload.category();
@@ -1179,7 +1180,7 @@ private static final ExecutorService STRUCTURE_VERIFY_EXECUTOR =
 		if (category == SearchCategory.BIOME) {
 			try {
 				src = sl.getChunkSource().getGenerator().getBiomeSource();
-				samp = sl.getChunkSource().getGeneratorState().randomState().sampler();
+				samp = sl.getChunkSource().getGeneratorState().randomState().createClimateSampler(SamplerContext.EMPTY_UNCACHED);
 				biomeKey = resolveBiomeKey(sl, targetIndex);
 			} catch (Throwable t) {
 				src = null;

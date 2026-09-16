@@ -3,7 +3,7 @@
   "criteria": {
     "has_the_recipe": {
       "conditions": {
-        "recipe": "doll-mod:warden_doll_egg"
+        "recipes": "doll-mod:warden_doll_egg"
       },
       "trigger": "minecraft:recipe_unlocked"
     },

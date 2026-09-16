@@ -1,5 +1,6 @@
 package io.github.a10086ovo.doll.screen;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import io.github.a10086ovo.doll.DollModConstants;
 import io.github.a10086ovo.doll.geo.GeoIndexService;
 import io.github.a10086ovo.doll.network.DollClientNetworking;
@@ -452,7 +453,7 @@ public class GuideSearchScreen extends Screen {
 		if (this.getFocused() != null && !this.getFocused().isFocused()) {
 			this.setFocused(null);
 		}
-		if (event.button() == 0) {
+		if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
 			int mx = (int) event.x();
 			int my = (int) event.y();
 			if (view == VIEW_RESULTS) {

@@ -108,9 +108,7 @@ public class WardenDollTalent implements DollTalent {
 			0.3,
 			dz / distance * pull
 		);
-		target.hurtMarked = true;
-
-		// 造成伤害（穿甲音波）
+		// 造成伤害（穿甲音波，hurtServer 内部自动触发受击闪红）
 		target.hurtServer(serverLevel, doll.damageSources().sonicBoom(doll), DollEntity.SONIC_BOOM_DAMAGE);
 
 		// 音波命中后同样补设 lastHurtByPlayer，使经验/稀有掉落正常

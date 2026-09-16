@@ -13,7 +13,7 @@
     },
     "has_the_recipe": {
       "conditions": {
-        "recipe": "doll-mod:doll_panel"
+        "recipes": "doll-mod:doll_panel"
       },
       "trigger": "minecraft:recipe_unlocked"
     }

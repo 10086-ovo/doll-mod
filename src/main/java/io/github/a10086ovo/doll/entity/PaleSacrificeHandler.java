@@ -127,7 +127,7 @@ public class PaleSacrificeHandler {
 
 		// 5. 恢复至满血（120）
 		player.setHealth(120.0f);
-		player.invulnerableTime = 40; // 2 秒无敌帧防止连续触发
+		player.setInvulnerableTime(40); // 2 秒无敌帧防止连续触发
 
 		// 6. 记录过期时间
 		long expireTick = serverLevel.getGameTime() + PALE_SACRIFICE_DURATION_TICKS;

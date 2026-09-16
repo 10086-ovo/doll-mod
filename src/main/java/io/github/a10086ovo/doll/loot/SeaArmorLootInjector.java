@@ -10,7 +10,9 @@ import net.minecraft.world.level.storage.loot.BuiltInLootTables;
 import net.minecraft.world.level.storage.loot.LootPool;
 import net.minecraft.world.level.storage.loot.LootTable;
 import net.minecraft.world.level.storage.loot.entries.NestedLootTable;
-import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ConstantValue;
+import net.minecraft.world.level.storage.loot.providers.number.ints.ContextIntProvider;
 
 /**
  * 向原版埋藏宝藏 (minecraft:chests/buried_treasure) 注入海洋套装战利品。
@@ -46,8 +48,9 @@ public class SeaArmorLootInjector {
 			// 追加一个 pool：1 roll，无额外条件，仅包含一个 reference entry
 			// 91% 概率门控、group/alternatives 逻辑全部在引用的自定义表中定义
 			LootPool.Builder pool = LootPool.lootPool()
-				.setRolls(ConstantValue.exactly(1.0f))
-				.add(NestedLootTable.lootTableReference(SEA_ARMOR_TABLE_KEY));
+				.setRolls(Holder.<ContextIntProvider>direct(new ConstantValue(1)))
+				.add(NestedLootTable.lootTableReference(
+					holder.lookupOrThrow(Registries.LOOT_TABLE).getOrThrow(SEA_ARMOR_TABLE_KEY)));
 
 			tableBuilder.withPool(pool);
 		});

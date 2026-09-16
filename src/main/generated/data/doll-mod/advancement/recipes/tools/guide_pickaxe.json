@@ -13,7 +13,7 @@
     },
     "has_the_recipe": {
       "conditions": {
-        "recipe": "doll-mod:guide_pickaxe"
+        "recipes": "doll-mod:guide_pickaxe"
       },
       "trigger": "minecraft:recipe_unlocked"
     }
