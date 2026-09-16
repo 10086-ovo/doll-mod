@@ -6586,8 +6586,13 @@ public class DollEntity extends Avatar {
 
 	/**
 	 * 海洋人偶水下呼吸：覆写返回 true，使其在水下不会溺水。
+	 * <p>MC 26.2 起该方法被 Mojang 标记为过时（默认实现改为查实体类型标签
+	 * {@code EntityTypeTags.CAN_BREATHE_UNDER_WATER}）。但标签只能按实体类型整体生效，
+	 * 无法表达"仅海人偶（实例级 variant）"的需求，且虚方法调用仍然生效，
+	 * 故保留覆写并显式抑制过时警告。
 	 */
 	@Override
+	@SuppressWarnings("deprecation")
 	public boolean canBreatheUnderwater() {
 		return isSeaDoll();
 	}

@@ -26,7 +26,6 @@ import net.minecraft.core.HolderSet;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -49,7 +48,6 @@ import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.listener.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.network.ChannelBuilder;
-import net.minecraftforge.network.NetworkProtocol;
 import net.minecraftforge.network.PacketDistributor;
 import net.minecraftforge.network.SimpleChannel;
 
@@ -307,65 +305,27 @@ public final class DollNetworking {
 		SimpleChannel ch = ChannelBuilder.named(Identifier.fromNamespaceAndPath(DollModConstants.MOD_ID, "main"))
 			.networkProtocolVersion(1)
 			.simpleChannel();
+		// Forge 26.2：SimpleChannel.messageBuilder 系列已过时，官方推荐 SimpleConnection 的
+		// play()/serverbound()/clientbound()/addMain() 分组注册。判别码改为按注册顺序自动分配
+		//（通道内 varint 判别码自描述帧，收发双端注册顺序一致即可，行为不变）。
 		// ---- serverbound（客户端 → 服务端）----
-		ch.messageBuilder(SelectDollModePayload.class, 1, NetworkProtocol.PLAY)
-			.codec(codec(SelectDollModePayload.STREAM_CODEC))
-			.direction(PacketFlow.SERVERBOUND)
-			.consumerMainThread(DollNetworking::handleSelectMode)
-			.add();
-		ch.messageBuilder(RecallDollPayload.class, 2, NetworkProtocol.PLAY)
-			.codec(codec(RecallDollPayload.STREAM_CODEC))
-			.direction(PacketFlow.SERVERBOUND)
-			.consumerMainThread(DollNetworking::handleRecallDoll)
-			.add();
-		ch.messageBuilder(RequestSearchPayload.class, 3, NetworkProtocol.PLAY)
-			.codec(codec(RequestSearchPayload.STREAM_CODEC))
-			.direction(PacketFlow.SERVERBOUND)
-			.consumerMainThread(DollNetworking::handleRequestSearch)
-			.add();
-		ch.messageBuilder(ToggleMarkPayload.class, 4, NetworkProtocol.PLAY)
-			.codec(codec(ToggleMarkPayload.STREAM_CODEC))
-			.direction(PacketFlow.SERVERBOUND)
-			.consumerMainThread(DollNetworking::handleToggleMark)
-			.add();
-		ch.messageBuilder(RequestIndexBuildPayload.class, 8, NetworkProtocol.PLAY)
-			.codec(codec(RequestIndexBuildPayload.STREAM_CODEC))
-			.direction(PacketFlow.SERVERBOUND)
-			.consumerMainThread(DollNetworking::handleRequestIndexBuild)
-			.add();
-		// 人偶背包打开后的全量重同步请求：Forge 的 OpenContainer 包与原版初始内容包走两条
-		// 不同队列，竞态下初始 81 槽同步被静默丢弃（背包屏空、点击才显示）。此包为自愈通道。
-		ch.messageBuilder(RequestDollInvSyncPayload.class, 11, NetworkProtocol.PLAY)
-			.codec(codec(RequestDollInvSyncPayload.STREAM_CODEC))
-			.direction(PacketFlow.SERVERBOUND)
-			.consumerMainThread(DollNetworking::handleRequestDollInvSync)
-			.add();
-		// ---- clientbound（服务端 → 客户端）----
-		ch.messageBuilder(OpenDollControlPanelPayload.class, 5, NetworkProtocol.PLAY)
-			.codec(codec(OpenDollControlPanelPayload.STREAM_CODEC))
-			.direction(PacketFlow.CLIENTBOUND)
-			.consumerMainThread(DollClientNetworking::handleOpenControlPanel)
-			.add();
-		ch.messageBuilder(UpdateDollSnapshotPayload.class, 6, NetworkProtocol.PLAY)
-			.codec(codec(UpdateDollSnapshotPayload.STREAM_CODEC))
-			.direction(PacketFlow.CLIENTBOUND)
-			.consumerMainThread(DollClientNetworking::handleUpdateSnapshot)
-			.add();
-		ch.messageBuilder(SearchResultsPayload.class, 7, NetworkProtocol.PLAY)
-			.codec(codec(SearchResultsPayload.STREAM_CODEC))
-			.direction(PacketFlow.CLIENTBOUND)
-			.consumerMainThread(DollClientNetworking::handleSearchResults)
-			.add();
-		ch.messageBuilder(StructureCatalogPayload.class, 9, NetworkProtocol.PLAY)
-			.codec(codec(StructureCatalogPayload.STREAM_CODEC))
-			.direction(PacketFlow.CLIENTBOUND)
-			.consumerMainThread(DollClientNetworking::handleStructureCatalog)
-			.add();
-		ch.messageBuilder(IndexBuildProgressPayload.class, 10, NetworkProtocol.PLAY)
-			.codec(codec(IndexBuildProgressPayload.STREAM_CODEC))
-			.direction(PacketFlow.CLIENTBOUND)
-			.consumerMainThread(DollClientNetworking::handleIndexBuildProgress)
-			.add();
+		ch.play(play -> play
+			.serverbound(flow -> flow
+				.addMain(SelectDollModePayload.class, codec(SelectDollModePayload.STREAM_CODEC), DollNetworking::handleSelectMode)
+				.addMain(RecallDollPayload.class, codec(RecallDollPayload.STREAM_CODEC), DollNetworking::handleRecallDoll)
+				.addMain(RequestSearchPayload.class, codec(RequestSearchPayload.STREAM_CODEC), DollNetworking::handleRequestSearch)
+				.addMain(ToggleMarkPayload.class, codec(ToggleMarkPayload.STREAM_CODEC), DollNetworking::handleToggleMark)
+				.addMain(RequestIndexBuildPayload.class, codec(RequestIndexBuildPayload.STREAM_CODEC), DollNetworking::handleRequestIndexBuild)
+				// 人偶背包打开后的全量重同步请求：Forge 的 OpenContainer 包与原版初始内容包走两条
+				// 不同队列，竞态下初始 81 槽同步被静默丢弃（背包屏空、点击才显示）。此包为自愈通道。
+				.addMain(RequestDollInvSyncPayload.class, codec(RequestDollInvSyncPayload.STREAM_CODEC), DollNetworking::handleRequestDollInvSync))
+			// ---- clientbound（服务端 → 客户端）----
+			.clientbound(flow -> flow
+				.addMain(OpenDollControlPanelPayload.class, codec(OpenDollControlPanelPayload.STREAM_CODEC), DollClientNetworking::handleOpenControlPanel)
+				.addMain(UpdateDollSnapshotPayload.class, codec(UpdateDollSnapshotPayload.STREAM_CODEC), DollClientNetworking::handleUpdateSnapshot)
+				.addMain(SearchResultsPayload.class, codec(SearchResultsPayload.STREAM_CODEC), DollClientNetworking::handleSearchResults)
+				.addMain(StructureCatalogPayload.class, codec(StructureCatalogPayload.STREAM_CODEC), DollClientNetworking::handleStructureCatalog)
+				.addMain(IndexBuildProgressPayload.class, codec(IndexBuildProgressPayload.STREAM_CODEC), DollClientNetworking::handleIndexBuildProgress)));
 		CHANNEL = ch.build();
 	}
 

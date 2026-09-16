@@ -2,7 +2,11 @@ plugins { id 'java'; id 'net.minecraftforge.gradle' version '[7.0.17,8)' }
 version = '1.0.0-r15'
 group = 'io.github.a10086ovo'
 base { archivesName = 'doll-mod' }
-java.toolchain.languageVersion = JavaLanguageVersion.of(26)
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(26)
+    // 同时产出源码 jar（doll-mod-<version>-sources.jar），与本体 jar 一同交付
+    withSourcesJar()
+}
 minecraft {
     runs {
         configureEach {
