@@ -13,6 +13,8 @@ import io.github.a10086ovo.doll.screen.DollInventoryScreen;
 import io.github.a10086ovo.doll.screen.DollScreenHandler;
 import io.github.a10086ovo.doll.item.GuideBookItem;
 import io.github.a10086ovo.doll.network.DollClientNetworking;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderers;
 import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.api.distmarker.Dist;
@@ -37,6 +39,17 @@ public class DollModClient {
 
 	private static long lastClientTickNanos = System.nanoTime();
 
+	/**
+	 * 当前打开的屏幕；客户端实例尚未就绪时返回 null，<b>不可直接 {@code Minecraft.getInstance().gui.screen()}</b>。
+	 * 26.2 的 {@code Minecraft.gui} 是 final 字段，构造函数跑完前为 null，而 {@code Minecraft.instance}
+	 * 是提前赋值的——网络包若在客户端构造完成前抵达（实测：进世界早期收到人偶快照即触发），
+	 * 直接取 gui 会抛 {@code NullPointerException: Cannot invoke "Gui.screen()" because "this.gui" is null}。
+	 */
+	private static Screen currentScreen() {
+		Minecraft mc = Minecraft.getInstance();
+		return mc != null && mc.gui != null ? mc.gui.screen() : null;
+	}
+
 	@SubscribeEvent
 	public static void onClientSetup(FMLClientSetupEvent event) {
 		event.enqueueWork(() -> {
@@ -52,13 +65,13 @@ public class DollModClient {
 				(List<DollSnapshot> dolls) -> net.minecraft.client.Minecraft.getInstance()
 					.setScreenAndShow(new DollControlScreen(dolls)),
 				(DollSnapshot snap) -> {
-					var current = net.minecraft.client.Minecraft.getInstance().gui.screen();
+					var current = currentScreen();
 					if (current instanceof DollControlScreen screen) {
 						screen.applySnapshotUpdate(snap);
 					}
 				},
 				(SearchResultsPayload payload) -> {
-					var current = net.minecraft.client.Minecraft.getInstance().gui.screen();
+					var current = currentScreen();
 					if (current instanceof GuideSearchScreen screen) {
 						screen.receiveResults(payload);
 					}
@@ -67,7 +80,7 @@ public class DollModClient {
 			// 全域索引构建进度：路由到当前打开的搜索屏（按钮就地变进度条，可点取消）
 			DollClientNetworking.setIndexBuildProgressConsumer(
 				(io.github.a10086ovo.doll.network.payload.IndexBuildProgressPayload payload) -> {
-					var current = net.minecraft.client.Minecraft.getInstance().gui.screen();
+					var current = currentScreen();
 					if (current instanceof GuideSearchScreen screen) {
 						screen.receiveIndexProgress(payload);
 					}
