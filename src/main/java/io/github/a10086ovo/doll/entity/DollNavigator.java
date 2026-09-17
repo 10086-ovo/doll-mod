@@ -14,9 +14,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
+import java.util.Set;
 
 /**
  * 自包含的轻量网格寻路器（A*），不依赖原版绑定 Mob 的寻路体系。
@@ -169,8 +171,10 @@ public class DollNavigator {
 	// ---- A* 网格搜索 ----
 
 	private List<Vec3> aStar(BlockPos start, BlockPos goal) {
+		Set<BlockPos> closed = new HashSet<>();
 		cameFrom.clear();
 		gScore.clear();
+		closed.clear();
 		PriorityQueue<BlockPos> open = new PriorityQueue<>(
 			Comparator.comparingDouble(p -> gScore.getOrDefault(p, 0) + heuristic(p, goal)));
 		gScore.put(start, 0);
@@ -181,6 +185,9 @@ public class DollNavigator {
 		int bestDist = start.distManhattan(goal);
 		while (!open.isEmpty() && visited < MAX_NODES) {
 			BlockPos cur = open.poll();
+			if (!closed.add(cur)) {
+				continue; // 惰性删除去重：同一节点在 PQ 中可能有多个副本（g 改善时重复入队），已终结的跳过重复展开
+			}
 			visited++;
 			int d = cur.distManhattan(goal);
 			if (d < bestDist) {

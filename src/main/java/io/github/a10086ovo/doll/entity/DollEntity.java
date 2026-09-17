@@ -1219,7 +1219,7 @@ public class DollEntity extends Avatar {
 	}
 
 	/**
-	 * 玩家式自动跳跃：贴墙（高差 ≥2 格的障碍）且正在移动时起跳。
+	 * 撞墙处理：<b>不再起跳</b>——原"玩家式自动跳跃"会让爬不上去的高墙反复干跳，不直觉。
 	 * 1 格台阶由 maxUpStep()=1.0f 自动跨上，不会触发本分支。
 	 * 撞墙时清空导航状态，下 tick 强制重寻路（换层 A* 会尝试找楼梯/坡道绕行），
 	 * 冷却节流避免寻路失败时每 tick 重复 1024 节点搜索。
@@ -1227,7 +1227,6 @@ public class DollEntity extends Avatar {
 	private void tickAutoJump() {
 		if (this.onGround() && this.horizontalCollision
 			&& (this.zza != 0.0f || this.xxa != 0.0f)) {
-			this.jumpFromGround();
 			if (navRetryCooldown <= 0) {
 				navRetryCooldown = NAV_RETRY_COOLDOWN_TICKS;
 				navigator.clearPath();
@@ -1550,6 +1549,79 @@ public class DollEntity extends Avatar {
 		return true;
 	}
 
+	/**
+	 * 直线可通行性判定（<b>仅跟随使用</b>）：与 {@link #hasLineOfSight(Vec3)} 判"看得见"不同，
+	 * 这里判"走得通"——逐列要求脚下有实心支撑、脚层与头层无碰撞，且垂直起伏不超可跨范围。
+	 * 于是深坑（脚下无支撑）、旋转楼梯井（悬空）、高墙（无落脚层）都会被判为不可直达，
+	 * 从而回落 A* 沿楼梯/台阶等可行进轨迹绕行。
+	 * 刻意不改动 hasLineOfSight：它还服务于射手索敌等调用点，且采矿的矿石可见性用的是
+	 * BlockPos 重载（另一个方法），改它会误伤采矿/砍伐/耕种。
+	 */
+	protected boolean canWalkStraightTo(Vec3 target) {
+		// 垂直落差超过可跨范围（maxUpStep=1）：一律交 A*，由 A* 去找楼梯/坡道换层
+		if (Math.abs(target.y - this.getY()) > this.maxUpStep()) {
+			return false;
+		}
+		double x0 = this.getX();
+		double z0 = this.getZ();
+		double dx = Math.abs(target.x - x0);
+		double dz = Math.abs(target.z - z0);
+		int steps = (int) Math.max(dx, dz);
+		if (steps == 0) {
+			return true;
+		}
+		double stepX = (target.x - x0) / steps;
+		double stepZ = (target.z - z0) / steps;
+		double curX = x0;
+		double curZ = z0;
+		int walkY = Mth.floor(this.getY());
+		BlockPos.MutableBlockPos below = new BlockPos.MutableBlockPos();
+		BlockPos.MutableBlockPos foot = new BlockPos.MutableBlockPos();
+		BlockPos.MutableBlockPos head = new BlockPos.MutableBlockPos();
+		for (int i = 1; i <= steps; i++) {
+			curX += stepX;
+			curZ += stepZ;
+			int bx = Mth.floor(curX);
+			int bz = Mth.floor(curZ);
+			int landedY = -1;
+			// 同层，或跨上 1 格（maxUpStep=1.0）
+			for (int dy = 0; dy <= 1 && landedY < 0; dy++) {
+				int y = walkY + dy;
+				below.set(bx, y - 1, bz);
+				foot.set(bx, y, bz);
+				head.set(bx, y + 1, bz);
+				if (isWalkableColumn(below, foot, head)) {
+					landedY = y;
+				}
+			}
+			if (landedY < 0) {
+				return false; // 悬空 / 撞墙 / 脚下无支撑：不可直达，交给 A*
+			}
+			walkY = landedY;
+		}
+		return true;
+	}
+
+	/** 该列是否可站立：脚下实心支撑 + 脚层与头层无碰撞（树叶按障碍，不站树冠、不穿叶间）。 */
+	private boolean isWalkableColumn(
+		BlockPos.MutableBlockPos below, BlockPos.MutableBlockPos foot, BlockPos.MutableBlockPos head
+	) {
+		BlockState belowState = level().getBlockState(below);
+		if (belowState.getCollisionShape(level(), below).isEmpty()) {
+			return false;
+		}
+		BlockState footState = level().getBlockState(foot);
+		BlockState headState = level().getBlockState(head);
+		// 树叶/菌光体：不站其顶、不穿其间（与砍树导航 foliageIsObstacle 口径一致）
+		if (belowState.is(BlockTags.LEAVES) || belowState.is(BlockTags.WART_BLOCKS)
+			|| footState.is(BlockTags.LEAVES) || footState.is(BlockTags.WART_BLOCKS)
+			|| headState.is(BlockTags.LEAVES) || headState.is(BlockTags.WART_BLOCKS)) {
+			return false;
+		}
+		return footState.getCollisionShape(level(), foot).isEmpty()
+			&& headState.getCollisionShape(level(), head).isEmpty();
+	}
+
 	/** 背对目标后退（用于射手模式拉开距离）。 */
 	private void retreatFrom(Vec3 target) {
 		smoothFaceTowards(target.x, target.z);
@@ -1564,6 +1636,15 @@ public class DollEntity extends Avatar {
 	 * 直线模式下直接向目标实际坐标移动，路径不经过网格对齐，消除 Z 字形。
 	 */
 	protected void moveToPosition(Vec3 target, float speedFactor) {
+		moveToPosition(target, speedFactor, false);
+	}
+
+	/**
+	 * @param followMode 跟随专用：直线判定改用"可通行性" {@link #canWalkStraightTo(Vec3)}
+	 *                   而非"可见性" {@link #hasLineOfSight(Vec3)}——深坑/旋转楼梯/高墙
+	 *                   会正确判为不可直达并回落 A* 绕行。战斗模式传 false，行为保持不变。
+	 */
+	protected void moveToPosition(Vec3 target, float speedFactor, boolean followMode) {
 		// 海洋人偶离开水面时清除游泳跳跃标记，避免在陆地继续起跳
 		if (isSeaDoll() && !this.isInWater()) {
 			this.setJumping(false);
@@ -1573,7 +1654,7 @@ public class DollEntity extends Avatar {
 		Vec3 moveTarget;
 		double goalY;
 
-		if (hasLineOfSight(target)) {
+		if (followMode ? canWalkStraightTo(target) : hasLineOfSight(target)) {
 			// ---- 直线跟随模式 ----
 			directMoveMode = true;
 			lastNavTarget = target;
@@ -1830,7 +1911,7 @@ public class DollEntity extends Avatar {
 		}
 		double distSqr = this.distanceToSqr(owner);
 		if (distSqr > FOLLOW_RESUME_DISTANCE_SQR) {
-			moveToPosition(owner.position(), 1.0f);
+			moveToPosition(owner.position(), 1.0f, true);
 		} else {
 			smoothLookAt(owner.getX(), owner.getEyeY(), owner.getZ());
 			clearMovementInput();
@@ -1928,11 +2009,15 @@ public class DollEntity extends Avatar {
 		return null;
 	}
 
-	/** 闻声助战的目标判据：存活、非自身、非玩家，且落于疆界之内（不问目见）。 */
+	/**
+	 * 闻声助战的目标判据：存活、非自身、非玩家，落于疆界之内，且<b>必须看得见</b>。
+	 * 原实现"不问目见"会隔着墙锁定主人刚打过/被打的怪（隔墙索敌），已加视线门。
+	 */
 	private boolean isAssistable(LivingEntity target) {
 		return target != null && target.isAlive() && !target.isRemoved()
 			&& target != this && !(target instanceof Player)
-			&& this.distanceToSqr(target) <= ASSIST_HEAR_RADIUS_SQR;
+			&& this.distanceToSqr(target) <= ASSIST_HEAR_RADIUS_SQR
+			&& hasClearSightTo(target);
 	}
 
 	private void teleportNearOwner(Player owner) {
@@ -2837,7 +2922,7 @@ public class DollEntity extends Avatar {
 		double distSqr = this.distanceToSqr(owner);
 		double stopDistanceSqr = needFeed ? FEED_CLOSE_DISTANCE_SQR : FOLLOW_RESUME_DISTANCE_SQR;
 		if (distSqr > stopDistanceSqr) {
-			moveToPosition(owner.position(), 1.0f);
+			moveToPosition(owner.position(), 1.0f, true);
 		} else {
 			smoothLookAt(owner.getX(), owner.getEyeY(), owner.getZ());
 			clearMovementInput();
