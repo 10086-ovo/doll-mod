@@ -175,7 +175,7 @@
 - **`level()` 必须实时取 `entity.level()`，不可缓存为 final 字段**：早期把 `level` 缓存为构造期字段，人偶跨维度召回后 `entity.level()` 已是新维度，navigator 仍持旧维度引用，导致 `computePath / canOccupy / hasLineOfSight` 全在错误维度方块数据上操作。改为每次实时获取彻底修复。→ `entity/DollNavigator.java:44-53`。
 - **路径复用**：目标偏移不大（`path 末端 distanceToSqr(target) <= 4.0`，即 ≤2 格）时直接复用旧路径，避免每 tick 重算 A*。→ `DollNavigator.java:84-90`。
 - 自实现轻量 A*（八方向 + 台阶换层），不绑原版 Mob 寻路体系；海洋人偶 `allowWater` 将水方块视为可占据格以实现下潜 / 上浮。
-- **A* 每步下降天然 ≤1 格**：下降邻居恒为 `cur` 正下方 1 格，且 `canOccupy` 要求落点下方必有实心支撑 → 人偶**不会**主动走下悬崖 / 掉进深坑（早期注释误报过"会走下悬崖"，已证伪）。`neighbors()` 的 `down` 邻居额外经 `isSafeLanding()` 过滤：岩浆 / 火 / 岩浆块 / 仙人掌等伤害性落点排除，因为这类方块无碰撞箱会被 `canOccupy` 误判成可落脚。→ `DollNavigator.java`。
+- **A\* 下降步幅**：常规下降邻居是 `cur` 正下方 1 格；另有 drop-edge 分支允许贴着边缘跳落最多 `MAX_SAFE_FALL_BLOCKS`（3）格——`dropColumnClear()` 要求下落通道无阻挡，`isSafeLanding()` 排除岩浆 / 火 / 岩浆块 / 仙人掌等伤害性落点（这类方块无碰撞箱，会被 `canOccupy` 误判成可落脚）。**（旧笔记曾写"每步下降天然 ≤1 格"，与 drop-edge 实现矛盾，已更正。）** → `DollNavigator.java`。
 - **`MAX_SAFE_FALL_BLOCKS = 3`**：安全落差上限（格），盾构机悬崖判定复用同一常量，保证"人偶敢走下去"与"盾构机敢挖过去"口径一致。
 
 ### 入水自救 / 放水自困（2026-09-04 反编译实证）
