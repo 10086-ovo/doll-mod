@@ -15,10 +15,13 @@ import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.Comparator;
@@ -541,15 +544,28 @@ public class NetherFlyingSwordEntity extends ItemEntity {
 		return a + d * t;
 	}
 
-	/** 召唤者 16 格半径内最近的敌对生物（排除召唤者本人）。 */
+	/**
+	 * 就近索敌：以召唤者为球心、SEARCH_RADIUS 为半径取最近敌对生物。
+	 * 隔墙不锁——候选须通过 {@link #hasClearSightToEnemy(LivingEntity)} 的 COLLIDER 射线
+	 * （原实现无任何视线检查，会隔着墙锁定敌人，已修）。
+	 */
 	private LivingEntity findNearestEnemy(LivingEntity owner) {
 		ServerLevel serverLevel = (ServerLevel) this.level();
 		AABB box = owner.getBoundingBox().inflate(SEARCH_RADIUS);
 		List<LivingEntity> candidates = serverLevel.getEntitiesOfClass(LivingEntity.class, box,
 			e -> e instanceof Enemy && e.isAlive() && e != owner);
 		return candidates.stream()
+			.filter(this::hasClearSightToEnemy)
 			.min(Comparator.comparingDouble(e -> e.distanceToSqr(owner)))
 			.orElse(null);
+	}
+
+	/** 隔墙不锁敌：自飞剑位置到目标眼部的 COLLIDER 射线，遇实心方块即断。 */
+	private boolean hasClearSightToEnemy(LivingEntity target) {
+		Vec3 from = this.getEyePosition();
+		Vec3 to = new Vec3(target.getX(), target.getY() + target.getEyeHeight(), target.getZ());
+		BlockHitResult hit = this.level().clip(new ClipContext(from, to, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+		return hit.getType() == HitResult.Type.MISS;
 	}
 
 	// ===================== 持有者工具 =====================
