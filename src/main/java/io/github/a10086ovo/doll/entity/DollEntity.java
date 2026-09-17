@@ -1632,7 +1632,9 @@ public class DollEntity extends Avatar {
 	}
 
 	/**
-	 * 混合模式移动：有视线时直线跟随（平滑转向），无视线时 A* 绕路。
+	 * 混合模式移动：跟随（{@code followMode=true}）按"走得通" {@link #canWalkStraightTo(Vec3)}
+	 * 直线逼近，其余模式按"看得见" {@link #hasLineOfSight(Vec3)} 直线逼近（平滑转向）；
+	 * 两者皆不成立则回落 A* 绕路。
 	 * 直线模式下直接向目标实际坐标移动，路径不经过网格对齐，消除 Z 字形。
 	 */
 	protected void moveToPosition(Vec3 target, float speedFactor) {
